@@ -135,9 +135,9 @@ export function App({ storage }: { storage: StorageProvider }) {
       await storage.deleteBinding(binding.id); setBindings(await storage.listBindings());
     });
   }
-  async function useVersion(version: Version, save = false) {
+  async function applyVersion(version: Version, save = false) {
     if (!window.confirm(`Använd v${version.number} i arbetsutkastet? Nuvarande utkast ersätts, men sparade versioner finns kvar.`)) return;
-    await run(async () => { await controller.useVersion(version); if (save) await controller.saveVersion(`Återgång till v${version.number}`); changeMode('template'); });
+    await run(async () => { await controller.applyVersion(version); if (save) await controller.saveVersion(`Återgång till v${version.number}`); changeMode('template'); });
   }
   async function writeClipboard(text: string, which: 'local' | 'ai') {
     try { await navigator.clipboard.writeText(text); setCopyMode(null); setNotice(which === 'local' ? 'LOCAL kopierad · riktiga värden i urklippet' : 'AI-kod kopierad'); }
@@ -185,7 +185,7 @@ export function App({ storage }: { storage: StorageProvider }) {
           {activeBindings.map(b => <div className="binding-card" key={b.id}><button className="binding-name" onClick={() => { setMode('template'); setFocusName(b.name); }}>{b.name}</button><div className="binding-meta"><span>{b.category}</span><span>{b.scope}</span></div><div className="binding-value">{resolveValue(b, options.profileId) ? b.category === 'secret' ? '••••••••' : 'Privat värde angivet' : <span className="danger-text">⚠ VÄRDE SAKNAS</span>}</div><div className="binding-example">AI: {b.aiReplacement}</div><div className="binding-actions"><small>{used.find(u => u.bindingName === b.name)?.occurrences ?? 0} förekomster</small><button className="text-button" onClick={() => setBindingDialog({ binding: b })}>Redigera</button><button className="text-button" aria-label={`Radera ${b.name}`} onClick={() => void removeBinding(b)}>×</button></div></div>)}
           {!activeBindings.length && <div className="bindings-empty">{'{{NAMN}}'}<p>Dina privata värden får en egen plats här.</p>{!template && language === 'powershell' && <button onClick={() => controller.changeText(fixture)}>Prova med exempelkod</button>}</div>}
           {issues.length > 0 && <div className="issue-panel" role="alert"><h3>{issues.length} renderingsproblem</h3>{issues.map((issue, i) => <p key={i}><b>{issue.name}</b><br />{issue.message}</p>)}</div>}
-          <details className="version-history"><summary>Sparade versioner <span>{versions.length}</span></summary>{versions.map(v => <div className="version-item" key={v.id}><button onClick={() => void useVersion(v)}><b>v{v.number}</b><span>{v.label || 'Sparad version'}<small>{new Date(v.createdAt).toLocaleDateString('sv-SE')}</small></span></button><button className="text-button" onClick={() => void useVersion(v, true)}>Återgå som ny version</button></div>)}{!versions.length && <p>Utkastet sparas automatiskt. Spara en version när du vill behålla en punkt i historiken.</p>}</details>
+          <details className="version-history"><summary>Sparade versioner <span>{versions.length}</span></summary>{versions.map(v => <div className="version-item" key={v.id}><button onClick={() => void applyVersion(v)}><b>v{v.number}</b><span>{v.label || 'Sparad version'}<small>{new Date(v.createdAt).toLocaleDateString('sv-SE')}</small></span></button><button className="text-button" onClick={() => void applyVersion(v, true)}>Återgå som ny version</button></div>)}{!versions.length && <p>Utkastet sparas automatiskt. Spara en version när du vill behålla en punkt i historiken.</p>}</details>
           <div className="m1-note"><b>M1 · Kärnrundan</b><p>Full scanner, automatisk återmatchning och backup återstår. Använd testvärden tills backup finns.</p></div>
         </aside></div>
       </div>

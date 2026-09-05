@@ -10,12 +10,12 @@ en motivering och ett konkret förslag. Sist finns en prioriterad åtgärdslista
 
 ## 1. Hur granskningen gjordes
 
-| Steg | Resultat |
-|---|---|
-| `pnpm install --frozen-lockfile` | OK |
-| `pnpm test` | 27 tester i 4 filer, alla gröna, 2,96 s |
-| `pnpm build` | OK. `tsc -b`, Vite, service worker, nätverkskontroll passerar |
-| Manuell körning i Chromium mot `pnpm preview` (1440×900 och 390×844) | Se avsnitt 3–5 |
+| Steg                                                                 | Resultat                                                      |
+| -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile`                                     | OK                                                            |
+| `pnpm test`                                                          | 27 tester i 4 filer, alla gröna, 2,96 s                       |
+| `pnpm build`                                                         | OK. `tsc -b`, Vite, service worker, nätverkskontroll passerar |
+| Manuell körning i Chromium mot `pnpm preview` (1440×900 och 390×844) | Se avsnitt 3–5                                                |
 
 Alla observationer nedan är verifierade antingen i koden (fil och rad anges) eller genom faktisk körning i webbläsaren.
 Beteenden som bara är verifierade genom körning är markerade **[körd]**.
@@ -44,7 +44,7 @@ användaren behöver den mest.
 3. Dialogen visar: **"Inga kända problem hittades"** och "0 ersatta förekomster".
 4. Efter bekräftelse hamnar hela texten oförändrad i urklipp — lösenord, server och anslutningssträng.
 
-Orsak: `render()` i `src/domain/render/index.ts:35-39` letar bara efter värden som redan är *kända* bindings. Kod utan bindings
+Orsak: `render()` i `src/domain/render/index.ts:35-39` letar bara efter värden som redan är _kända_ bindings. Kod utan bindings
 har per definition inga kända värden, alltså inga problem. Logiken är korrekt; formuleringen och avsaknaden av en scanner gör
 den missvisande.
 
@@ -55,8 +55,9 @@ litar på beskedet är sämre skyddad än en som inte har verktyget alls.
 **Åtgärd, i två steg:**
 
 **Steg 1 (litet, kan göras direkt).** Ändra beskedet så att det speglar vad som faktiskt kontrollerats.
+
 - Utan bindings i mallen: rubriken ska vara neutral eller varnande, aldrig "Inga kända problem hittades".
-  Exempel: *"0 värden är skyddade. Ingen automatisk granskning har körts på den här koden."*
+  Exempel: _"0 värden är skyddade. Ingen automatisk granskning har körts på den här koden."_
 - Visa alltid räknaren "N av M strängliteraler är kopplade till bindings" så användaren ser sin egen täckningsgrad.
 - Byt knapptexten från "Jag har granskat · kopiera för AI" till något som kräver ett aktivt val när täckningen är 0.
 
@@ -76,6 +77,7 @@ litar på beskedet är sämre skyddad än en som inte har verktyget alls.
 UI finns. Detta är den enskilt viktigaste saknade funktionen.
 
 Minsta användbara version:
+
 - 15–25 inbyggda regler: höga entropivärden, `password|pwd|secret|token|apikey|api_key|client_secret|connectionstring`,
   privata IP-intervall och interna domäner, UNC-sökvägar (`\\server\share`), Windows-sökvägar, e-postadresser,
   AWS/Azure/GitHub-nyckelformat, JWT, PEM-block, personnummer.
@@ -95,8 +97,9 @@ Konsekvens: README rekommenderar därför att bara använda testvärden — vilk
 till det det är byggt för. Kombinerat med F3 nedan är detta en väntande dataförlust.
 
 Minsta användbara version:
+
 - **Exportera valv** i inställningarna: laddar ned en JSON-fil. Två varianter enligt `DECISIONS.md` §14.2:
-  *Full Workspace Backup* (allt) och *Private Configuration Backup* (bindings, profiler, inställningar — ingen projektkod).
+  _Full Workspace Backup_ (allt) och _Private Configuration Backup_ (bindings, profiler, inställningar — ingen projektkod).
 - **Importera** med schemavalidering (`zod` finns redan som beroende men används inte i koden), förhandsgranskning
   ("12 projekt, 40 bindings, 3 konflikter") och explicit val per konflikt.
 - Frivillig lösenordskryptering av exportfilen (Web Crypto, AES-GCM + PBKDF2). Filändelsen `.acv.enc` är redan reserverad i
@@ -111,8 +114,9 @@ utlösa någon CSP-överträdelse. Nuvarande policy behöver alltså inte ändra
 användaren har ingen backup (F2).
 
 Åtgärd, litet arbete och stor effekt:
+
 - Anropa `navigator.storage.persist()` efter första sparningen och visa resultatet.
-- Visa i inställningarna: *"Beständig lagring: ja/nej"* och `navigator.storage.estimate()` som "X MB av Y MB".
+- Visa i inställningarna: _"Beständig lagring: ja/nej"_ och `navigator.storage.estimate()` som "X MB av Y MB".
   I testmiljön var kvoten 810 MB, vilket är värt att visa.
 - Om beständighet nekas: tydlig varning kopplad till exportfunktionen.
 
@@ -178,7 +182,7 @@ versioner och utkast i en transaktion, med förhandsvisning av hur många förek
 
 **F16 · Ingen "ta bort binding och skriv tillbaka värdet".** `removeBinding()` (`App.tsx:130-137`) tar bort bindingen och
 lämnar kvar `{{NAMN}}` som ett trasigt platshållarvärde som blockerar all kopiering. Lägg till två separata val:
-*"Ta bort och återställ det privata värdet i mallen"* respektive *"Ta bort och lämna platshållaren"*.
+_"Ta bort och återställ det privata värdet i mallen"_ respektive _"Ta bort och lämna platshållaren"_.
 
 **F17 · Övergivna bindings städas aldrig.** **[körd]** En binding med noll förekomster ligger kvar i listan och fortsätter
 blockera AI-kopiering om dess värde råkar dyka upp någon annanstans i koden. Visa "0 förekomster" som en varning med ett
@@ -199,7 +203,7 @@ scannerreglerna från F1; låt kategorin `secret` vara standard vid osäkerhet i
 **F20 · Markeringen expanderas inte till hela strängliteralen.** **[körd]** Dubbelklick på `Hunter2!` markerar `Hunter2` och
 lämnar `!` utanför, så resultatet blir `"{{PASSWORD}}!"` med halva lösenordet kvar i mallen. Detta är den farligaste sortens
 tyst fel. Lägg till: när markeringen ligger inuti en strängliteral, föreslå hela literalen och visa en förhandsvisning
-*före → efter* i bindingdialogen. Varna om texten precis utanför markeringen ser ut att höra till värdet.
+_före → efter_ i bindingdialogen. Varna om texten precis utanför markeringen ser ut att höra till värdet.
 
 **F21 · Ingen komplettering av platshållare i editorn.** Att skriva `{{` borde föreslå befintliga bindingnamn.
 Monaco har `registerCompletionItemProvider` inbyggd; `quickSuggestions` är i dag avstängt i `CodeEditor.tsx:46`.
@@ -265,7 +269,7 @@ till första fokuserbara elementet — `×`. Enter stänger då dialogen i stäl
 Åtgärd: fokusera målfältet explicit efter `showModal()`, och lägg till Enter = spara i formuläret.
 
 **U5 · Fyra `window.confirm()` mitt i ett annars genomarbetat UI.** `App.tsx:134`, `App.tsx:139`, `BindingDialog.tsx:14`,
-`BindingDialog.tsx:27`. De två i bindingdialogen läggs dessutom *ovanpå* en `<dialog>`, vilket ser trasigt ut. Native
+`BindingDialog.tsx:27`. De två i bindingdialogen läggs dessutom _ovanpå_ en `<dialog>`, vilket ser trasigt ut. Native
 `confirm()` går inte att formge, kan blockeras av webbläsaren och saknar möjlighet till "fråga inte igen".
 Åtgärd: använd den befintliga `Modal`-komponenten för alla bekräftelser.
 
@@ -413,47 +417,47 @@ beräknas och sparas vid varje `saveVersion()`.
 
 ## 8. Prioriterad åtgärdslista
 
-Ordningen är vald efter *risk för användaren* först, sedan *nytta per arbetsinsats*.
+Ordningen är vald efter _risk för användaren_ först, sedan _nytta per arbetsinsats_.
 
 ### P0 — Gör innan något annat
 
-| ID | Åtgärd | Ungefärlig insats |
-|---|---|---|
-| K1 | Ta bort det falska "Inga kända problem hittades" och visa faktisk skyddstäckning | Timmar |
-| F3 | `navigator.storage.persist()` + lagringsstatus i inställningarna | Timmar |
-| F2 | Export av valvet till JSON (import kan komma senare) | 1–2 dagar |
-| U1 | Förklara varför en kopieringsknapp är avstängd | Timmar |
-| U3 | Klick i platshållare ska inte öppna modal | Timmar |
+| ID  | Åtgärd                                                                           | Ungefärlig insats |
+| --- | -------------------------------------------------------------------------------- | ----------------- |
+| K1  | Ta bort det falska "Inga kända problem hittades" och visa faktisk skyddstäckning | Timmar            |
+| F3  | `navigator.storage.persist()` + lagringsstatus i inställningarna                 | Timmar            |
+| F2  | Export av valvet till JSON (import kan komma senare)                             | 1–2 dagar         |
+| U1  | Förklara varför en kopieringsknapp är avstängd                                   | Timmar            |
+| U3  | Klick i platshållare ska inte öppna modal                                        | Timmar            |
 
 Efter P0 kan verktyget användas med riktiga värden utan att vara vilseledande eller riskera tyst dataförlust. Det är tröskeln
 för att README ska kunna sluta rekommendera testvärden.
 
 ### P1 — Gör verktyget faktiskt användbart
 
-| ID | Åtgärd |
-|---|---|
-| F1 | Scanner med inbyggda regler, träfflista och "Skapa binding"-genväg |
-| F2 | Import med validering, förhandsgranskning och konflikthantering |
-| U11 | Markera utbytta intervall i Local- och AI-vyerna |
-| F22 + F23 | Etiketter vid versionssparning, klockslag i listan, diff mellan versioner |
-| F8 + F9 | Radera projekt; redigerbar metadata (namn, beskrivning, taggar, status) |
+| ID        | Åtgärd                                                                          |
+| --------- | ------------------------------------------------------------------------------- |
+| F1        | Scanner med inbyggda regler, träfflista och "Skapa binding"-genväg              |
+| F2        | Import med validering, förhandsgranskning och konflikthantering                 |
+| U11       | Markera utbytta intervall i Local- och AI-vyerna                                |
+| F22 + F23 | Etiketter vid versionssparning, klockslag i listan, diff mellan versioner       |
+| F8 + F9   | Radera projekt; redigerbar metadata (namn, beskrivning, taggar, status)         |
 | F19 + F20 | Bättre namn- och kategoriförslag; expandera markering till hela strängliteralen |
-| U4 + U5 | Fokushantering i dialoger; ersätt `window.confirm` med `Modal` |
-| F28 | Genvägsöversikt, och lös krockarna med Ctrl+K och Ctrl+Shift+C |
+| U4 + U5   | Fokushantering i dialoger; ersätt `window.confirm` med `Modal`                  |
+| F28       | Genvägsöversikt, och lös krockarna med Ctrl+K och Ctrl+Shift+C                  |
 
 ### P2 — Höjer verktyget från användbart till bra
 
-| ID | Åtgärd |
-|---|---|
-| F5 + F6 | Återmatchning vid retur från AI; AI-promptblock |
-| F7 | Flera filer per projekt |
-| F18 | Profiler, eller ta bort den falska profiletiketten |
-| U16 | Mörkt läge |
-| P1–P6 | Memoisering, flytta läckagekontrollen ur skrivvägen, filtrerade bindings, koddelning av Monaco |
-| F4 | Automatisk urklippsrensning |
-| F14 + F15 + F16 | Global bindinghanterare, namnbyte, ta bort med återställning |
-| U15 | Riktig mobilanpassning |
-| K-b + K-e | Linter, formatering, CI och ett Playwright-test över huvudflödena |
+| ID              | Åtgärd                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| F5 + F6         | Återmatchning vid retur från AI; AI-promptblock                                                |
+| F7              | Flera filer per projekt                                                                        |
+| F18             | Profiler, eller ta bort den falska profiletiketten                                             |
+| U16             | Mörkt läge                                                                                     |
+| P1–P6           | Memoisering, flytta läckagekontrollen ur skrivvägen, filtrerade bindings, koddelning av Monaco |
+| F4              | Automatisk urklippsrensning                                                                    |
+| F14 + F15 + F16 | Global bindinghanterare, namnbyte, ta bort med återställning                                   |
+| U15             | Riktig mobilanpassning                                                                         |
+| K-b + K-e       | Linter, formatering, CI och ett Playwright-test över huvudflödena                              |
 
 ---
 
@@ -470,7 +474,7 @@ av dem är dokumenterade i `DECISIONS.md`.
    (`escape.ts:48-54`). Rendering ska aldrig substituera rekursivt.
 4. **AI-vyn får aldrig innehålla ett privat värde.** Läckagekontrollen (`render/index.ts:35-39`) och det property-baserade
    testet i `render.test.ts:57-65` ska bestå. Om kontrollen flyttas för prestandans skull (P2) måste den fortfarande köras
-   *före varje kopiering*.
+   _före varje kopiering_.
 5. **Felmeddelanden och problemobjekt får aldrig innehålla privata värden.** Verifieras av `render.test.ts:52-56`.
 6. **Utkast skapar aldrig versionshistorik automatiskt.** `DECISIONS.md`, sektionen "Kod först och utkast".
 7. **Revisionskontroll av utkast.** Föråldrade skrivningar ska avvisas (`DraftConflictError`), aldrig skriva över.
@@ -495,7 +499,7 @@ Detta står här för att en AI som ska förbättra verktyget inte ska bygga bor
   efter en pågående skrivning, och tillstånd som överlever ett misslyckat anrop.
 - **"Kod först"-flödet är rätt produktbeslut.** Att första inklistringen skapar projektet, i stället för ett formulär före
   arbetet, tar bort det största hindret för att komma igång.
-- **Säkerhetstexterna är ärliga.** `Security.tsx` listar vad verktyget *inte* skyddar mot, och formuleringen är
+- **Säkerhetstexterna är ärliga.** `Security.tsx` listar vad verktyget _inte_ skyddar mot, och formuleringen är
   "Inga kända problem hittades" snarare än ett garantipåstående. Bevara den tonen — det enda som behöver ändras är att beskedet
   faktiskt måste stämma (K1).
 - **Byggkedjan verifierar sig själv.** Nätverksgranskningen och CSP-kontrollen som del av `pnpm build`, med en tydlig

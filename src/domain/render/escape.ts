@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex -- Escaping control characters is this module's purpose. */
 import type { LanguageId } from '../../types/models';
 
 export interface Context { quote: string; blocked?: string }

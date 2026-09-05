@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build && node scripts/build-sw.mjs && node scripts/check-network.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "oxlint && prettier --check .",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "dexie": "^4.4.5",
@@ -26,6 +28,7 @@
     "fake-indexeddb": "^6.2.5",
     "fast-check": "^4.9.0",
     "jsdom": "^30.0.1",
+    "oxlint": "^1.81.0",
     "prettier": "^3.9.6",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",

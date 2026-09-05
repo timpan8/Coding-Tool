@@ -95,7 +95,7 @@ export class WorkspaceController {
           files, currentVersionId: null, paths: { rootOverride: null, subfolders: ['Input', 'Output', 'Logs'] }, notes: '', createdAt: time, updatedAt: time, deviceId: this.state.settings!.deviceId,
         };
         const draft: ProjectDraft = { projectId: project.id, baseVersionId: s.baseVersionId,
-          templates: { ...(s.draft?.templates ?? {}), [s.fileId]: s.text }, updatedAt: time, revision: s.draft?.revision ?? 0 };
+          templates: { ...s.draft?.templates, [s.fileId]: s.text }, updatedAt: time, revision: s.draft?.revision ?? 0 };
         const saved = s.project ? await this.storage.saveDraft(draft, draft.revision, { name: project.name, language: project.language, files })
           : await this.storage.createProjectWithDraft(project, draft);
         this.session({ project, draft: saved, saved: s.changed });
@@ -145,7 +145,7 @@ export class WorkspaceController {
       this.publish({ projects: [project, ...this.state.projects.filter(p => p.id !== project.id)] });
     } catch (error) { this.report(error); throw error; }
   }
-  async useVersion(version: Version) {
+  async applyVersion(version: Version) {
     await this.flush();
     this.edit({ text: version.templates[this.state.session.fileId] ?? '', baseVersionId: version.id });
     await this.flush();
