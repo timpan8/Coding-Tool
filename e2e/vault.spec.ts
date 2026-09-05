@@ -53,11 +53,14 @@ test.fail('explains why a copy button is disabled', async ({ page }) => {
 
 // Report U3. onMouseDown opens the edit dialog, so the caret can never be placed inside a
 // placeholder and a stray click during editing throws up a modal.
-test.fail('lets the caret be placed inside a placeholder', async ({ page }) => {
+test('lets the caret be placed inside a placeholder', async ({ page }) => {
   await type(page, '$p = "Hunter2"\n');
   await bind(page, 'Hunter2', 'Hunter2', 'secret');
   await page.getByText('{{', { exact: false }).first().click();
   await expect(page.locator('dialog[open]')).toHaveCount(0);
+  // The deliberate gesture still opens it.
+  await page.getByText('{{', { exact: false }).first().dblclick();
+  await expect(page.locator('dialog[open]')).toHaveCount(1);
 });
 
 // Report F19 and invariant 9. Masking and the second confirmation before Copy Local both key off

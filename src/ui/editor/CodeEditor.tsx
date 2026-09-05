@@ -3,6 +3,7 @@ import '../../../node_modules/monaco-editor/esm/vs/base/browser/ui/codicons/codi
 import * as monaco from 'monaco-editor/editor/editor.api.js';
 import 'monaco-editor/editor/contrib/find/browser/findController.js';
 import 'monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter.js';
+import 'monaco-editor/editor/contrib/hover/browser/hoverContribution.js';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
 import { language as powershell } from 'monaco-editor/languages/definitions/powershell/powershell.js';
 import { language as javascript } from 'monaco-editor/languages/definitions/javascript/javascript.js';
@@ -19,6 +20,7 @@ for (const [id, language] of Object.entries({ powershell, javascript, typescript
   monaco.languages.register({ id });
   monaco.languages.setMonarchTokensProvider(id, language);
 }
+const languageIds = ['powershell', 'javascript', 'typescript', 'python', 'xml', 'yaml', 'shell', 'json', 'plaintext'];
 monaco.languages.register({ id: 'json' });
 monaco.languages.setMonarchTokensProvider('json', { tokenizer: { root: [[/"(?:[^"\\]|\\.)*"/, 'string'], [/\b(?:true|false|null)\b/, 'keyword'], [/-?\d+(?:\.\d+)?/, 'number']] } });
 monaco.editor.defineTheme('vault', { base: 'vs', inherit: true, rules: [], colors: editorColors.light });
@@ -28,6 +30,7 @@ interface Props {
   documentKey?: string; active?: boolean; autoFocus?: boolean;
   value: string; language: LanguageId; readOnly?: boolean; onChange?: (value: string) => void;
   onBinding?: (selection: Selection) => void; onPlaceholder?: (name: string) => void;
+  describePlaceholder?: (name: string) => { category: string; aiReplacement: string; hasValue: boolean } | undefined;
   focusName?: string; focusLine?: number; onLine?: (line: number) => void; theme?: ResolvedTheme;
 }
 export function CodeEditor(props: Props) {
@@ -44,7 +47,7 @@ export function CodeEditor(props: Props) {
     const instance = monaco.editor.create(host.current!, { model, theme: themeName(callbacks.current.theme ?? 'light'), automaticLayout: true,
       readOnly: callbacks.current.readOnly, minimap: { enabled: false }, fontSize: 14, lineHeight: 23,
       scrollBeyondLastLine: false, wordWrap: 'on', padding: { top: 16 }, contextmenu: true,
-      links: false, hover: { enabled: 'off' }, unicodeHighlight: { ambiguousCharacters: false },
+      links: false, hover: { enabled: 'on', delay: 250 }, unicodeHighlight: { ambiguousCharacters: false },
       quickSuggestions: false, parameterHints: { enabled: false }, renderValidationDecorations: 'off',
       ariaLabel: 'Kodredigerare', accessibilitySupport: 'auto' });
     editor.current = instance;
@@ -63,16 +66,37 @@ export function CodeEditor(props: Props) {
     const change = instance.onDidChangeModelContent(() => { decorate(); if (!updating.current && !instance.getOption(monaco.editor.EditorOption.readOnly)) callbacks.current.onChange?.(instance.getValue()); });
     const modelChange = instance.onDidChangeModel(decorate);
     const line = instance.onDidChangeCursorPosition(e => callbacks.current.onLine?.(e.position.lineNumber));
-    const mouse = instance.onMouseDown(e => {
-      const position = e.target.position;
-      if (!position) return;
+    const placeholderAt = (position: monaco.Position) => {
       const matches = instance.getModel()!.findMatches('\\{\\{([A-Z][A-Z0-9_]{1,63})\\}\\}', false, true, false, null, true);
-      const match = matches.find(m => m.range.containsPosition(position));
-      if (match?.matches) callbacks.current.onPlaceholder?.(match.matches[1]);
+      return matches.find(m => m.range.containsPosition(position))?.matches?.[1];
+    };
+    // Opening the editor on a single click made it impossible to put the caret inside a placeholder,
+    // and threw up a modal on a stray click while typing. A double click is the deliberate gesture.
+    const mouse = instance.onMouseUp(e => {
+      if (e.event.browserEvent.detail !== 2 || !e.target.position) return;
+      const name = placeholderAt(e.target.position);
+      if (name) callbacks.current.onPlaceholder?.(name);
     });
+    // A single click should still tell you what is behind the placeholder, without opening anything
+    // and without showing the private value: this is the view people screen-share.
+    const hover = monaco.languages.registerHoverProvider(
+      [...languageIds],
+      {
+        provideHover(model, position) {
+          if (model !== instance.getModel()) return null;
+          const name = placeholderAt(position);
+          const info = name ? callbacks.current.describePlaceholder?.(name) : undefined;
+          if (!name) return null;
+          const lines = info
+            ? [`**${name}** · ${info.category}`, info.aiReplacement ? `AI-värde: \`${info.aiReplacement}\`` : '', info.hasValue ? 'Privat värde är angivet.' : '⚠ Privat värde saknas.']
+            : [`**${name}**`, '⚠ Ingen binding med det här namnet.'];
+          return { contents: lines.filter(Boolean).map(value => ({ value })) };
+        },
+      },
+    );
     decorate();
     if (callbacks.current.autoFocus) instance.focus();
-    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); mouse.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
+    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); mouse.dispose(); hover.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
   }, []);
   useEffect(() => {
     const instance = editor.current;
