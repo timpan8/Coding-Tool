@@ -120,17 +120,6 @@ kbd {
   display: flex;
   min-height: 100vh;
 }
-.rail {
-  background: var(--ink);
-  color: #bdcbd8;
-  width: 224px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 28px 16px;
-  position: fixed;
-  inset: 0 auto 0 0;
-}
 .brand {
   display: flex;
   align-items: center;
@@ -159,68 +148,10 @@ kbd {
   letter-spacing: 1.6px;
   margin-top: 3px;
 }
-.rail nav {
-  display: grid;
-  gap: 5px;
-}
-.rail button {
-  text-align: left;
-  border: 0;
-  background: transparent;
-  color: #afc1d0;
-  font-weight: 500;
-  padding: 11px 13px;
-}
 .rail button:hover,
-.rail button.nav-active {
-  background: #213a4b;
-  color: #fff;
-}
-.rail button.nav-active {
-  box-shadow: inset 3px 0 #62d5b6;
-}
-.rail-label {
-  font-size: 0.7rem;
-  letter-spacing: 1.5px;
-  color: #7892a5;
-  margin: 35px 12px 12px;
-}
-.project-links {
-  display: grid;
-  gap: 3px;
-}
-.project-links button {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.825rem;
-}
-.project-links button span {
-  margin-right: 8px;
-  color: #7191a7;
-}
 .project-links button.selected {
   background: #1a3343;
   color: white;
-}
-.rail-bottom {
-  margin-top: auto;
-  padding: 30px 8px 0;
-  font-size: 0.75rem;
-  color: #9fb6c4;
-}
-.rail-bottom p {
-  color: #7692a5;
-  font-size: 0.75rem;
-  margin: 10px 0 0 15px;
-}
-.local-dot {
-  display: inline-block;
-  background: #68d4ac;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  margin-right: 8px;
 }
 .main-shell {
   margin-left: 224px;
@@ -238,14 +169,6 @@ kbd {
   padding: 12px 30px;
   background: #fff;
   font-size: 0.8rem;
-}
-.breadcrumb {
-  color: #607386;
-  flex: 1;
-}
-.breadcrumb span {
-  margin: 0 10px;
-  color: #a4b0bc;
 }
 .profile-badge {
   border: 1px solid var(--border);
@@ -380,70 +303,6 @@ main {
   color: #18735e;
   font-weight: 600;
 }
-.empty-vault {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  min-height: 360px;
-  padding: 35px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.empty-symbol {
-  font-family: Consolas, monospace;
-  font-size: 1.6rem;
-  letter-spacing: 3px;
-  background: #eaf4f0;
-  color: #1c7b64;
-  padding: 15px 18px;
-  border-radius: 12px;
-  margin-bottom: 18px;
-}
-.empty-vault h2 {
-  font-size: 1.2rem;
-  margin-bottom: 8px;
-}
-.empty-vault > p {
-  max-width: 470px;
-  font-size: 0.875rem;
-}
-.flow {
-  display: flex;
-  gap: 30px;
-  margin-top: 35px;
-  padding-top: 22px;
-  border-top: 1px solid #edf1f4;
-  font-size: 0.75rem;
-  color: #718798;
-}
-.dashboard-note {
-  display: flex;
-  gap: 18px;
-  align-items: center;
-  margin-top: 28px;
-  padding: 22px 0;
-}
-.dashboard-note > span {
-  font-size: 1.8rem;
-  color: #2a8a74;
-}
-.dashboard-note b {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-.dashboard-note p {
-  font-size: 0.8rem;
-  margin: 4px 0;
-}
-.dashboard-note button {
-  background: transparent;
-  border: 0;
-  white-space: nowrap;
-  margin-left: auto;
-  font-size: 0.75rem;
-}
 .workspace {
   padding: 23px 25px;
 }
@@ -460,10 +319,6 @@ main {
   font-size: 0.8rem;
   margin: 5px 0 0;
 }
-.dot-separator {
-  margin: 0 7px;
-  color: #9bacb9;
-}
 .heading-actions {
   display: flex;
   gap: 8px;
@@ -473,28 +328,6 @@ main {
   grid-template-columns: 155px minmax(300px, 1fr) 236px;
   align-items: stretch;
   gap: 15px;
-}
-.file-panel {
-  padding: 12px 0;
-}
-.file-panel h2 {
-  font-size: 0.8rem;
-  display: flex;
-  justify-content: space-between;
-  padding: 0 10px;
-}
-.file-panel h2 small {
-  font-weight: 400;
-  color: #94a0ac;
-}
-.file-current {
-  padding: 9px 10px;
-  background: #e4edf3;
-  color: #2c5067;
-  font-size: 0.75rem;
-  border-radius: 5px;
-  overflow-wrap: anywhere;
-  margin: 10px 0 28px;
 }
 .version-item {
   margin-bottom: 10px;
@@ -636,23 +469,6 @@ main {
   font-size: 0.65rem;
   color: #8090a0;
 }
-.editor-empty {
-  padding: 22px;
-  background: #f9fbfc;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.85rem;
-  display: grid;
-  gap: 8px;
-}
-.editor-empty span {
-  font-size: 0.75rem;
-  color: #7890a1;
-}
-.editor-empty button {
-  justify-self: start;
-  font-size: 0.75rem;
-  margin-top: 4px;
-}
 .binding-chip {
   background: #e0eee9;
   color: #116653 !important;
@@ -787,10 +603,6 @@ main {
 .issue-panel p {
   color: #925137;
   font-size: 0.7rem;
-}
-.panel-note {
-  padding: 0 8px;
-  font-size: 0.75rem;
 }
 .muted {
   color: var(--muted);
@@ -935,31 +747,11 @@ dialog p {
   }
 }
 @media (max-width: 1250px) {
-  .rail {
-    width: 195px;
-    padding-inline: 12px;
-  }
   .main-shell {
     margin-left: 195px;
   }
   .work-grid {
     grid-template-columns: minmax(300px, 1fr) 220px;
-  }
-  .file-panel {
-    grid-column: 1/-1;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    overflow: auto;
-    padding: 0;
-  }
-  .file-panel h2 {
-    white-space: nowrap;
-    margin: 0;
-  }
-  .file-current {
-    margin: 0;
-    white-space: nowrap;
   }
   .version-item {
     margin: 0;
@@ -968,9 +760,6 @@ dialog p {
     white-space: nowrap;
   }
   .version-item .text-button {
-    display: none;
-  }
-  .file-panel .panel-note {
     display: none;
   }
   .editor-panel {
@@ -990,29 +779,12 @@ dialog p {
   }
 }
 @media (max-width: 900px) {
-  .rail {
-    width: 64px;
-    padding: 20px 7px;
-  }
   .brand {
     padding: 0 6px 25px;
   }
   .brand > span:last-child,
   .rail-label,
   .project-links,
-  .rail-bottom {
-    display: none;
-  }
-  .rail nav button {
-    overflow: hidden;
-    white-space: nowrap;
-    width: 48px;
-    padding: 10px;
-    font-size: 0;
-  }
-  .rail nav button::first-letter {
-    font-size: 1.3rem;
-  }
   .main-shell {
     margin-left: 64px;
   }
@@ -1033,9 +805,6 @@ dialog p {
   .heading-actions {
     flex-direction: column;
   }
-  .dashboard-note {
-    flex-wrap: wrap;
-  }
   .topbar {
     gap: 10px;
   }
@@ -1048,9 +817,6 @@ dialog p {
   .dashboard {
     padding: 25px;
   }
-  .flow {
-    gap: 15px;
-  }
   .document {
     padding: 30px;
   }
@@ -1062,9 +828,6 @@ dialog p {
   .topbar {
     flex-wrap: wrap;
     padding: 10px 15px;
-  }
-  .breadcrumb {
-    min-width: 180px;
   }
   .save-state {
     max-width: none;
@@ -1094,14 +857,6 @@ dialog p {
   }
   .dashboard {
     padding: 20px 15px;
-  }
-  .empty-vault {
-    padding: 25px 15px;
-  }
-  .flow {
-    flex-direction: column;
-    text-align: left;
-    gap: 10px;
   }
   .section-title {
     gap: 15px;
