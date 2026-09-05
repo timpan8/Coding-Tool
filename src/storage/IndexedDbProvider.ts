@@ -91,10 +91,11 @@ export class IndexedDbProvider implements StorageProvider {
   async getSettings(): Promise<Settings> {
     return this.db.transaction('rw', this.db.settings, async () => {
       const existing = await this.db.settings.get('settings');
-      if (existing) { const { key: _key, ...settings } = existing; return settings; }
+      // A vault written before the theme setting existed has no such field; fill it on read.
+      if (existing) { const { key: _key, ...settings } = existing; return { ...settings, theme: settings.theme ?? 'system' }; }
       const settings: Settings = { deviceId: crypto.randomUUID(), deviceName: 'Min dator', globalRootPath: 'C:\\Temp', aiRootPath: 'C:\\Temp\\Example',
         defaultSubfolders: ['Input', 'Output', 'Logs'], activeProfileId: null, roundTripMarkers: true,
-        includeAiPromptBlock: true, clipboardAutoClearSeconds: 0, maskSecretsInUi: true };
+        includeAiPromptBlock: true, clipboardAutoClearSeconds: 0, maskSecretsInUi: true, theme: 'system' };
       await this.db.settings.add({ ...settings, key: 'settings' });
       return settings;
     });

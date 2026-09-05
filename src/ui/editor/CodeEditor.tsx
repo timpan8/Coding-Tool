@@ -12,6 +12,7 @@ import { language as xml } from 'monaco-editor/languages/definitions/xml/xml.js'
 import { language as yaml } from 'monaco-editor/languages/definitions/yaml/yaml.js';
 import { language as shell } from 'monaco-editor/languages/definitions/shell/shell.js';
 import type { LanguageId } from '../../types/models';
+import { editorColors, themeName, type ResolvedTheme } from '../theme';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell })) {
@@ -20,13 +21,14 @@ for (const [id, language] of Object.entries({ powershell, javascript, typescript
 }
 monaco.languages.register({ id: 'json' });
 monaco.languages.setMonarchTokensProvider('json', { tokenizer: { root: [[/"(?:[^"\\]|\\.)*"/, 'string'], [/\b(?:true|false|null)\b/, 'keyword'], [/-?\d+(?:\.\d+)?/, 'number']] } });
-monaco.editor.defineTheme('vault', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#ffffff', 'editorLineNumber.foreground': '#728296', 'editor.lineHighlightBackground': '#f3f7fa' } });
+monaco.editor.defineTheme('vault', { base: 'vs', inherit: true, rules: [], colors: editorColors.light });
+monaco.editor.defineTheme('vault-dark', { base: 'vs-dark', inherit: true, rules: [], colors: editorColors.dark });
 export interface Selection { text: string; start: number; end: number; lineBefore: string; line: number }
 interface Props {
   documentKey?: string; active?: boolean; autoFocus?: boolean;
   value: string; language: LanguageId; readOnly?: boolean; onChange?: (value: string) => void;
   onBinding?: (selection: Selection) => void; onPlaceholder?: (name: string) => void;
-  focusName?: string; focusLine?: number; onLine?: (line: number) => void;
+  focusName?: string; focusLine?: number; onLine?: (line: number) => void; theme?: ResolvedTheme;
 }
 export function CodeEditor(props: Props) {
   const host = useRef<HTMLDivElement>(null), editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -39,7 +41,7 @@ export function CodeEditor(props: Props) {
     const model = monaco.editor.createModel(callbacks.current.value, callbacks.current.language);
     activeKey.current = callbacks.current.documentKey ?? 'default';
     documents.current.set(activeKey.current, { model, view: null });
-    const instance = monaco.editor.create(host.current!, { model, theme: 'vault', automaticLayout: true,
+    const instance = monaco.editor.create(host.current!, { model, theme: themeName(callbacks.current.theme ?? 'light'), automaticLayout: true,
       readOnly: callbacks.current.readOnly, minimap: { enabled: false }, fontSize: 14, lineHeight: 23,
       scrollBeyondLastLine: false, wordWrap: 'on', padding: { top: 16 }, contextmenu: true,
       links: false, hover: { enabled: 'off' }, unicodeHighlight: { ambiguousCharacters: false },
@@ -96,6 +98,7 @@ export function CodeEditor(props: Props) {
     }
     if (model.getLanguageId() !== props.language) monaco.editor.setModelLanguage(model, props.language);
   }, [props.value, props.language, props.readOnly, props.documentKey, props.active]);
+  useEffect(() => { monaco.editor.setTheme(themeName(props.theme ?? 'light')); }, [props.theme]);
   useEffect(() => { if (props.active) { editor.current?.layout(); if (props.autoFocus) editor.current?.focus(); } }, [props.active, props.autoFocus]);
   useEffect(() => {
     if (!props.focusName || !editor.current) return;

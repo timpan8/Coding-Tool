@@ -305,3 +305,20 @@
     display: none;
   }
 }
+
+.theme-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.theme-choice select {
+  width: auto;
+  margin: 0;
+  padding: 5px 8px;
+  font-size: 0.75rem;
+}

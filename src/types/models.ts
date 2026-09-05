@@ -47,7 +47,7 @@ export interface ScannerRule {
 export interface Settings {
   deviceId: string; deviceName: string; globalRootPath: string; aiRootPath: string; defaultSubfolders: string[];
   activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean;
-  clipboardAutoClearSeconds: number; maskSecretsInUi: boolean;
+  clipboardAutoClearSeconds: number; maskSecretsInUi: boolean; theme: 'system' | 'light' | 'dark';
 }
 export interface WorkspaceSnapshot { projects: Project[]; versions: Version[]; drafts: ProjectDraft[]; bindings: Binding[]; profiles: Profile[]; datasets: Dataset[]; rules: ScannerRule[]; settings: Settings }
 export type ProjectSummary = Project;

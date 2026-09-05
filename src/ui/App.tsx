@@ -10,6 +10,7 @@ import { BindingDialog } from './components/BindingDialog';
 import { Modal } from './components/Modal';
 import { ProjectBrowser, projectMatches } from './components/ProjectBrowser';
 import { Security } from './pages/Security';
+import { applyTheme, paintHint, resolveTheme, systemPrefersDark, watchSystemTheme, type ThemeChoice } from './theme';
 import './code-first.css';
 
 type Mode = 'template' | 'local' | 'ai';
@@ -36,6 +37,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [showSecrets, setShowSecrets] = useState(false), [focusName, setFocusName] = useState(''), [focusLine, setFocusLine] = useState<number>();
   const [copyMode, setCopyMode] = useState<'local' | 'ai' | null>(null), [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
   const [deviceName, setDeviceName] = useState(''), currentLine = useRef(1);
+  const [theme, setTheme] = useState<ThemeChoice>(paintHint()), [systemDark, setSystemDark] = useState(systemPrefersDark);
   const overview = useRef<HTMLDivElement>(null), overviewScroll = useRef(0);
   const navigateRef = useRef<(hash: string, replace?: boolean) => Promise<void>>(async () => {});
   const workspaceVisible = route === '#/' || route.startsWith('#/project/');
@@ -69,7 +71,8 @@ export function App({ storage }: { storage: StorageProvider }) {
     let alive = true;
     void controller.initialize().then(async () => {
       if (!alive) return;
-      setDeviceName(controller.getSnapshot().settings!.deviceName); setBindings(await storage.listBindings());
+      const stored = controller.getSnapshot().settings!;
+      setDeviceName(stored.deviceName); setTheme(stored.theme); applyTheme(stored.theme); setBindings(await storage.listBindings());
       if (routeRef.current.startsWith('#/project/')) await navigateRef.current(routeRef.current, true);
     }).catch(() => {});
     const changed = () => { const target = location.hash || '#/'; history.replaceState(null, '', routeRef.current); void navigateRef.current(target, true); };
@@ -77,6 +80,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     window.addEventListener('hashchange', changed); window.addEventListener('beforeunload', unload);
     return () => { alive = false; window.removeEventListener('hashchange', changed); window.removeEventListener('beforeunload', unload); controller.dispose(); };
   }, [controller, storage]);
+  useEffect(() => watchSystemTheme(setSystemDark), []);
   useEffect(() => { if (project && routeRef.current === '#/') setLocation(`#/project/${project.id}`, true); }, [project]);
   useEffect(() => { if (route === '#/projects' && overview.current) overview.current.scrollTop = overviewScroll.current; }, [route]);
   useEffect(() => {
@@ -87,6 +91,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     }).catch(() => setNotice('Offline-cache kunde inte aktiveras. Behåll appen öppen.'));
   }, []);
 
+  const resolvedTheme = resolveTheme(theme, systemDark);
   const options = { language, projectId: project?.id ?? '', versionId: session.baseVersionId, profileId: settings?.activeProfileId ?? null };
   const ai = render(template, bindings, { ...options, mode: 'ai' });
   const local = render(template, bindings, { ...options, mode: 'local', maskSecrets: !showSecrets });
@@ -96,6 +101,10 @@ export function App({ storage }: { storage: StorageProvider }) {
     .sort((a, b) => Number(Boolean(resolveValue(a, options.profileId))) - Number(Boolean(resolveValue(b, options.profileId))) || a.name.localeCompare(b.name));
   const saveStatus = phase === 'loading' ? 'Öppnar lokalt valv…' : phase === 'error' ? 'Fel vid sparning' : phase === 'saved' ? 'Sparat lokalt' : 'Sparar lokalt…';
   const currentId = controller.getLastProjectId(), filtered = projects.filter(p => projectMatches(p, query));
+  function changeTheme(next: ThemeChoice) {
+    setTheme(next); applyTheme(next);
+    if (settings) void storage.saveSettings({ ...settings, theme: next }).catch(() => setNotice('Temat gäller nu men kunde inte sparas.'));
+  }
   function changeMode(next: Mode) { setMode(next); setShowSecrets(false); setFocusName(''); setFocusLine(undefined); }
   function createBinding(selection: Selection) {
     if (mode === 'local' || !selection.text || /\{\{.*\}\}/.test(selection.text)) return;
@@ -164,7 +173,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   return <div className="app-shell code-first"><div className="main-shell">
     <header className="topbar"><a className="brand" href="#/" onClick={e => { e.preventDefault(); void navigate('#/'); }}><span className="brand-icon">{'</>'}</span><span>AI Code Vault</span></a>
       <nav className="top-navigation" aria-label="Huvudnavigation"><button disabled={busy} onClick={() => void navigate('#/')}>＋ Ny kod</button><button disabled={busy} onClick={openDrawer}>Mina projekt <kbd>Ctrl K</kbd></button><button onClick={() => void navigate('#/security')}>Säkerhet</button><button onClick={() => void navigate('#/settings')}>Inställningar</button></nav>
-      <span className="profile-badge">Profil: Standard</span><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
+      <span className="profile-badge">Profil: Standard</span><label className="theme-choice">Tema<select aria-label="Tema" value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">System</option><option value="light">Ljust</option><option value="dark">Mörkt</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>Försök spara igen</button></div>}
     {notice && <div className="inline-notice" role="status">{notice}<button aria-label="Stäng meddelande" onClick={() => setNotice('')}>×</button></div>}
     {updateReady && <div className="notice">Uppdatering tillgänglig <button onClick={() => void run(async () => { await controller.flush(); navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true }); updateReady.waiting?.postMessage({ type: 'ACTIVATE' }); })}>Ladda om</button></div>}
@@ -179,7 +188,7 @@ export function App({ storage }: { storage: StorageProvider }) {
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj secrets' : 'Visa secrets'}</button></div>}
           <div className="editor-body">{!template && mode === 'template' && <div className="paste-prompt" aria-hidden="true"><strong>Klistra in din kod här</strong><span>Ctrl+V · Projektet skapas automatiskt och sparas lokalt.</span></div>}
             <CodeEditor key="primary-editor" documentKey={`${session.key}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => controller.changeText(text)} onBinding={createBinding}
-              onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }} />
+              onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} theme={resolvedTheme} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }} />
           </div><div className="editor-footer"><span>{visible.split('\n').length} rader · {used.length} bindings</span><span>{mode === 'local' ? 'Använd endast i din lokala kodmiljö' : 'Utkast sparas automatiskt · ingen kod körs'}</span></div>
         </section><aside className="binding-panel"><div className="panel-title"><h2>Bindings</h2><span className="count">{activeBindings.length}</span></div><p className="muted">Markera ett värde och tryck <kbd>Ctrl+B</kbd> för att koppla det till en platshållare.</p>
           {activeBindings.map(b => <div className="binding-card" key={b.id}><button className="binding-name" onClick={() => { setMode('template'); setFocusName(b.name); }}>{b.name}</button><div className="binding-meta"><span>{b.category}</span><span>{b.scope}</span></div><div className="binding-value">{resolveValue(b, options.profileId) ? b.category === 'secret' ? '••••••••' : 'Privat värde angivet' : <span className="danger-text">⚠ VÄRDE SAKNAS</span>}</div><div className="binding-example">AI: {b.aiReplacement}</div><div className="binding-actions"><small>{used.find(u => u.bindingName === b.name)?.occurrences ?? 0} förekomster</small><button className="text-button" onClick={() => setBindingDialog({ binding: b })}>Redigera</button><button className="text-button" aria-label={`Radera ${b.name}`} onClick={() => void removeBinding(b)}>×</button></div></div>)}

@@ -4,7 +4,7 @@
   font-synthesis: none;
   font-size: 16px;
   line-height: 1.5;
-  color-scheme: light;
+  color-scheme: light dark;
 
   /* Surfaces */
   --bg: #f3f6f9;
@@ -65,6 +65,117 @@
   color: var(--text);
   background: var(--bg);
 }
+
+/* Dark theme. Tokens only: no component rule is redefined here, so the two themes cannot drift.
+   Two selectors because the choice has three states — an explicit choice wins in both directions,
+   and the unset default follows the system. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #0e1a24;
+    --surface: #16242f;
+    --surface-raised: #1c2c38;
+    --surface-sunken: #111d27;
+    --surface-hover: #223341;
+
+    --border-subtle: #1e2f3b;
+    --border: #2a3e4d;
+    --border-strong: #3a5265;
+    --focus-ring: #5cc8ec;
+
+    --text-strong: #eaf2f7;
+    --text: #d3e0e9;
+    --text-muted: #93a7b6;
+    --text-subtle: #7b8fa0;
+    --text-faint: #5f7383;
+
+    --accent: #1c9078;
+    --accent-hover: #23a88c;
+    --accent-fg: #04140f;
+    --accent-text: #62d5b6;
+    --accent-bright: #70dec3;
+    --accent-muted: #7fa89c;
+    --accent-on-dark: #70dec3;
+    --accent-glow: #1c9078;
+    --accent-surface: #122d27;
+    --accent-surface-strong: #16382f;
+    --accent-border: #24523f;
+    --accent-border-strong: #2f6b52;
+
+    --danger: #c05a3c;
+    --danger-strong: #d06a49;
+    --danger-text: #f2a98d;
+    --danger-muted: #b89486;
+    --danger-surface: #2e1b14;
+    --danger-surface-strong: #3a221a;
+    --danger-border: #5a3324;
+    --danger-border-strong: #8a4a31;
+
+    --warn-text: #e8c987;
+    --warn-surface: #2c2415;
+    --warn-border: #4d4024;
+
+    --shadow-xs: #00000030;
+    --shadow-sm: #0000004d;
+    --shadow-md: #00000066;
+    --scrim: #00000059;
+    --backdrop: #000000a6;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0e1a24;
+  --surface: #16242f;
+  --surface-raised: #1c2c38;
+  --surface-sunken: #111d27;
+  --surface-hover: #223341;
+
+  --border-subtle: #1e2f3b;
+  --border: #2a3e4d;
+  --border-strong: #3a5265;
+  --focus-ring: #5cc8ec;
+
+  --text-strong: #eaf2f7;
+  --text: #d3e0e9;
+  --text-muted: #93a7b6;
+  --text-subtle: #7b8fa0;
+  --text-faint: #5f7383;
+
+  --accent: #1c9078;
+  --accent-hover: #23a88c;
+  --accent-fg: #04140f;
+  --accent-text: #62d5b6;
+  --accent-bright: #70dec3;
+  --accent-muted: #7fa89c;
+  --accent-on-dark: #70dec3;
+  --accent-glow: #1c9078;
+  --accent-surface: #122d27;
+  --accent-surface-strong: #16382f;
+  --accent-border: #24523f;
+  --accent-border-strong: #2f6b52;
+
+  --danger: #c05a3c;
+  --danger-strong: #d06a49;
+  --danger-text: #f2a98d;
+  --danger-muted: #b89486;
+  --danger-surface: #2e1b14;
+  --danger-surface-strong: #3a221a;
+  --danger-border: #5a3324;
+  --danger-border-strong: #8a4a31;
+
+  --warn-text: #e8c987;
+  --warn-surface: #2c2415;
+  --warn-border: #4d4024;
+
+  --shadow-xs: #00000030;
+  --shadow-sm: #0000004d;
+  --shadow-md: #00000066;
+  --scrim: #00000059;
+  --backdrop: #000000a6;
+}
+
 * {
   box-sizing: border-box;
 }
