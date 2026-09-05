@@ -360,3 +360,60 @@
   font-size: 0.875rem;
   color: var(--text-muted);
 }
+
+.backup-panel {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.backup-panel h2 {
+  margin-top: 22px;
+}
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.file-picker input {
+  margin-top: 6px;
+  padding: 8px;
+  background: var(--surface-sunken);
+}
+.import-problems {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--danger-border);
+  border-left: 4px solid var(--danger);
+  border-radius: 8px;
+  background: var(--danger-surface);
+}
+.import-problems strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--danger-text);
+}
+.import-problems ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+.import-plan {
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+.import-plan strong {
+  display: block;
+  margin-bottom: 6px;
+}
+.import-result {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--accent-surface);
+  color: var(--accent-text);
+  font-size: 0.875rem;
+}

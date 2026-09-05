@@ -86,3 +86,49 @@ test('masks a value categorised as a secret until it is revealed', async ({ page
   await page.getByRole('button', { name: 'Visa secrets' }).click();
   await expect(page.locator('.editor-body')).toContainText('Hunter2');
 });
+
+// Report F2. The vault lives in one browser profile, so an export is the only way back from
+// cleared site data. This drives the whole round trip: export, a fresh empty vault, restore.
+test('restores a vault from an exported file', async ({ browser }) => {
+  const source = await browser.newContext();
+  const page = await source.newPage();
+  await page.goto('/');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.getByRole('button', { name: 'Ändra projektnamn' }).click();
+  await page.getByLabel('Projektnamn').fill('Backup-provet');
+  await page.getByLabel('Projektnamn').press('Enter');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+
+  await page.evaluate(() => (location.hash = '#/settings'));
+  const download = await Promise.race([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Exportera hela valvet' }).click().then(() => page.waitForEvent('download')),
+  ]);
+  // Saved before the context closes: Playwright deletes a download's temp file with its context.
+  const file = test.info().outputPath('vault-backup.json');
+  await download.saveAs(file);
+  await source.close();
+
+  // A separate context is a separate origin storage: an empty vault, as after clearing site data.
+  const restored = await browser.newContext();
+  const fresh = await restored.newPage();
+  await fresh.goto('/');
+  await expect(fresh.getByRole('status').first()).toContainText('Sparat lokalt');
+  await fresh.evaluate(() => (location.hash = '#/projects'));
+  await expect(fresh.locator('.project-cards')).not.toContainText('Backup-provet');
+
+  await fresh.evaluate(() => (location.hash = '#/settings'));
+  await fresh.getByLabel('Välj en exporterad fil').setInputFiles(file);
+  await expect(fresh.locator('.import-plan')).toContainText('0 krockar');
+  await fresh.getByRole('button', { name: 'Slå ihop med valvet' }).click();
+  await expect(fresh.locator('.import-result')).toBeVisible();
+
+  await fresh.getByRole('button', { name: 'Ladda om appen' }).click();
+  await expect(fresh.getByRole('status').first()).toContainText('Sparat lokalt');
+  await fresh.evaluate(() => (location.hash = '#/projects'));
+  await expect(fresh.locator('.project-cards')).toContainText('Backup-provet');
+  await restored.close();
+});

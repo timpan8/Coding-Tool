@@ -55,6 +55,8 @@ export type VersionSummary = Version;
 export interface BindingFilter { projectId?: string; versionId?: string }
 export interface DatasetFilter { projectId?: string }
 export type ImportMode = 'merge' | 'replace';
-export interface ImportResult { added: number; conflicts: number }
+/** What to do with an entity the vault already has: keep the vault's, take the file's, or keep both. */
+export type ImportResolution = 'keep' | 'replace' | 'duplicate';
+export interface ImportResult { added: number; replaced: number; duplicated: number; skipped: number }
 export const languages: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'plaintext'];
 export const categories: Category[] = ['secret', 'identity', 'infrastructure', 'environment', 'configuration', 'testdata'];

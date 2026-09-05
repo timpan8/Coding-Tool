@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type { StorageProvider } from './StorageProvider';
 import { DraftConflictError } from './StorageProvider';
 import type { ProjectDraft, ProjectDraftMetadata } from '../types/models';
-import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResult, Profile, Project, ScannerRule, Settings, Version, WorkspaceSnapshot } from '../types/models';
+import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ScannerRule, Settings, Version, WorkspaceSnapshot } from '../types/models';
 import { validateBinding } from '../domain/bindings';
 
 class VaultDatabase extends Dexie {
@@ -107,9 +107,53 @@ export class IndexedDbProvider implements StorageProvider {
       bindings: await this.listBindings(), profiles: await this.listProfiles(), datasets: await this.listDatasets(),
       rules: await this.listScannerRules(), settings: (await this.db.settings.get('settings'))! }));
   }
-  async importAll(_snapshot: WorkspaceSnapshot, _mode: ImportMode): Promise<ImportResult> {
-    // M3 introduces schema validation + preview + explicit conflict choices. No unsafe bypass in M1.
-    throw new Error('Import aktiveras i M3 efter validering och förhandsgranskning.');
+  /** One transaction over every table: either the whole payload lands or none of it does, so a
+   * failure halfway through cannot leave a vault that is part one backup and part another. */
+  async importAll(payload: Partial<WorkspaceSnapshot>, mode: ImportMode, resolutions: Record<string, ImportResolution> = {}): Promise<ImportResult> {
+    const result: ImportResult = { added: 0, replaced: 0, duplicated: 0, skipped: 0 };
+    await this.db.transaction('rw', this.db.tables, async () => {
+      if (mode === 'replace') for (const table of this.db.tables) await table.clear();
+
+      const apply = async <T extends object>(table: Table<T, string>, items: T[] | undefined, key: (item: T) => string, rekey?: (item: T, id: string) => T) => {
+        for (const item of items ?? []) {
+          const id = key(item);
+          const existing = await table.get(id);
+          if (!existing) { await table.put(item); result.added++; continue; }
+          const choice = resolutions[id] ?? 'keep';
+          if (choice === 'keep') { result.skipped++; continue; }
+          if (choice === 'replace') { await table.put(item); result.replaced++; continue; }
+          // 'duplicate' only makes sense where a fresh id is harmless; otherwise keep the vault's.
+          if (rekey) { await table.put(rekey(item, crypto.randomUUID())); result.duplicated++; }
+          else result.skipped++;
+        }
+      };
+
+      // The planner already rejects these, but a bad caller must not be able to write a binding the
+      // app's own rules forbid. Failing here aborts the whole transaction.
+      for (const b of payload.bindings ?? []) {
+        const errors = validateBinding(b, (payload.bindings ?? []).filter(other => other.id !== b.id));
+        if (errors.length) throw new Error(`Importen avbröts. Bindingen ${b.name}: ${errors.join(' ')}`);
+      }
+
+      await apply(this.db.projects, payload.projects, p => p.id, (p, id) => ({ ...p, id, name: `${p.name} (importerad)`, currentVersionId: null }));
+      await apply(this.db.versions, payload.versions, v => v.id);
+      await apply(this.db.bindings, payload.bindings, b => b.id, (b, id) => ({ ...b, id, name: `${b.name}_IMPORTERAD`.slice(0, 64) }));
+      await apply(this.db.profiles, payload.profiles, p => p.id);
+      await apply(this.db.datasets, payload.datasets, d => d.id);
+      await apply(this.db.rules, payload.rules, r => r.id);
+      for (const draft of payload.drafts ?? []) {
+        const existing = await this.db.drafts.get(draft.projectId);
+        if (!existing) { await this.db.drafts.put(draft); result.added++; }
+        else if (resolutions[draft.projectId] === 'replace') { await this.db.drafts.put({ ...draft, revision: existing.revision + 1 }); result.replaced++; }
+        else result.skipped++;
+      }
+      // Device identity stays this device's; importing it would make two machines claim one id.
+      if (payload.settings) {
+        const current = await this.db.settings.get('settings');
+        await this.db.settings.put({ ...payload.settings, deviceId: current?.deviceId ?? payload.settings.deviceId, deviceName: current?.deviceName ?? payload.settings.deviceName, key: 'settings' });
+      }
+    });
+    return result;
   }
   async clearAll() { await this.db.transaction('rw', this.db.tables, async () => { for (const table of this.db.tables) await table.clear(); }); }
   async commitVersion(project: Project, version: Version, expectedDraftRevision?: number) {

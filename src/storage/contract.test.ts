@@ -48,9 +48,28 @@ export function storageContract(factory: () => { storage: StorageProvider; clean
     expect(await storage.getProject(p.id)).toBeUndefined(); expect(await storage.listVersions(p.id)).toEqual([]);
     expect(await storage.getProject(other.id)).toEqual(other); expect(await storage.listBindings()).toEqual([global]);
   });
-  it('rejects premature imports and clears the entire local store explicitly', async () => {
-    await storage.saveProject(project()); const snapshot = await storage.exportAll();
-    await expect(storage.importAll(snapshot, 'merge')).rejects.toThrow();
+  // Import used to be required to reject outright; it now applies a payload the caller has already
+  // validated and planned. This is the one existing expectation deliberately inverted.
+  it('leaves the vault alone on re-import unless a conflict is explicitly resolved', async () => {
+    const p = project(); await storage.saveProject(p);
+    const snapshot = await storage.exportAll();
+    expect(await storage.importAll(snapshot, 'merge')).toMatchObject({ added: 0, replaced: 0 });
+    expect((await storage.getProject(p.id))?.name).toBe(p.name);
+    const renamed = { ...snapshot, projects: [{ ...p, name: 'Från backup' }] };
+    expect(await storage.importAll(renamed, 'merge', { [p.id]: 'replace' })).toMatchObject({ replaced: 1 });
+    expect((await storage.getProject(p.id))?.name).toBe('Från backup');
+  });
+  it('writes nothing at all when any part of the import is invalid', async () => {
+    const p = project(); await storage.saveProject(p);
+    const other = project();
+    const unsafe = binding({ aiReplacement: 'SuperSecret123!' });
+    await expect(storage.importAll({ projects: [other], bindings: [unsafe] }, 'merge')).rejects.toThrow();
+    expect(await storage.getProject(other.id)).toBeUndefined();
+    expect(await storage.listBindings()).toEqual([]);
+    expect((await storage.getProject(p.id))?.name).toBe(p.name);
+  });
+  it('clears the entire local store explicitly', async () => {
+    await storage.saveProject(project());
     await storage.clearAll(); expect(await storage.listProjects()).toEqual([]);
   });
 }

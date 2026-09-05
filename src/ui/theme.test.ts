@@ -31,7 +31,7 @@ describe('theme tokens', () => {
         expect(expected, `${theme}: --${token} is not defined`).toBeTruthy();
         // #ffffff and #fff are the same colour; compare expanded.
         const expand = (hex: string) =>
-          hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join('')}` : hex.toLowerCase();
+          hex.length === 4 ? `#${hex.slice(1).replace(/./g, (c) => c + c)}` : hex.toLowerCase();
         expect(expand(editorColors[theme][key]), `${theme}: ${key} should equal --${token}`).toBe(expand(expected));
       }
     }

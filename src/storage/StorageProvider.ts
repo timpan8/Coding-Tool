@@ -1,4 +1,4 @@
-import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResult, Profile, Project, ProjectSummary, ScannerRule, Settings, Version, VersionSummary, WorkspaceSnapshot } from '../types/models';
+import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ProjectSummary, ScannerRule, Settings, Version, VersionSummary, WorkspaceSnapshot } from '../types/models';
 import type { ProjectDraft, ProjectDraftMetadata } from '../types/models';
 
 export class DraftConflictError extends Error {
@@ -29,7 +29,11 @@ export interface StorageProvider {
   getSettings(): Promise<Settings>;
   saveSettings(s: Settings): Promise<void>;
   exportAll(): Promise<WorkspaceSnapshot>;
-  importAll(s: WorkspaceSnapshot, mode: ImportMode): Promise<ImportResult>;
+  /** Applies a validated payload. The caller has already parsed the file and shown the user a plan,
+   * so this only writes; it never decides. `resolutions` is keyed by entity id, and anything absent
+   * keeps what the vault already has. A private backup carries no project code, so its payload is
+   * partial by design. */
+  importAll(payload: Partial<WorkspaceSnapshot>, mode: ImportMode, resolutions?: Record<string, ImportResolution>): Promise<ImportResult>;
   clearAll(): Promise<void>;
   /** Atomically creates a version and advances its project's pointer. */
   commitVersion(project: Project, version: Version, expectedDraftRevision?: number): Promise<void>;
