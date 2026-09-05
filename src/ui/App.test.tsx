@@ -24,21 +24,24 @@ beforeEach(() => {
 });
 afterEach(async () => { cleanup(); vi.restoreAllMocks(); await storage.destroy(); });
 
-it('creates a project, binds a selected value, renders both views and persists a template version', async () => {
+it('creates a project from first input, binds a selected value, renders both views and persists a template version', async () => {
   mount(<App storage={storage} />);
-  await screen.findByText('Sparat lokalt');
-  fireEvent.click(await screen.findByRole('button', { name: 'Skapa ditt första projekt' }));
-  fireEvent.change(screen.getByLabelText('Projektnamn'), { target: { value: 'Create-ADUsers' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Skapa projekt' }));
+  await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Sparat lokalt'));
   const editor = await screen.findByLabelText('Testkod');
   fireEvent.change(editor, { target: { value: '$username = "example.user"' } });
+  await waitFor(() => expect(storage.listProjects()).resolves.toHaveLength(1));
+  await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Sparat lokalt'));
+  const nameButton = await screen.findByRole('button', { name: 'Ändra projektnamn' });
+  fireEvent.click(nameButton);
+  fireEvent.change(screen.getByLabelText('Projektnamn'), { target: { value: 'Create-ADUsers' } });
+  fireEvent.keyDown(screen.getByLabelText('Projektnamn'), { key: 'Enter' });
   fireEvent.click(screen.getByRole('button', { name: 'Testmarkering' }));
-  fireEvent.change(screen.getByLabelText('Namn'), { target: { value: 'ADMIN_USERNAME' } });
+  fireEvent.change(await screen.findByLabelText('Namn'), { target: { value: 'ADMIN_USERNAME' } });
   fireEvent.change(screen.getByLabelText('Privat värde · standard'), { target: { value: 'synthetic.user' } });
   fireEvent.click(screen.getByRole('button', { name: 'Spara binding' }));
   await waitFor(() => expect((editor as HTMLTextAreaElement).value).toContain('{{ADMIN_USERNAME}}'));
-  fireEvent.click(screen.getByRole('button', { name: 'Spara som v1' }));
-  await screen.findByRole('button', { name: 'Spara som v2' });
+  fireEvent.click(screen.getByRole('button', { name: 'Spara version' }));
+  await waitFor(async () => expect(await storage.listVersions((await storage.listProjects())[0].id)).toHaveLength(1));
   fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
   expect((editor as HTMLTextAreaElement).value).toContain('synthetic.user');
   fireEvent.click(screen.getByRole('tab', { name: 'AI' }));
@@ -58,6 +61,7 @@ it('masks local secrets and requires a second deliberate action to copy them', a
   location.hash = `#/project/${p.id}`;
   mount(<App storage={storage} />);
   const editor = await screen.findByLabelText('Testkod');
+  await waitFor(() => expect((editor as HTMLTextAreaElement).value).toContain('{{ADMIN_PASSWORD}}'));
   fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
   expect((editor as HTMLTextAreaElement).value).toContain('••••••••');
   expect((editor as HTMLTextAreaElement).value).not.toContain('SuperSecret123!');

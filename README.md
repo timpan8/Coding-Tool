@@ -4,7 +4,7 @@ Statisk React/TypeScript-app för GitHub Pages. Kod lagras som mallar med `{{BIN
 
 ## Status
 
-**M1 – körbar kärnrunda.** Projekt, en fil per projekt i UI, bevarade versioner, Monaco, skapa/redigera/radera bindings, scope-resolution, profil-fallback i domänen, kontextstyrd escaping, tre tydliga vyer och kopiering. Secrets maskeras som standard och lokal kopiering med secrets kräver bekräftelse.
+**M1 – körbar kärnrunda.** Startsidan är en direkt kodarbetsyta: första inklistringen skapar ett namnlöst projekt och ett lokalt utkast automatiskt. Utkast sparas med debounce och revisionskontroll; projekt kan namnges i överkanten och växlas via Mina projekt eller Alla projekt utan att versionshistoriken fylls. Projekt, en fil per projekt i UI, bevarade versioner, Monaco, bindings, scope-resolution, profil-fallback, kontextstyrd escaping, tre tydliga vyer och kopiering ingår. Secrets maskeras som standard och lokal kopiering med secrets kräver bekräftelse.
 
 **Inte levererat ännu:** M2 reconciliation/scanner/markörer, M3 backup/import/merge/autosave, M4 diff/datasets/profil-UI, M5 sökvägsregler/diskintegration. Använd testvärden tills backup finns. `StorageProvider.importAll` avvisar anrop i M1; import aktiveras först tillsammans med M3:s schema och granskning.
 

@@ -10,6 +10,11 @@ export interface Project {
   createdAt: Iso; updatedAt: Iso; deviceId: string;
 }
 export interface BindingUsage { bindingName: string; fileId: string; occurrences: number }
+export interface ProjectDraft {
+  projectId: string; baseVersionId: string | null; templates: Record<string, string>;
+  updatedAt: Iso; revision: number;
+}
+export type ProjectDraftMetadata = Pick<Project, 'name' | 'language' | 'files'>;
 export interface IngestReport { decisions: { bindingName: string; tier: number; start: number; end: number; accepted: boolean; reason: string }[] }
 export interface Version {
   id: string; projectId: string; number: number; label: string; parentVersionId: string | null;
@@ -44,7 +49,7 @@ export interface Settings {
   activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean;
   clipboardAutoClearSeconds: number; maskSecretsInUi: boolean;
 }
-export interface WorkspaceSnapshot { projects: Project[]; versions: Version[]; bindings: Binding[]; profiles: Profile[]; datasets: Dataset[]; rules: ScannerRule[]; settings: Settings }
+export interface WorkspaceSnapshot { projects: Project[]; versions: Version[]; drafts: ProjectDraft[]; bindings: Binding[]; profiles: Profile[]; datasets: Dataset[]; rules: ScannerRule[]; settings: Settings }
 export type ProjectSummary = Project;
 export type VersionSummary = Version;
 export interface BindingFilter { projectId?: string; versionId?: string }
@@ -53,4 +58,3 @@ export type ImportMode = 'merge' | 'replace';
 export interface ImportResult { added: number; conflicts: number }
 export const languages: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'plaintext'];
 export const categories: Category[] = ['secret', 'identity', 'infrastructure', 'environment', 'configuration', 'testdata'];
-

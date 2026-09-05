@@ -23,6 +23,7 @@ monaco.languages.setMonarchTokensProvider('json', { tokenizer: { root: [[/"(?:[^
 monaco.editor.defineTheme('vault', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#ffffff', 'editorLineNumber.foreground': '#728296', 'editor.lineHighlightBackground': '#f3f7fa' } });
 export interface Selection { text: string; start: number; end: number; lineBefore: string; line: number }
 interface Props {
+  documentKey?: string; active?: boolean; autoFocus?: boolean;
   value: string; language: LanguageId; readOnly?: boolean; onChange?: (value: string) => void;
   onBinding?: (selection: Selection) => void; onPlaceholder?: (name: string) => void;
   focusName?: string; focusLine?: number; onLine?: (line: number) => void;
@@ -30,10 +31,14 @@ interface Props {
 export function CodeEditor(props: Props) {
   const host = useRef<HTMLDivElement>(null), editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const updating = useRef(false);
+  const documents = useRef(new Map<string, { model: monaco.editor.ITextModel; view: monaco.editor.ICodeEditorViewState | null }>());
+  const activeKey = useRef('');
   const callbacks = useRef(props);
   callbacks.current = props;
   useEffect(() => {
     const model = monaco.editor.createModel(callbacks.current.value, callbacks.current.language);
+    activeKey.current = callbacks.current.documentKey ?? 'default';
+    documents.current.set(activeKey.current, { model, view: null });
     const instance = monaco.editor.create(host.current!, { model, theme: 'vault', automaticLayout: true,
       readOnly: callbacks.current.readOnly, minimap: { enabled: false }, fontSize: 14, lineHeight: 23,
       scrollBeyondLastLine: false, wordWrap: 'on', padding: { top: 16 }, contextmenu: true,
@@ -43,35 +48,55 @@ export function CodeEditor(props: Props) {
     editor.current = instance;
     const decorations = instance.createDecorationsCollection();
     const decorate = () => {
-      decorations.set(model.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } })));
+      decorations.set(instance.getModel()!.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } })));
     };
     const binding = () => {
+      const model = instance.getModel()!;
       const selected = instance.getSelection();
       if (!selected || selected.isEmpty()) return;
       callbacks.current.onBinding?.({ text: model.getValueInRange(selected), start: model.getOffsetAt(selected.getStartPosition()),
         end: model.getOffsetAt(selected.getEndPosition()), lineBefore: model.getLineContent(selected.startLineNumber).slice(0, selected.startColumn - 1), line: selected.startLineNumber });
     };
     const action = instance.addAction({ id: 'create-binding', label: 'Skapa binding', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB], contextMenuGroupId: 'vault', run: binding });
-    const change = model.onDidChangeContent(() => { decorate(); if (!updating.current && !instance.getOption(monaco.editor.EditorOption.readOnly)) callbacks.current.onChange?.(model.getValue()); });
+    const change = instance.onDidChangeModelContent(() => { decorate(); if (!updating.current && !instance.getOption(monaco.editor.EditorOption.readOnly)) callbacks.current.onChange?.(instance.getValue()); });
+    const modelChange = instance.onDidChangeModel(decorate);
     const line = instance.onDidChangeCursorPosition(e => callbacks.current.onLine?.(e.position.lineNumber));
     const mouse = instance.onMouseDown(e => {
       const position = e.target.position;
       if (!position) return;
-      const matches = model.findMatches('\\{\\{([A-Z][A-Z0-9_]{1,63})\\}\\}', false, true, false, null, true);
+      const matches = instance.getModel()!.findMatches('\\{\\{([A-Z][A-Z0-9_]{1,63})\\}\\}', false, true, false, null, true);
       const match = matches.find(m => m.range.containsPosition(position));
       if (match?.matches) callbacks.current.onPlaceholder?.(match.matches[1]);
     });
     decorate();
-    return () => { action.dispose(); change.dispose(); line.dispose(); mouse.dispose(); instance.dispose(); model.dispose(); editor.current = null; };
+    if (callbacks.current.autoFocus) instance.focus();
+    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); mouse.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
   }, []);
   useEffect(() => {
     const instance = editor.current;
     if (!instance) return;
     instance.updateOptions({ readOnly: props.readOnly });
+    const key = props.documentKey ?? 'default';
+    const switched = activeKey.current !== key;
+    if (switched) {
+      const old = documents.current.get(activeKey.current);
+      if (old) old.view = instance.saveViewState();
+      let next = documents.current.get(key);
+      if (!next) { next = { model: monaco.editor.createModel(props.value, props.language), view: null }; documents.current.set(key, next); }
+      activeKey.current = key;
+      instance.setModel(next.model);
+      if (next.view) instance.restoreViewState(next.view);
+      if (props.active) instance.focus();
+    }
     const model = instance.getModel()!;
-    if (model.getValue() !== props.value) { updating.current = true; try { model.setValue(props.value); } finally { updating.current = false; } }
+    if (model.getValue() !== props.value) {
+      updating.current = true;
+      try { model.pushStackElement(); model.pushEditOperations([], [{ range: model.getFullModelRange(), text: props.value }], () => null); model.pushStackElement(); }
+      finally { updating.current = false; }
+    }
     if (model.getLanguageId() !== props.language) monaco.editor.setModelLanguage(model, props.language);
-  }, [props.value, props.language, props.readOnly]);
+  }, [props.value, props.language, props.readOnly, props.documentKey, props.active]);
+  useEffect(() => { if (props.active) { editor.current?.layout(); if (props.autoFocus) editor.current?.focus(); } }, [props.active, props.autoFocus]);
   useEffect(() => {
     if (!props.focusName || !editor.current) return;
     const model = editor.current.getModel()!;
