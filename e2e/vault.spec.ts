@@ -30,7 +30,7 @@ test.beforeEach(async ({ page }) => {
 
 // Report K1. The headline defect: nothing is bound, so nothing is known, and the app says so in
 // the affirmative and then copies the secret verbatim.
-test.fail('does not claim a clean review of code it has not checked', async ({ page }) => {
+test('does not claim a clean review of code it has not checked', async ({ page }) => {
   await type(page, '$password = "Hunter2!"\n');
   await page.getByRole('button', { name: /Copy for AI/ }).click();
   const dialog = page.locator('dialog[open]');

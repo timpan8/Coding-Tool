@@ -4,6 +4,7 @@ import { languages } from '../types/models';
 import type { StorageProvider } from '../storage/StorageProvider';
 import { resolveBinding, resolveValue, suggestBinding, defaults } from '../domain/bindings';
 import { render, usage } from '../domain/render';
+import { coverage, type Coverage } from '../domain/render/coverage';
 import { WorkspaceController } from './WorkspaceController';
 import { CodeEditor, type Selection } from './editor/CodeEditor';
 import { BindingDialog } from './components/BindingDialog';
@@ -22,6 +23,43 @@ function ProjectName({ name, change }: { name: string; change: (name: string) =>
   function finish() { if (!cancelled.current) change(text); setEditing(false); }
   return <input className="project-name-input" aria-label="Projektnamn" autoFocus value={text} onFocus={e => e.target.select()} onChange={e => setText(e.target.value)}
     onBlur={finish} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } if (e.key === 'Escape') { cancelled.current = true; setEditing(false); } }} />;
+}
+
+/** What the app actually checked, said plainly. The previous wording announced that no known
+ * problems were found even when nothing had been bound and therefore nothing could be known,
+ * which made the default paste-and-copy path read as a clean bill of health. */
+function AiCopyReview({ coverage, issues, replaced }: { coverage: Coverage; issues: number; replaced: number }) {
+  const { bound, literals, unbound } = coverage;
+  const headline = issues
+    ? 'Granskning krävs'
+    : bound === 0
+      ? literals === 0
+        ? 'Ingenting att skydda hittades i koden'
+        : 'Inga värden är skyddade'
+      : 'Inga kända problem hittades';
+  return (
+    <>
+      <p className={issues || bound === 0 ? 'danger-text' : ''}><b>{headline}</b></p>
+      <p>
+        <b>{bound} av {literals}</b> strängvärden är kopplade till bindings. {replaced} förekomster ersätts vid kopiering.
+      </p>
+      {bound === 0 && literals > 0 && (
+        <p>Ingen automatisk granskning har körts på den här koden. Värdena nedan skickas som de står.</p>
+      )}
+      {unbound.length > 0 && (
+        <ul className="unbound-values">
+          {unbound.slice(0, 6).map((literal, index) => (
+            <li key={index}><code>{literal.text.length > 60 ? literal.text.slice(0, 60) + '…' : literal.text}</code></li>
+          ))}
+          {unbound.length > 6 && <li>och {unbound.length - 6} till</li>}
+        </ul>
+      )}
+      <p className="notice">
+        Kontrollen omfattar saknade bindings, stödd escaping och exakta kända privata värden. Den letar ännu inte
+        efter okända hemligheter på egen hand, så granska kommentarer och övrig kod själv.
+      </p>
+    </>
+  );
 }
 
 export function App({ storage }: { storage: StorageProvider }) {
@@ -95,6 +133,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const options = { language, projectId: project?.id ?? '', versionId: session.baseVersionId, profileId: settings?.activeProfileId ?? null };
   const ai = render(template, bindings, { ...options, mode: 'ai' });
   const local = render(template, bindings, { ...options, mode: 'local', maskSecrets: !showSecrets });
+  const cover = coverage(template, language);
   const visible = mode === 'template' ? template : mode === 'ai' ? ai.text : local.text;
   const issues = mode === 'ai' ? ai.issues : local.issues, used = usage(template);
   const activeBindings = bindings.filter(b => resolveBinding(b.name, bindings, options.projectId, options.versionId)?.id === b.id)
@@ -210,7 +249,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
     {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0} save={storeBinding} close={() => setBindingDialog(null)} />}
-    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <><p><b>{ai.issues.length ? 'Granskning krävs' : 'Inga kända problem hittades'}</b></p><p>{ai.used.length} ersatta förekomster. Kontroll av saknade bindings, stödd escaping och exakta kända privata värden har körts.</p><p className="notice">M1 saknar heuristisk scanner. Granska även kommentarer, nya värden och övrig kod.</p></>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : 'primary'} onClick={() => { const result = render(template, bindings, { ...options, mode: copyMode }); if (!result.issues.length) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : 'Jag har granskat · kopiera för AI'}</button></div></Modal>}
+    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} />}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound ? 'primary' : ''} onClick={() => { const result = render(template, bindings, { ...options, mode: copyMode }); if (!result.issues.length) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
     {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
   </div>;
 }
