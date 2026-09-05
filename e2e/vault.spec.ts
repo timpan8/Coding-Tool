@@ -40,15 +40,20 @@ test('does not claim a clean review of code it has not checked', async ({ page }
 
 // Report U1. The leak check runs only in AI mode, so in the template view the copy button is
 // disabled with the reason rendered nowhere on screen.
-test.fail('explains why a copy button is disabled', async ({ page }) => {
+test('explains why a copy button is disabled', async ({ page }) => {
   await type(page, '$p = "Hunter2"\n');
   await bind(page, 'Hunter2', 'Hunter2', 'secret');
   await page.locator('.code-editor').click();
   await page.keyboard.press('Control+End');
   await page.keyboard.type('# the old value was Hunter2\n');
-  await expect(page.getByRole('button', { name: /Copy for AI/ })).toBeDisabled();
-  // Blocked is correct; blocked with no explanation anywhere on screen is the defect.
+  await expect(page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ })).toBeDisabled();
+  // Blocked is correct; blocked with no explanation anywhere on screen was the defect.
   await expect(page.locator('.issue-panel')).toBeVisible();
+  await expect(page.locator('.issue-panel')).toContainText('blockerar Copy for AI');
+  await expect(page.locator('.copy-blocked')).toBeVisible();
+  // The problem is reachable: clicking it switches to the projection that has it.
+  await page.locator('.issue-item').first().click();
+  await expect(page.getByRole('tab', { name: 'AI' })).toHaveAttribute('aria-selected', 'true');
 });
 
 // Report U3. onMouseDown opens the edit dialog, so the caret can never be placed inside a

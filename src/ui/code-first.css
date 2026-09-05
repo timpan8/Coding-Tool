@@ -436,3 +436,35 @@
 .confirm-body li {
   margin-bottom: 4px;
 }
+
+.copy-blocked {
+  align-self: center;
+  margin-right: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--danger-text);
+}
+.issue-item {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 9px 11px;
+  text-align: left;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  border-color: var(--danger-border);
+  background: var(--surface);
+}
+.issue-item:hover {
+  background: var(--danger-surface);
+}
+.issue-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.issue-head small {
+  color: var(--text-muted);
+  white-space: nowrap;
+}

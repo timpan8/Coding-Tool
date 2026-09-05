@@ -12,6 +12,7 @@ import { Modal } from './components/Modal';
 import { ProjectBrowser, projectMatches } from './components/ProjectBrowser';
 import { BackupPanel } from './components/BackupPanel';
 import { useConfirm } from './components/ConfirmDialog';
+import { collectIssues, IssuePanel, type LocatedIssue } from './components/IssuePanel';
 import { Security } from './pages/Security';
 import { applyTheme, paintHint, resolveTheme, systemPrefersDark, watchSystemTheme, type ThemeChoice } from './theme';
 import { formatBytes, requestPersistence, storageState, type StorageState } from '../storage/persistence';
@@ -147,7 +148,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const local = render(template, bindings, { ...options, mode: 'local', maskSecrets: !showSecrets });
   const cover = coverage(template, language);
   const visible = mode === 'template' ? template : mode === 'ai' ? ai.text : local.text;
-  const issues = mode === 'ai' ? ai.issues : local.issues, used = usage(template);
+  const issues = collectIssues(template, local, ai), used = usage(template);
   const activeBindings = bindings.filter(b => resolveBinding(b.name, bindings, options.projectId, options.versionId)?.id === b.id)
     .sort((a, b) => Number(Boolean(resolveValue(a, options.profileId))) - Number(Boolean(resolveValue(b, options.profileId))) || a.name.localeCompare(b.name));
   const saveStatus = phase === 'loading' ? 'Öppnar lokalt valv…' : phase === 'error' ? 'Fel vid sparning' : phase === 'saved' ? 'Sparat lokalt' : 'Sparar lokalt…';
@@ -172,6 +173,12 @@ export function App({ storage }: { storage: StorageProvider }) {
   function changeTheme(next: ThemeChoice) {
     setTheme(next); applyTheme(next);
     if (settings) void storage.saveSettings({ ...settings, theme: next }).catch(() => setNotice('Temat gäller nu men kunde inte sparas.'));
+  }
+  function showIssue(issue: LocatedIssue) {
+    // The offset belongs to the projection that produced it, so switch there before jumping.
+    changeMode(issue.view === 'ai' ? 'ai' : 'template');
+    setFocusLine(issue.line);
+    if (issue.kind !== 'leak') setFocusName(issue.name);
   }
   function changeMode(next: Mode) { setMode(next); setShowSecrets(false); setFocusName(''); setFocusLine(undefined); }
   function createBinding(selection: Selection) {
@@ -253,7 +260,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => controller.changeLanguage(e.target.value as LanguageId)}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project?.files[0].name ?? 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
       </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => void run(() => controller.saveVersion())}>Spara version</button></div></section>
         <div className="work-grid"><section className={`editor-panel mode-${mode}`}>
-          <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions"><button disabled={!template.trim() || Boolean(local.issues.length)} onClick={() => void copy('local')}>Copy Local</button><button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
+          <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions">{Boolean(issues.length) && <span id="copy-blocked" className="copy-blocked">{issues.length} problem hindrar kopiering — se panelen</span>}<button disabled={!template.trim() || Boolean(local.issues.length)} aria-describedby={local.issues.length ? 'copy-blocked' : undefined} title={local.issues.length ? `Blockerad: ${local.issues.length} problem i Local-vyn` : undefined} onClick={() => void copy('local')}>Copy Local</button><button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} aria-describedby={ai.issues.length ? 'copy-blocked' : undefined} title={ai.issues.length ? `Blockerad: ${ai.issues.length} problem i AI-vyn` : undefined} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
           <div className="view-banner" key={mode}><strong>{mode === 'template' ? '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN' : mode === 'local' ? '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN' : '◇ AI — SANERAD'}</strong><span>{mode === 'template' ? 'Redigerbar källa' : 'Skrivskyddad projektion'}</span></div>
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj secrets' : 'Visa secrets'}</button></div>}
           <div className="editor-body">{!template && mode === 'template' && <div className="paste-prompt" aria-hidden="true"><strong>Klistra in din kod här</strong><span>Ctrl+V · Projektet skapas automatiskt och sparas lokalt.</span></div>}
@@ -263,9 +270,9 @@ export function App({ storage }: { storage: StorageProvider }) {
         </section><aside className="binding-panel"><div className="panel-title"><h2>Bindings</h2><span className="count">{activeBindings.length}</span></div><p className="muted">Markera ett värde och tryck <kbd>Ctrl+B</kbd> för att koppla det till en platshållare.</p>
           {activeBindings.map(b => <div className="binding-card" key={b.id}><button className="binding-name" onClick={() => { setMode('template'); setFocusName(b.name); }}>{b.name}</button><div className="binding-meta"><span>{b.category}</span><span>{b.scope}</span></div><div className="binding-value">{resolveValue(b, options.profileId) ? b.category === 'secret' ? '••••••••' : 'Privat värde angivet' : <span className="danger-text">⚠ VÄRDE SAKNAS</span>}</div><div className="binding-example">AI: {b.aiReplacement}</div><div className="binding-actions"><small>{used.find(u => u.bindingName === b.name)?.occurrences ?? 0} förekomster</small><button className="text-button" onClick={() => setBindingDialog({ binding: b })}>Redigera</button><button className="text-button" aria-label={`Radera ${b.name}`} onClick={() => void removeBinding(b)}>×</button></div></div>)}
           {!activeBindings.length && <div className="bindings-empty">{'{{NAMN}}'}<p>Dina privata värden får en egen plats här.</p>{!template && language === 'powershell' && <button onClick={() => controller.changeText(fixture)}>Prova med exempelkod</button>}</div>}
-          {issues.length > 0 && <div className="issue-panel" role="alert"><h3>{issues.length} renderingsproblem</h3>{issues.map((issue, i) => <p key={i}><b>{issue.name}</b><br />{issue.message}</p>)}</div>}
+          <IssuePanel issues={issues} onSelect={showIssue} />
           <details className="version-history"><summary>Sparade versioner <span>{versions.length}</span></summary>{versions.map(v => <div className="version-item" key={v.id}><button onClick={() => void applyVersion(v)}><b>v{v.number}</b><span>{v.label || 'Sparad version'}<small>{new Date(v.createdAt).toLocaleDateString('sv-SE')}</small></span></button><button className="text-button" onClick={() => void applyVersion(v, true)}>Återgå som ny version</button></div>)}{!versions.length && <p>Utkastet sparas automatiskt. Spara en version när du vill behålla en punkt i historiken.</p>}</details>
-          <div className="m1-note"><b>M1 · Kärnrundan</b><p>Full scanner, automatisk återmatchning och backup återstår. Använd testvärden tills backup finns.</p></div>
+          <div className="m1-note"><b>Vad som ännu inte finns</b><p>Ingen automatisk scanner letar efter okända hemligheter, och kod som kommer tillbaka från en AI matchas inte om automatiskt. Granska den sanerade koden själv.</p></div>
         </aside></div>
       </div>
       <div className="overview-scroll" ref={overview} hidden={route !== '#/projects'} onScroll={e => { if (route === '#/projects') overviewScroll.current = e.currentTarget.scrollTop; }}><section className="dashboard">

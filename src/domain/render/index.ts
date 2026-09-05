@@ -31,10 +31,13 @@ export function render(template: string, bindings: Binding[], options: RenderOpt
     cursor = start + match[0].length;
   }
   output += template.slice(cursor);
-  // Safety invariant in the renderer, even before the full scanner ships in M2.
+  // Safety invariant in the renderer, even before the full scanner ships.
   if (options.mode === 'ai') {
     for (const b of bindings) for (const value of Object.values(b.values)) {
-      if (value && output.includes(value)) issues.push({ name: b.name, start: 0, kind: 'leak', message: 'Ett känt privat värde finns i AI-outputen. Kopiering är blockerad.' });
+      if (!value) continue;
+      const start = output.indexOf(value);
+      // Report where it is: an unlocatable problem cannot be acted on, and start was always 0.
+      if (start >= 0) issues.push({ name: b.name, start, kind: 'leak', message: 'Ett känt privat värde står i klartext här. Kopiering till AI är blockerad tills det är borta.' });
     }
   }
   return { text: output, issues, used, secretRanges };
