@@ -159,6 +159,7 @@ export class WorkspaceController {
     this.lastProjectId = null;
     this.publish({ session: blank(), phase: 'saved', error: '' });
   }
+  async reloadSettings() { this.publish({ settings: await this.storage.getSettings() }); }
   async refreshProjects() { this.publish({ projects: await this.storage.listProjects() }); }
   dispose() { clearTimeout(this.timer); }
 }

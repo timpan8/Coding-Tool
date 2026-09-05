@@ -16,6 +16,7 @@ import { collectIssues, IssuePanel, type LocatedIssue } from './components/Issue
 import { Security } from './pages/Security';
 import { applyTheme, paintHint, resolveTheme, systemPrefersDark, watchSystemTheme, type ThemeChoice } from './theme';
 import { formatBytes, requestPersistence, storageState, type StorageState } from '../storage/persistence';
+import { clearClipboard } from './clipboard';
 import './code-first.css';
 
 type Mode = 'template' | 'local' | 'ai';
@@ -82,6 +83,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [theme, setTheme] = useState<ThemeChoice>(paintHint()), [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [storageInfo, setStorageInfo] = useState<StorageState | null>(null), asked = useRef(false);
   const [confirm, confirmDialog] = useConfirm();
+  const [countdown, setCountdown] = useState<number | null>(null), pendingClear = useRef<string | null>(null);
   const overview = useRef<HTMLDivElement>(null), overviewScroll = useRef(0);
   const navigateRef = useRef<(hash: string, replace?: boolean) => Promise<void>>(async () => {});
   const workspaceVisible = route === '#/' || route.startsWith('#/project/');
@@ -226,9 +228,25 @@ export function App({ storage }: { storage: StorageProvider }) {
     await run(async () => { await controller.applyVersion(version); if (save) await controller.saveVersion(`Återgång till v${version.number}`); changeMode('template'); });
   }
   async function writeClipboard(text: string, which: 'local' | 'ai') {
-    try { await navigator.clipboard.writeText(text); setCopyMode(null); setNotice(which === 'local' ? 'LOCAL kopierad · riktiga värden i urklippet' : 'AI-kod kopierad'); }
+    try {
+      await navigator.clipboard.writeText(text); setCopyMode(null);
+      setNotice(which === 'local' ? 'LOCAL kopierad · riktiga värden i urklippet' : 'AI-kod kopierad');
+      const seconds = settings?.clipboardAutoClearSeconds ?? 0;
+      // Only the local copy carries real values, so only it is worth clearing.
+      if (which === 'local' && seconds > 0) { pendingClear.current = text; setCountdown(seconds); }
+    }
     catch { setError('Webbläsaren nekade urklippsåtkomst. Kontrollera sidans behörighet.'); }
   }
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown > 0) { const id = setTimeout(() => setCountdown(countdown - 1), 1000); return () => clearTimeout(id); }
+    const text = pendingClear.current;
+    pendingClear.current = null; setCountdown(null);
+    if (text) void clearClipboard(text).then(outcome => setNotice(
+      outcome === 'cleared' ? 'Urklippet är rensat.'
+        : outcome === 'replaced-by-other' ? 'Urklippet innehåller något annat nu och lämnades orört.'
+          : 'Urklippet kunde inte rensas. Kopiera något ofarligt för att skriva över det.'));
+  }, [countdown]);
   async function copy(which: 'local' | 'ai') {
     if (!workspaceVisible || !template.trim() || busyRef.current) return;
     const result = render(template, bindings, { ...options, mode: which });
@@ -252,6 +270,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <nav className="top-navigation" aria-label="Huvudnavigation"><button disabled={busy} onClick={() => void navigate('#/')}>＋ Ny kod</button><button disabled={busy} onClick={openDrawer}>Mina projekt <kbd>Ctrl K</kbd></button><button onClick={() => void navigate('#/security')}>Säkerhet</button><button onClick={() => void navigate('#/settings')}>Inställningar</button></nav>
       <span className="profile-badge">Profil: Standard</span><label className="theme-choice">Tema<select aria-label="Tema" value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">System</option><option value="light">Ljust</option><option value="dark">Mörkt</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>Försök spara igen</button></div>}
+    {countdown !== null && <div className="clipboard-countdown" role="status">Urklippet rensas om {countdown} s<button onClick={() => { pendingClear.current = null; setCountdown(null); setNotice('Urklippet lämnas kvar.'); }}>Avbryt</button></div>}
     {notice && <div className="inline-notice" role="status">{notice}<button aria-label="Stäng meddelande" onClick={() => setNotice('')}>×</button></div>}
     {updateReady && <div className="notice">Uppdatering tillgänglig <button onClick={() => void run(async () => { await controller.flush(); navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true }); updateReady.waiting?.postMessage({ type: 'ACTIVATE' }); })}>Ladda om</button></div>}
     <main inert={busy}>
@@ -282,7 +301,8 @@ export function App({ storage }: { storage: StorageProvider }) {
         {!filtered.length && <p className="empty-project-list">{projects.length ? 'Inga projekt matchar sökningen.' : 'Inga projekt ännu. Välj Ny kod och klistra in för att börja.'}</p>}
       </section></div>
       <div hidden={route !== '#/security'}><Security /></div>
-      <article className="document" hidden={route !== '#/settings'}><span className="eyebrow">DEN HÄR INSTALLATIONEN</span><h1>Inställningar</h1><p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p><dl><dt>Aktuellt origin</dt><dd>{location.origin}</dd><dt>App-sökväg</dt><dd>{location.pathname}</dd><dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd><dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd><dt>Beständig lagring</dt><dd>{!storageInfo ? 'Läser…' : !storageInfo.supported ? 'Stöds inte av webbläsaren' : storageInfo.persisted ? 'Ja · valvet vräks inte vid diskbrist' : 'Nej · webbläsaren får radera valvet'}</dd><dt>Utrymme</dt><dd>{storageInfo?.supported ? `${formatBytes(storageInfo.usedBytes)} av ${formatBytes(storageInfo.quotaBytes)}` : 'okänt'}</dd></dl>{storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert"><strong>Valvet kan raderas av webbläsaren</strong><p>Utan beständig lagring får webbläsaren slänga valvet när enheten får ont om utrymme. Det finns ingen backup att återställa från.</p><button onClick={() => void requestPersistence().then(state => { setStorageInfo(state); setNotice(state.persisted ? 'Beständig lagring beviljad.' : 'Webbläsaren nekade beständig lagring.'); })}>Begär beständig lagring</button></div>}<label>Enhetsnamn<input value={deviceName} onChange={e => setDeviceName(e.target.value)} /></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><p className="notice">Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.</p><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></article>
+      <article className="document" hidden={route !== '#/settings'}><span className="eyebrow">DEN HÄR INSTALLATIONEN</span><h1>Inställningar</h1><p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p><dl><dt>Aktuellt origin</dt><dd>{location.origin}</dd><dt>App-sökväg</dt><dd>{location.pathname}</dd><dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd><dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd><dt>Beständig lagring</dt><dd>{!storageInfo ? 'Läser…' : !storageInfo.supported ? 'Stöds inte av webbläsaren' : storageInfo.persisted ? 'Ja · valvet vräks inte vid diskbrist' : 'Nej · webbläsaren får radera valvet'}</dd><dt>Utrymme</dt><dd>{storageInfo?.supported ? `${formatBytes(storageInfo.usedBytes)} av ${formatBytes(storageInfo.quotaBytes)}` : 'okänt'}</dd></dl>{storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert"><strong>Valvet kan raderas av webbläsaren</strong><p>Utan beständig lagring får webbläsaren slänga valvet när enheten får ont om utrymme. Det finns ingen backup att återställa från.</p><button onClick={() => void requestPersistence().then(state => { setStorageInfo(state); setNotice(state.persisted ? 'Beständig lagring beviljad.' : 'Webbläsaren nekade beständig lagring.'); })}>Begär beständig lagring</button></div>}<label>Enhetsnamn<input value={deviceName} onChange={e => setDeviceName(e.target.value)} /></label>
+      <label>Rensa urklipp efter Copy Local<select aria-label="Rensa urklipp efter Copy Local" value={settings?.clipboardAutoClearSeconds ?? 0} onChange={e => void run(async () => { if (settings) await storage.saveSettings({ ...settings, clipboardAutoClearSeconds: Number(e.target.value) }); await controller.reloadSettings(); })}><option value={0}>Aldrig</option><option value={30}>Efter 30 sekunder</option><option value={60}>Efter 1 minut</option><option value={300}>Efter 5 minuter</option></select><small>Skriver över urklippet när tiden gått. Nedräkningen visas och går att avbryta. Urklippshistorik och molnsynk ligger utanför appens kontroll.</small></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><p className="notice">Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.</p><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></article>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>Lokalt valv · M1</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}

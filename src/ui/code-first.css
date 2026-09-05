@@ -468,3 +468,19 @@
   color: var(--text-muted);
   white-space: nowrap;
 }
+
+.clipboard-countdown {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  background: var(--warn-surface);
+  border-bottom: 1px solid var(--warn-border);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--warn-text);
+}
+.clipboard-countdown button {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+}

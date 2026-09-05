@@ -166,3 +166,25 @@ test('requires a typed confirmation before deleting a project', async ({ page })
   await expect(page.locator('.project-cards')).not.toContainText('Ska raderas');
   await expect(page.locator('.empty-project-list')).toBeVisible();
 });
+
+// Report F4. clipboardAutoClearSeconds existed in the model, defaulted to 0 and was never read, so
+// a real password stayed on the clipboard until something else replaced it.
+test('counts down and clears the clipboard after a local copy', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate(() => (location.hash = '#/settings'));
+  await page.getByLabel('Rensa urklipp efter Copy Local').selectOption('30');
+  await page.evaluate(() => (location.hash = '#/'));
+
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.locator('.copy-actions').getByRole('button', { name: 'Copy Local' }).click();
+  await page.getByRole('button', { name: 'Kopiera LOCAL med secrets' }).click();
+
+  await expect(page.locator('.clipboard-countdown')).toContainText('Urklippet rensas om');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('Hunter2');
+
+  // Cancelling leaves it alone, which is the whole point of showing the countdown.
+  await page.locator('.clipboard-countdown').getByRole('button', { name: 'Avbryt' }).click();
+  await expect(page.locator('.clipboard-countdown')).toHaveCount(0);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('Hunter2');
+});
