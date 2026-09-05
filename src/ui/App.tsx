@@ -12,6 +12,7 @@ import { Modal } from './components/Modal';
 import { ProjectBrowser, projectMatches } from './components/ProjectBrowser';
 import { Security } from './pages/Security';
 import { applyTheme, paintHint, resolveTheme, systemPrefersDark, watchSystemTheme, type ThemeChoice } from './theme';
+import { formatBytes, requestPersistence, storageState, type StorageState } from '../storage/persistence';
 import './code-first.css';
 
 type Mode = 'template' | 'local' | 'ai';
@@ -76,6 +77,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [copyMode, setCopyMode] = useState<'local' | 'ai' | null>(null), [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
   const [deviceName, setDeviceName] = useState(''), currentLine = useRef(1);
   const [theme, setTheme] = useState<ThemeChoice>(paintHint()), [systemDark, setSystemDark] = useState(systemPrefersDark);
+  const [storageInfo, setStorageInfo] = useState<StorageState | null>(null), asked = useRef(false);
   const overview = useRef<HTMLDivElement>(null), overviewScroll = useRef(0);
   const navigateRef = useRef<(hash: string, replace?: boolean) => Promise<void>>(async () => {});
   const workspaceVisible = route === '#/' || route.startsWith('#/project/');
@@ -119,6 +121,13 @@ export function App({ storage }: { storage: StorageProvider }) {
     return () => { alive = false; window.removeEventListener('hashchange', changed); window.removeEventListener('beforeunload', unload); controller.dispose(); };
   }, [controller, storage]);
   useEffect(() => watchSystemTheme(setSystemDark), []);
+  useEffect(() => { void storageState().then(setStorageInfo); }, []);
+  // Asking on an empty first visit would prompt Firefox users before they have anything to lose.
+  useEffect(() => {
+    if (!project || asked.current) return;
+    asked.current = true;
+    void requestPersistence().then(setStorageInfo);
+  }, [project]);
   useEffect(() => { if (project && routeRef.current === '#/') setLocation(`#/project/${project.id}`, true); }, [project]);
   useEffect(() => { if (route === '#/projects' && overview.current) overview.current.scrollTop = overviewScroll.current; }, [route]);
   useEffect(() => {
@@ -244,7 +253,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         {!filtered.length && <p className="empty-project-list">{projects.length ? 'Inga projekt matchar sökningen.' : 'Inga projekt ännu. Välj Ny kod och klistra in för att börja.'}</p>}
       </section></div>
       <div hidden={route !== '#/security'}><Security /></div>
-      <article className="document" hidden={route !== '#/settings'}><span className="eyebrow">DEN HÄR INSTALLATIONEN</span><h1>Inställningar</h1><p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p><dl><dt>Aktuellt origin</dt><dd>{location.origin}</dd><dt>App-sökväg</dt><dd>{location.pathname}</dd><dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd><dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd></dl><label>Enhetsnamn<input value={deviceName} onChange={e => setDeviceName(e.target.value)} /></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><p className="notice">Utkast sparas automatiskt på den här datorn. Det är ingen backup. Backup och återställning införs i M3.</p></article>
+      <article className="document" hidden={route !== '#/settings'}><span className="eyebrow">DEN HÄR INSTALLATIONEN</span><h1>Inställningar</h1><p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p><dl><dt>Aktuellt origin</dt><dd>{location.origin}</dd><dt>App-sökväg</dt><dd>{location.pathname}</dd><dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd><dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd><dt>Beständig lagring</dt><dd>{!storageInfo ? 'Läser…' : !storageInfo.supported ? 'Stöds inte av webbläsaren' : storageInfo.persisted ? 'Ja · valvet vräks inte vid diskbrist' : 'Nej · webbläsaren får radera valvet'}</dd><dt>Utrymme</dt><dd>{storageInfo?.supported ? `${formatBytes(storageInfo.usedBytes)} av ${formatBytes(storageInfo.quotaBytes)}` : 'okänt'}</dd></dl>{storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert"><strong>Valvet kan raderas av webbläsaren</strong><p>Utan beständig lagring får webbläsaren slänga valvet när enheten får ont om utrymme. Det finns ingen backup att återställa från.</p><button onClick={() => void requestPersistence().then(state => { setStorageInfo(state); setNotice(state.persisted ? 'Beständig lagring beviljad.' : 'Webbläsaren nekade beständig lagring.'); })}>Begär beständig lagring</button></div>}<label>Enhetsnamn<input value={deviceName} onChange={e => setDeviceName(e.target.value)} /></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><p className="notice">Utkast sparas automatiskt på den här datorn. Det är ingen backup. Backup och återställning införs i M3.</p></article>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>Lokalt valv · M1</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}

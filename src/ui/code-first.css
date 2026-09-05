@@ -341,3 +341,22 @@
   color: var(--danger-text);
   word-break: break-all;
 }
+
+.persistence-warning {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--warn-border);
+  border-left: 4px solid var(--warn-text);
+  border-radius: 8px;
+  background: var(--warn-surface);
+}
+.persistence-warning strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--warn-text);
+}
+.persistence-warning p {
+  margin-bottom: 10px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
