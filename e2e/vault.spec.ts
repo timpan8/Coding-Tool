@@ -132,3 +132,29 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await expect(fresh.locator('.project-cards')).toContainText('Backup-provet');
   await restored.close();
 });
+
+// Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did
+// exist were native dialogs, two of which opened on top of an already open <dialog>.
+test('requires a typed confirmation before deleting a project', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await page.getByRole('button', { name: 'Ändra projektnamn' }).click();
+  await page.getByLabel('Projektnamn').fill('Ska raderas');
+  await page.getByLabel('Projektnamn').press('Enter');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+
+  await page.getByRole('button', { name: 'Radera projekt' }).click();
+  const dialog = page.locator('dialog[open]');
+  await expect(dialog).toContainText('försvinner för alltid');
+  const remove = dialog.getByRole('button', { name: 'Radera projektet' });
+  await expect(remove).toBeDisabled();
+
+  await dialog.getByLabel(/Skriv RADERA/).fill('RADERA');
+  await expect(remove).toBeEnabled();
+  await remove.click();
+  // Navigating before the delete settles would be cancelled, so wait for its acknowledgement.
+  await expect(page.locator('.inline-notice')).toContainText('Ska raderas raderat');
+
+  await page.evaluate(() => (location.hash = '#/projects'));
+  await expect(page.locator('.project-cards')).not.toContainText('Ska raderas');
+  await expect(page.locator('.empty-project-list')).toBeVisible();
+});

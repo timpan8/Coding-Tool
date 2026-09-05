@@ -150,6 +150,15 @@ export class WorkspaceController {
     this.edit({ text: version.templates[this.state.session.fileId] ?? '', baseVersionId: version.id });
     await this.flush();
   }
+  /** Drops the in-memory session without writing it back. Needed after the open project is deleted
+   * or the vault is replaced by an import: the session still holds a draft revision for a project
+   * that no longer exists, so any later flush would throw. */
+  reset() {
+    clearTimeout(this.timer);
+    this.sessions.clear();
+    this.lastProjectId = null;
+    this.publish({ session: blank(), phase: 'saved', error: '' });
+  }
   async refreshProjects() { this.publish({ projects: await this.storage.listProjects() }); }
   dispose() { clearTimeout(this.timer); }
 }

@@ -417,3 +417,22 @@
   color: var(--accent-text);
   font-size: 0.875rem;
 }
+
+.inline-warning {
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--warn-border);
+  border-left: 4px solid var(--warn-text);
+  border-radius: 7px;
+  background: var(--warn-surface);
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+.confirm-body ul {
+  margin: 0 0 12px;
+  padding-left: 22px;
+  font-size: 0.875rem;
+}
+.confirm-body li {
+  margin-bottom: 4px;
+}

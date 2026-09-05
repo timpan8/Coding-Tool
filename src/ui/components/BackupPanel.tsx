@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ImportResolution, ImportResult } from '../../types/models';
 import type { StorageProvider } from '../../storage/StorageProvider';
 import { parseSnapshot, planImport, toSnapshot, type ImportPlan, type Snapshot, type SnapshotKind } from '../../domain/snapshot';
+import type { ConfirmRequest } from './ConfirmDialog';
 
 function download(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -17,7 +18,15 @@ function download(name: string, text: string) {
 
 const stamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
 
-export function BackupPanel({ storage, notify }: { storage: StorageProvider; notify: (message: string) => void }) {
+export function BackupPanel({
+  storage,
+  notify,
+  confirm,
+}: {
+  storage: StorageProvider;
+  notify: (message: string) => void;
+  confirm: (request: ConfirmRequest) => Promise<boolean>;
+}) {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ snapshot: Snapshot; plan: ImportPlan } | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
@@ -82,6 +91,35 @@ export function BackupPanel({ storage, notify }: { storage: StorageProvider; not
     }
   }
 
+  async function clearVault() {
+    const workspace = await storage.exportAll();
+    const ok = await confirm({
+      title: 'Rensa hela valvet?',
+      danger: true,
+      confirmLabel: 'Rensa valvet',
+      typeToConfirm: 'RENSA',
+      body: (
+        <>
+          <p>Allt på den här datorn raderas för alltid:</p>
+          <ul>
+            <li>{workspace.projects.length} projekt med all versionshistorik</li>
+            <li>{workspace.bindings.length} bindings, med sina privata värden</li>
+          </ul>
+          <p>Det finns ingen ångra. Exportera en backup först om du kan behöva något av det igen.</p>
+        </>
+      ),
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await storage.clearAll();
+      notify('Valvet är rensat.');
+      location.reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="backup-panel">
       <h2>Backup</h2>
@@ -132,6 +170,15 @@ export function BackupPanel({ storage, notify }: { storage: StorageProvider; not
           </button>
         </div>
       )}
+
+      <h2>Rensa</h2>
+      <p>
+        Tar bort allt som hör till den här appen i den här webbläsaren. Använd det innan du lämnar en delad dator, och
+        exportera först om något ska sparas.
+      </p>
+      <button className="danger" disabled={busy} onClick={() => void clearVault()}>
+        Rensa hela valvet
+      </button>
 
       {pending && (
         <div className="import-plan">

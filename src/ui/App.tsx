@@ -11,6 +11,7 @@ import { BindingDialog } from './components/BindingDialog';
 import { Modal } from './components/Modal';
 import { ProjectBrowser, projectMatches } from './components/ProjectBrowser';
 import { BackupPanel } from './components/BackupPanel';
+import { useConfirm } from './components/ConfirmDialog';
 import { Security } from './pages/Security';
 import { applyTheme, paintHint, resolveTheme, systemPrefersDark, watchSystemTheme, type ThemeChoice } from './theme';
 import { formatBytes, requestPersistence, storageState, type StorageState } from '../storage/persistence';
@@ -79,6 +80,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [deviceName, setDeviceName] = useState(''), currentLine = useRef(1);
   const [theme, setTheme] = useState<ThemeChoice>(paintHint()), [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [storageInfo, setStorageInfo] = useState<StorageState | null>(null), asked = useRef(false);
+  const [confirm, confirmDialog] = useConfirm();
   const overview = useRef<HTMLDivElement>(null), overviewScroll = useRef(0);
   const navigateRef = useRef<(hash: string, replace?: boolean) => Promise<void>>(async () => {});
   const workspaceVisible = route === '#/' || route.startsWith('#/project/');
@@ -150,6 +152,23 @@ export function App({ storage }: { storage: StorageProvider }) {
     .sort((a, b) => Number(Boolean(resolveValue(a, options.profileId))) - Number(Boolean(resolveValue(b, options.profileId))) || a.name.localeCompare(b.name));
   const saveStatus = phase === 'loading' ? 'Öppnar lokalt valv…' : phase === 'error' ? 'Fel vid sparning' : phase === 'saved' ? 'Sparat lokalt' : 'Sparar lokalt…';
   const currentId = controller.getLastProjectId(), filtered = projects.filter(p => projectMatches(p, query));
+  async function removeProject(id: string, name: string) {
+    await run(async () => {
+      const [versions, all] = await Promise.all([storage.listVersions(id), storage.listBindings()]);
+      const scoped = all.filter(b => b.scope === 'project' && b.scopeRef === id);
+      if (!await confirm({ title: `Radera ${name}?`, danger: true, confirmLabel: 'Radera projektet', typeToConfirm: 'RADERA',
+        body: <><p>Följande försvinner för alltid från den här datorn:</p><ul><li>{versions.length} sparade versioner</li><li>{scoped.length} bindings som hör till projektet, med sina privata värden</li><li>Det pågående utkastet</li></ul><p>Globala bindings påverkas inte. Exportera en backup först om du är osäker.</p></> })) return;
+      const wasOpen = controller.getSnapshot().session.project?.id === id;
+      await storage.deleteProject(id);
+      // The session still points at the deleted project, so it must be dropped before anything
+      // else runs; a later flush would try to save a draft for a project that is gone.
+      if (wasOpen) controller.reset();
+      await controller.refreshProjects();
+      setBindings(await storage.listBindings());
+      if (wasOpen) setLocation('#/', true);
+      setNotice(`${name} raderat.`);
+    });
+  }
   function changeTheme(next: ThemeChoice) {
     setTheme(next); applyTheme(next);
     if (settings) void storage.saveSettings({ ...settings, theme: next }).catch(() => setNotice('Temat gäller nu men kunde inte sparas.'));
@@ -189,12 +208,14 @@ export function App({ storage }: { storage: StorageProvider }) {
     await run(async () => {
       await controller.flush(); const snapshot = await storage.exportAll();
       const locations = [...snapshot.versions, ...snapshot.drafts].filter(item => Object.values(item.templates).some(t => t.includes(`{{${binding.name}}}`)));
-      if (!window.confirm(`Radera ${binding.name}? Används i ${locations.length} versioner/utkast. Berörda platshållare får saknade värden.`)) return;
+      if (!await confirm({ title: `Radera ${binding.name}?`, danger: true, confirmLabel: 'Radera bindingen',
+        body: <><p>Bindingen används i {locations.length} versioner och utkast.</p><p>Platshållarna blir kvar i koden men får inget värde, så kopiering blockeras tills du åtgärdar dem.</p></> })) return;
       await storage.deleteBinding(binding.id); setBindings(await storage.listBindings());
     });
   }
   async function applyVersion(version: Version, save = false) {
-    if (!window.confirm(`Använd v${version.number} i arbetsutkastet? Nuvarande utkast ersätts, men sparade versioner finns kvar.`)) return;
+    if (!await confirm({ title: `Använd v${version.number}?`, confirmLabel: 'Ersätt utkastet',
+      body: <><p>Det nuvarande arbetsutkastet ersätts av innehållet i v{version.number}.</p><p>Sparade versioner påverkas inte och går att gå tillbaka till.</p></> })) return;
     await run(async () => { await controller.applyVersion(version); if (save) await controller.saveVersion(`Återgång till v${version.number}`); changeMode('template'); });
   }
   async function writeClipboard(text: string, which: 'local' | 'ai') {
@@ -230,7 +251,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <div className="workspace" hidden={!workspaceVisible}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : 'BÖRJA DIREKT'}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
         <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => controller.changeLanguage(e.target.value as LanguageId)}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project?.files[0].name ?? 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
-      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => void run(() => controller.saveVersion())}>Spara version</button></div></section>
+      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => void run(() => controller.saveVersion())}>Spara version</button></div></section>
         <div className="work-grid"><section className={`editor-panel mode-${mode}`}>
           <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions"><button disabled={!template.trim() || Boolean(local.issues.length)} onClick={() => void copy('local')}>Copy Local</button><button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
           <div className="view-banner" key={mode}><strong>{mode === 'template' ? '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN' : mode === 'local' ? '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN' : '◇ AI — SANERAD'}</strong><span>{mode === 'template' ? 'Redigerbar källa' : 'Skrivskyddad projektion'}</span></div>
@@ -254,12 +275,13 @@ export function App({ storage }: { storage: StorageProvider }) {
         {!filtered.length && <p className="empty-project-list">{projects.length ? 'Inga projekt matchar sökningen.' : 'Inga projekt ännu. Välj Ny kod och klistra in för att börja.'}</p>}
       </section></div>
       <div hidden={route !== '#/security'}><Security /></div>
-      <article className="document" hidden={route !== '#/settings'}><span className="eyebrow">DEN HÄR INSTALLATIONEN</span><h1>Inställningar</h1><p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p><dl><dt>Aktuellt origin</dt><dd>{location.origin}</dd><dt>App-sökväg</dt><dd>{location.pathname}</dd><dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd><dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd><dt>Beständig lagring</dt><dd>{!storageInfo ? 'Läser…' : !storageInfo.supported ? 'Stöds inte av webbläsaren' : storageInfo.persisted ? 'Ja · valvet vräks inte vid diskbrist' : 'Nej · webbläsaren får radera valvet'}</dd><dt>Utrymme</dt><dd>{storageInfo?.supported ? `${formatBytes(storageInfo.usedBytes)} av ${formatBytes(storageInfo.quotaBytes)}` : 'okänt'}</dd></dl>{storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert"><strong>Valvet kan raderas av webbläsaren</strong><p>Utan beständig lagring får webbläsaren slänga valvet när enheten får ont om utrymme. Det finns ingen backup att återställa från.</p><button onClick={() => void requestPersistence().then(state => { setStorageInfo(state); setNotice(state.persisted ? 'Beständig lagring beviljad.' : 'Webbläsaren nekade beständig lagring.'); })}>Begär beständig lagring</button></div>}<label>Enhetsnamn<input value={deviceName} onChange={e => setDeviceName(e.target.value)} /></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><p className="notice">Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.</p><BackupPanel storage={storage} notify={setNotice} /></article>
+      <article className="document" hidden={route !== '#/settings'}><span className="eyebrow">DEN HÄR INSTALLATIONEN</span><h1>Inställningar</h1><p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p><dl><dt>Aktuellt origin</dt><dd>{location.origin}</dd><dt>App-sökväg</dt><dd>{location.pathname}</dd><dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd><dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd><dt>Beständig lagring</dt><dd>{!storageInfo ? 'Läser…' : !storageInfo.supported ? 'Stöds inte av webbläsaren' : storageInfo.persisted ? 'Ja · valvet vräks inte vid diskbrist' : 'Nej · webbläsaren får radera valvet'}</dd><dt>Utrymme</dt><dd>{storageInfo?.supported ? `${formatBytes(storageInfo.usedBytes)} av ${formatBytes(storageInfo.quotaBytes)}` : 'okänt'}</dd></dl>{storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert"><strong>Valvet kan raderas av webbläsaren</strong><p>Utan beständig lagring får webbläsaren slänga valvet när enheten får ont om utrymme. Det finns ingen backup att återställa från.</p><button onClick={() => void requestPersistence().then(state => { setStorageInfo(state); setNotice(state.persisted ? 'Beständig lagring beviljad.' : 'Webbläsaren nekade beständig lagring.'); })}>Begär beständig lagring</button></div>}<label>Enhetsnamn<input value={deviceName} onChange={e => setDeviceName(e.target.value)} /></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><p className="notice">Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.</p><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></article>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>Lokalt valv · M1</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
     {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0} save={storeBinding} close={() => setBindingDialog(null)} />}
     {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} />}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound ? 'primary' : ''} onClick={() => { const result = render(template, bindings, { ...options, mode: copyMode }); if (!result.issues.length) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
+    {confirmDialog}
     {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
   </div>;
 }
