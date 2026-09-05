@@ -1,0 +1,36 @@
+import { useState } from 'react';
+import type { Binding, Category } from '../../types/models';
+import { categories } from '../../types/models';
+import { defaults, validateBinding } from '../../domain/bindings';
+import { Modal } from './Modal';
+export function BindingDialog({ initial, bindings, count, save, close }: {
+  initial: Binding; bindings: Binding[]; count: number; save: (binding: Binding, all: boolean) => Promise<void>; close: () => void;
+}) {
+  const [value, setValue] = useState(initial), [show, setShow] = useState(false), [all, setAll] = useState(true), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const existing = bindings.some(b => b.id === initial.id);
+  async function submit() {
+    const errors = validateBinding(value, bindings);
+    if (errors.length) { setError(errors.join(' ')); return; }
+    if (value.category === 'secret' && !/^<[A-Z_]+>$/.test(value.aiReplacement) && !window.confirm('AI-värdet ser inte ut som en tydlig platshållare, t.ex. <PASSWORD>. Har du granskat att det är ofarligt?')) return;
+    setBusy(true);
+    try { await save(value, all); close(); } catch { setError('Bindingen kunde inte sparas. Ändringarna finns kvar i dialogen.'); } finally { setBusy(false); }
+  }
+  return <Modal title={existing ? 'Redigera binding' : 'Skapa binding'} close={close}>
+    <div className="form-grid">
+      <label>Namn<input value={value.name} disabled={existing} onChange={e => setValue({ ...value, name: e.target.value.toUpperCase() })} autoFocus />{existing && <small>Namnet är låst för att bevara mallarnas referenser.</small>}</label>
+      <label>Kategori<select value={value.category} onChange={e => { const category = e.target.value as Category; setValue({ ...value, category, aiReplacement: existing ? value.aiReplacement : defaults[category] }); }}>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
+      <label>Scope<select value={value.scope} onChange={e => setValue({ ...value, scope: e.target.value as Binding['scope'], scopeRef: e.target.value === 'global' ? null : initial.scopeRef })} disabled={existing || initial.scope === 'version'}><option value="project">Projekt</option><option value="global">Globalt</option>{initial.scope === 'version' && <option value="version">Version</option>}</select></label>
+      <label>AI-värde<input value={value.aiReplacement} onChange={e => setValue({ ...value, aiReplacement: e.target.value })} spellCheck={false} autoComplete="off" /></label>
+      <label className="wide">Privat värde · standard<input type={show ? 'text' : 'password'} value={value.values.__default__ ?? ''} onChange={e => setValue({ ...value, values: { ...value.values, __default__: e.target.value } })} autoComplete="off" spellCheck={false} /></label>
+      <label className="check"><input type="checkbox" checked={show} onChange={e => setShow(e.target.checked)} />Visa privat värde</label>
+      <label className="check"><input type="checkbox" checked={value.escapeMode === 'raw'} onChange={e => {
+        if (!e.target.checked || window.confirm('Raw stänger av escaping. Värdet kan ändra kodens syntax och betydelse. Aktivera raw för denna binding?')) setValue({ ...value, escapeMode: e.target.checked ? 'raw' : 'auto' });
+      }} />Raw · ingen escaping</label>
+      <label className="wide">Beskrivning<input value={value.description} onChange={e => setValue({ ...value, description: e.target.value })} /></label>
+    </div>
+    {count > 0 && <label className="check"><input type="checkbox" checked={all} onChange={e => setAll(e.target.checked)} />Ersätt alla identiska förekomster i filen ({count} st)</label>}
+    <p className="muted">Ange privata värden utan kodens escaping. Endast AI-värdet visas i den sanerade vyn.</p>
+    {error && <p role="alert" className="error">{error}</p>}
+    <div className="dialog-actions"><button onClick={close}>Avbryt</button><button className="primary" disabled={busy} onClick={() => void submit()}>{busy ? 'Sparar…' : 'Spara binding'}</button></div>
+  </Modal>;
+}
