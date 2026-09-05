@@ -4,9 +4,11 @@ Statisk React/TypeScript-app för GitHub Pages. Kod lagras som mallar med `{{BIN
 
 ## Status
 
-**M1 – körbar kärnrunda.** Startsidan är en direkt kodarbetsyta: första inklistringen skapar ett namnlöst projekt och ett lokalt utkast automatiskt. Utkast sparas med debounce och revisionskontroll; projekt kan namnges i överkanten och växlas via Mina projekt eller Alla projekt utan att versionshistoriken fylls. Projekt, en fil per projekt i UI, bevarade versioner, Monaco, bindings, scope-resolution, profil-fallback, kontextstyrd escaping, tre tydliga vyer och kopiering ingår. Secrets maskeras som standard och lokal kopiering med secrets kräver bekräftelse.
+**Körbar kärnrunda med backup.** Startsidan är en direkt kodarbetsyta: första inklistringen skapar ett namnlöst projekt och ett lokalt utkast automatiskt. Utkast sparas med debounce och revisionskontroll; projekt kan namnges i överkanten och växlas via Mina projekt eller Alla projekt utan att versionshistoriken fylls. Projekt, en fil per projekt i UI, bevarade versioner, Monaco, bindings, scope-resolution, profil-fallback, kontextstyrd escaping, tre tydliga vyer och kopiering ingår. Secrets maskeras som standard och lokal kopiering med secrets kräver bekräftelse.
 
-**Inte levererat ännu:** M2 reconciliation/scanner/markörer, M3 backup/import/merge/autosave, M4 diff/datasets/profil-UI, M5 sökvägsregler/diskintegration. Använd testvärden tills backup finns. `StorageProvider.importAll` avvisar anrop i M1; import aktiveras först tillsammans med M3:s schema och granskning.
+Valvet går att exportera och återställa, appen begär beständig lagring så att webbläsaren inte vräker det, urklippet kan rensas automatiskt efter Copy Local, och kopieringsdialogen redovisar hur stor andel av kodens strängvärden som faktiskt är skyddade. Ljust och mörkt tema finns.
+
+**Inte levererat ännu:** heuristisk scanner för okända hemligheter, återmatchning av kod som kommer tillbaka från en AI, flera filer per projekt, diff mellan versioner, datasets och profil-UI, sökvägsregler och diskintegration.
 
 ## Start
 
@@ -48,17 +50,17 @@ Verktyget är byggt för att minska oavsiktlig delning av privata värden, bevar
 
 Det skyddar **inte** mot skadlig kod, keyloggers, annan användare på samma OS-konto, webbläsartillägg som kan läsa DOM/IndexedDB, diskforensik, manuellt skickade hemligheter eller en komprometterad GitHub Pages-app/supply chain.
 
-**Urklippshistorik och molnsynkat urklipp ligger utanför appens kontroll.** Copy Local lägger riktiga värden i Windows/macOS/Linux-urklippet. Ingen automatisk urklippsrensning finns i M1.
+**Urklippshistorik och molnsynkat urklipp ligger utanför appens kontroll.** Copy Local lägger riktiga värden i Windows/macOS/Linux-urklippet. Automatisk rensning efter en valbar tid finns i inställningarna, men den når bara själva urklippet, inte historiken.
 
-**IndexedDB lagrar privata värden i klartext**, enligt specifikationen. Inget huvudlösenord. Rensad webbläsardata, annan profil eller annat origin kan göra valvet oåtkomligt. Backup finns ännu inte i M1.
+**IndexedDB lagrar privata värden i klartext**, enligt specifikationen. Inget huvudlösenord. Rensad webbläsardata, annan profil eller annat origin kan göra valvet oåtkomligt — exportera en backup regelbundet. Exportfilerna innehåller också klartext; den privata varianten utelämnar projektkoden men inte värdena.
 
 **Origin är viktigt:** `http://localhost:5173`, `http://127.0.0.1:4173` och `https://timpan8.github.io` har separata valv. Välj ett primärt origin. Repo-sökvägar på samma `user.github.io` delar däremot origin; separata databasnamn är bara namnisolering, ingen säkerhetsgräns mellan appar. Aktuellt origin visas i inställningarna. Ingen synk mellan datorer.
 
-Appen säger **”Inga kända problem hittades”**, aldrig att säkerhet är garanterad. M1 blockerar saknade värden, osäkra renderingskontexter och exakta kända privata värden vid AI-kopiering. Okända och transformerade värden kan fortfarande förekomma; full scanner införs i M2. Escaping är konservativ textbearbetning och ersätter inte en fullständig språkparser.
+Appen redovisar vad den faktiskt kontrollerat och säger aldrig att säkerhet är garanterad. Före AI-kopiering blockeras saknade värden, osäkra renderingskontexter och exakta kända privata värden, och dialogen visar hur många av kodens strängvärden som är kopplade till bindings. Är inget kopplat sägs det rakt ut i stället för att beskedet låter godkännande. Okända och transformerade värden kan fortfarande förekomma; en heuristisk scanner återstår. Escaping är konservativ textbearbetning och ersätter inte en fullständig språkparser.
 
 ## Verifiering
 
-`pnpm test` kör Vitest, fake-indexeddb och fast-check. Domänlogik saknar DOM-beroenden. Storage-kontraktet kan köras mot framtida providers med samma tester. Tester använder endast syntetiska värden.
+`pnpm lint`, `pnpm test` och `pnpm test:e2e` körs i CI vid varje pull request. `pnpm test` kör Vitest, fake-indexeddb och fast-check; `pnpm test:e2e` kör Playwright mot produktionsbygget, eftersom flera fel bara syns med den riktiga editorn. Domänlogik saknar DOM-beroenden. Storage-kontraktet kan köras mot framtida providers med samma tester. Tester använder endast syntetiska värden.
 
 `pnpm build` kontrollerar TypeScript strict, bygger alla lokala Monaco-resurser och granskar JavaScript-bundlen för nätverksanrop utanför service workern. CSP har `connect-src 'none'`. Kontrollerna är begränsade och är inte ett bevis på frånvaro av alla möjliga läckagevägar.
 

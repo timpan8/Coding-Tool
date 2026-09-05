@@ -25,3 +25,26 @@ Ambiguösa eller ej stödda strängkontexter behåller platshållaren med blocke
 Startsidan är en arbetsyta i stället för ett projektskapande formulär. Första icke-tomma texten skapar ett `Namnlöst projekt`; namn och språk kan ändras efteråt. Utkast lagras i en separat IndexedDB-tabell efter 500 ms och får aldrig skapa versionshistorik automatiskt. Utkast har monoton revisionsräknare och stale writes avvisas.
 
 Mina projekt är en snabb sökbar dialog och Alla projekt är en separat hash-route. Projektbyte flushar utkastet före läsning; navigering stoppas om flush misslyckas. Monaco-modeller hålls per arbetsyta/vy så editorhistorik och vyposition inte blandas ihop.
+
+## 2026-09-05 — Rapportens åtgärdslista styr leveransordningen
+
+Milstolpeordningen M1–M5 ersätts av den prioriterade listan i `FORBATTRINGSRAPPORT.md`. Skälet är att M1 levererade
+ett verktyg som i sitt vanligaste flöde påstod att koden var granskad när ingenting var kopplat, och att valvet saknade
+både backup och beständig lagring. Att bygga vidare på den ordningen hade betytt att fortsätta lägga funktioner ovanpå
+ett felaktigt besked.
+
+Två ordningsregler gäller oavsett vad som byggs härnäst:
+
+- **Export före destruktivt.** Radera projekt och Rensa valvet får inte finnas innan det går att ta en backup.
+- **Färgtokens före nya komponenter.** Varje ny komponent som skrivs innan färgerna är tokeniserade bidrar med nya
+  hårdkodade värden som måste migreras en andra gång. Byggkontrollen fäller numera en färgliteral utanför en
+  tokendefinition.
+
+Kända defekter läggs in i Playwright-sviten som `test.fail()` innan de åtgärdas. CI förblir grön, buggen är dokumenterad,
+och den commit som rättar den tar bort markören — historiken bär då beviset att felet fanns och sedan inte fanns.
+
+## Beslut om urklippsrensning
+
+Rensningen skriver bara över texten appen själv lade dit, när webbläsaren tillåter att urklippet läses. Nekas läsning
+rensas ändå: nedräkningen är synlig hela tiden och går att avbryta, så användaren har haft sin chans att behålla det som
+kopierats, och ett kvarlämnat lösenord är det värre utfallet. Utfallet redovisas i gränssnittet i stället för att antas.
