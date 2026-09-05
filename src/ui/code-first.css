@@ -7,7 +7,7 @@
   gap: 22px;
 }
 .code-first .brand {
-  color: var(--ink);
+  color: var(--text-strong);
   padding: 0;
   text-decoration: none;
   display: flex;
@@ -17,8 +17,8 @@
   white-space: nowrap;
 }
 .code-first .brand-icon {
-  background: #e1f0eb;
-  color: #126956;
+  background: var(--accent-surface-strong);
+  color: var(--accent);
 }
 .top-navigation {
   display: flex;
@@ -33,13 +33,13 @@
   font-size: 0.8rem;
 }
 .top-navigation button:hover {
-  background: #eef4f7;
+  background: var(--surface-hover);
 }
 .top-navigation kbd {
   margin-left: 5px;
 }
 .code-first main {
-  background: #f3f6f9;
+  background: var(--bg);
   min-height: calc(100vh - 120px);
 }
 .project-heading {
@@ -57,7 +57,7 @@
   border: 0;
   background: transparent;
   padding: 0;
-  color: var(--ink);
+  color: var(--text-strong);
   font-size: 1.65rem;
   font-weight: 650;
   letter-spacing: -0.7px;
@@ -67,11 +67,11 @@
 }
 .project-name:hover {
   background: transparent;
-  color: #126956;
+  color: var(--accent);
 }
 .project-name span {
   font-size: 0.85rem;
-  color: #8aa0ad;
+  color: var(--text-subtle);
   opacity: 0;
 }
 .project-name:hover span {
@@ -87,7 +87,7 @@
   display: flex;
   align-items: center;
   gap: 15px;
-  color: #708595;
+  color: var(--text-muted);
   font-size: 0.78rem;
   margin-top: 7px;
 }
@@ -132,7 +132,7 @@
   top: 25px;
   display: grid;
   gap: 4px;
-  color: #7890a1;
+  color: var(--text-subtle);
   font-size: 0.95rem;
 }
 .paste-prompt span {
@@ -149,7 +149,7 @@
   border-top: 1px solid var(--border);
   margin-top: 18px;
   padding-top: 14px;
-  color: #5f7787;
+  color: var(--text-muted);
   font-size: 0.75rem;
 }
 .version-history summary {
@@ -159,7 +159,7 @@
   justify-content: space-between;
 }
 .version-history summary span {
-  background: #e8edf1;
+  background: var(--border-subtle);
   border-radius: 15px;
   padding: 1px 7px;
   font-weight: 400;
@@ -174,20 +174,20 @@
   align-items: center;
   gap: 15px;
   padding: 10px 30px;
-  border-bottom: 1px solid #e5c3b4;
-  background: #fff0e8;
-  color: #893d2a;
+  border-bottom: 1px solid var(--danger-border);
+  background: var(--danger-surface);
+  color: var(--danger-text);
   font-size: 0.8rem;
 }
 .persistence-error p {
   margin: 0;
   flex: 1;
-  color: #893d2a;
+  color: var(--danger-text);
 }
 .inline-notice {
-  background: #eaf5f1;
-  color: #236b5b;
-  border-color: #c5e2d7;
+  background: var(--accent-surface);
+  color: var(--accent-text);
+  border-color: var(--accent-border);
 }
 .inline-notice button {
   margin-left: auto;
@@ -200,13 +200,13 @@
   overflow: auto;
 }
 .current-project {
-  outline: 2px solid #25846e;
+  outline: 2px solid var(--accent-bright);
   outline-offset: 2px;
 }
 .empty-project-list {
   text-align: center;
   padding: 50px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .project-drawer {
   position: fixed;
@@ -219,7 +219,7 @@
   z-index: 10;
 }
 .project-drawer::backdrop {
-  background: #10233325;
+  background: var(--scrim);
   backdrop-filter: blur(1px);
 }
 .drawer-projects {
@@ -235,7 +235,7 @@
   text-align: left;
   width: 100%;
   padding: 11px 12px;
-  background: #f8fafb;
+  background: var(--surface-raised);
 }
 .drawer-project strong {
   overflow: hidden;
@@ -243,12 +243,12 @@
 }
 .drawer-project span {
   font-size: 0.7rem;
-  color: #778c9b;
+  color: var(--text-subtle);
   font-weight: 400;
 }
 .drawer-project.current {
-  background: #e4f1ec;
-  border-color: #97cdbb;
+  background: var(--accent-surface);
+  border-color: var(--accent-border-strong);
 }
 .code-first .app-footer {
   padding: 12px 30px;
