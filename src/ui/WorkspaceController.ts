@@ -5,7 +5,7 @@ import { usage } from '../domain/render';
 import { t } from './text';
 
 const now = () => new Date().toISOString();
-const extensions: Record<LanguageId, string> = { powershell: 'ps1', javascript: 'js', typescript: 'ts', python: 'py', json: 'json', xml: 'xml', yaml: 'yaml', shell: 'sh', dotenv: 'env', hcl: 'tf', sql: 'sql', plaintext: 'txt' };
+const extensions: Record<LanguageId, string> = { powershell: 'ps1', javascript: 'js', typescript: 'ts', python: 'py', json: 'json', xml: 'xml', yaml: 'yaml', shell: 'sh', dotenv: 'env', hcl: 'tf', sql: 'sql', csharp: 'cs', go: 'go', java: 'java', plaintext: 'txt' };
 export interface WorkSession {
   key: string; project: Project | null; draft: ProjectDraft | null;
   files: ProjectFile[]; activeFileId: string; texts: Record<string, string>;

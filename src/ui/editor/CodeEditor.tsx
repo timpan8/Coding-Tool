@@ -15,16 +15,19 @@ import { language as yaml } from 'monaco-editor/languages/definitions/yaml/yaml.
 import { language as shell } from 'monaco-editor/languages/definitions/shell/shell.js';
 import { language as hcl } from 'monaco-editor/languages/definitions/hcl/hcl.js';
 import { language as sql } from 'monaco-editor/languages/definitions/sql/sql.js';
+import { language as csharp } from 'monaco-editor/languages/definitions/csharp/csharp.js';
+import { language as go } from 'monaco-editor/languages/definitions/go/go.js';
+import { language as java } from 'monaco-editor/languages/definitions/java/java.js';
 import { editorColors, themeName } from '../theme';
 import type { EditorProps } from './props';
 import { t } from '../text';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
-for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell, hcl, sql })) {
+for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell, hcl, sql, csharp, go, java })) {
   monaco.languages.register({ id });
   monaco.languages.setMonarchTokensProvider(id, language);
 }
-const languageIds = ['powershell', 'javascript', 'typescript', 'python', 'xml', 'yaml', 'shell', 'hcl', 'sql', 'json', 'dotenv', 'plaintext'];
+const languageIds = ['powershell', 'javascript', 'typescript', 'python', 'xml', 'yaml', 'shell', 'hcl', 'sql', 'csharp', 'go', 'java', 'json', 'dotenv', 'plaintext'];
 monaco.languages.register({ id: 'json' });
 monaco.languages.setMonarchTokensProvider('json', { tokenizer: { root: [[/"(?:[^"\\]|\\.)*"/, 'string'], [/\b(?:true|false|null)\b/, 'keyword'], [/-?\d+(?:\.\d+)?/, 'number']] } });
 // No dotenv definition ships with monaco, and the syntax is small enough to state outright: a
