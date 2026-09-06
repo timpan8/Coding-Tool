@@ -449,6 +449,30 @@ test('names the profile it is about to copy and says how old the last backup is'
   await expect(page.locator('.backup-panel')).toContainText('Senast exporterat i dag');
 });
 
+// Punkt 11b. Det vanligaste fallet är värde markerat → namn → klart. Allt annat har ett fungerande
+// standardvärde och ligger bakom progressive disclosure — men AI-värdet står kvar på skärmen som
+// text, eftersom det är det enda fält som lämnar valvet.
+test('asks only for a name in the ordinary case', async ({ page }) => {
+  await type(page, '$password = "Hunter2!"\n');
+  await page.getByText('Hunter2', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+
+  const dialog = page.locator('dialog[open]');
+  await expect(dialog.getByLabel('Bindingnamn')).toBeVisible();
+  await expect(dialog.getByLabel('Scope')).toBeHidden();
+  await expect(dialog.getByLabel('AI-värde')).toBeHidden();
+  // Folded away, not hidden: what an AI would see is on screen either way.
+  await expect(dialog.locator('.ai-sees')).toContainText('<PASSWORD>');
+
+  await dialog.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await expect(page.locator('.editor-body')).toContainText('{{PASSWORD}}');
+
+  // Opening an existing binding is opening it for one of those fields, so they start unfolded.
+  await page.locator('.binding-card').getByLabel(/^Redigera /).click();
+  await expect(page.locator('dialog[open]').getByLabel('AI-värde')).toBeVisible();
+});
+
 // Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did
 // exist were native dialogs, two of which opened on top of an already open <dialog>.
 test('requires a typed confirmation before deleting a project', async ({ page }) => {
@@ -1021,6 +1045,9 @@ test('lists every binding in the vault, including global ones', async ({ page })
   // scope is a choice, and the page is what makes the global one reachable at all.
   await page.getByRole('button', { name: '＋ Ny binding' }).click();
   await page.getByLabel('Bindingnamn').fill('SHARED_TOKEN');
+  // Scope is behind the disclosure now: the common case is a value in the open project, and naming
+  // it is the only decision that case has left.
+  await page.getByRole('button', { name: /Fler val/ }).click();
   await page.getByLabel('Scope').selectOption('global');
   await page.getByLabel('Privat värde · standard').fill('token-abc-123');
   await page.getByRole('button', { name: 'Spara binding' }).click();

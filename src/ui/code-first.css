@@ -777,6 +777,20 @@ dialog:has(.version-view) {
   width: 1100px;
 }
 
+.ai-sees {
+  margin: 10px 0 4px;
+  font-size: 0.8125rem;
+}
+.ai-sees code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+}
+.disclosure {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.8125rem;
+}
 .binding-preview {
   display: grid;
   gap: 4px;

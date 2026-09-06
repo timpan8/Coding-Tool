@@ -160,3 +160,11 @@ titta på den.
 **Backuppåminnelsen tjatar inte.** Sidan säger hur gammal den senaste filen är och överlämnar
 bedömningen till den som vet vad som hänt sedan dess. Tidsstämpeln skrivs efter att filen lämnats över,
 så en misslyckad export inte nollställer den.
+
+**Bindingdialogen visar ett fält och gömmer resten.** Det vanligaste fallet är värde markerat → namn →
+klart, och efter etapp 1 och radkontexten finns inget kvar som måste rättas: namnet är fritt när det
+föreslås, kategorin är läst ur raden och AI-värdet följer kategorin. Räckvidd, AI-värde, profilvärden,
+escaping och beskrivning ligger bakom en fällning som är öppen när man redigerar en befintlig binding —
+den som öppnar en sådan kom hit för ett av de fälten. AI-värdet står kvar på skärmen som text även när
+det inte står där som ett fält: det är det enda fält som lämnar valvet, och att fälla undan är inte
+detsamma som att dölja.
