@@ -4,11 +4,17 @@ Statisk React/TypeScript-app för GitHub Pages. Kod lagras som mallar med `{{BIN
 
 ## Status
 
-**Körbar kärnrunda med backup.** Startsidan är en direkt kodarbetsyta: första inklistringen skapar ett namnlöst projekt och ett lokalt utkast automatiskt. Utkast sparas med debounce och revisionskontroll; projekt kan namnges i överkanten och växlas via Mina projekt eller Alla projekt utan att versionshistoriken fylls. Projekt, en fil per projekt i UI, bevarade versioner, Monaco, bindings, scope-resolution, profil-fallback, kontextstyrd escaping, tre tydliga vyer och kopiering ingår. Secrets maskeras som standard och lokal kopiering med secrets kräver bekräftelse.
+**Verktyget är avsett att användas med dina riktiga värden.** Startsidan är en direkt kodarbetsyta: första inklistringen skapar ett namnlöst projekt och ett lokalt utkast automatiskt. Utkast sparas med debounce och revisionskontroll och fyller aldrig versionshistoriken.
 
-Valvet går att exportera och återställa, appen begär beständig lagring så att webbläsaren inte vräker det, urklippet kan rensas automatiskt efter Copy Local, och kopieringsdialogen redovisar hur stor andel av kodens strängvärden som faktiskt är skyddade. Ljust och mörkt tema finns.
+Ett projekt kan ha flera filer. Versioner har etiketter, går att jämföra, förhandsgranska skrivskyddat och radera. Bindings kan byta namn i alla mallar på en gång, raderas med värdet återskrivet i filen, ha ett värde per profil, och nås samlat på `#/bindings` — vilket är enda stället en global binding går att komma åt. Kod som kommer tillbaka från en AI kan klistras in och matchas mot dina värden igen, i tre nivåer där den tredje alltid är ett förslag.
 
-**Inte levererat ännu:** heuristisk scanner för okända hemligheter, återmatchning av kod som kommer tillbaka från en AI, flera filer per projekt, diff mellan versioner, datasets och profil-UI, sökvägsregler och diskintegration.
+En heuristisk scanner letar efter värden som liknar hemligheter och varnar per träff. Den blockerar aldrig: en falsk positiv som inte går att kvittera är hur ett verktyg blir kringgått. Reglerna går att stänga av och komplettera med egna sökord.
+
+Arton språk har var sitt escaping-regelverk. Kontexter som inte kan hanteras säkert vägras med besked om vad man ska göra i stället, i stället för att gissas.
+
+Valvet går att exportera i två former och återställa, appen begär beständig lagring så att webbläsaren inte vräker det, urklippet kan rensas automatiskt efter Copy Local, och kopieringsdialogen redovisar hur stor andel av kodens strängvärden som faktiskt är skyddade. Ljust och mörkt tema, introduktion vid första besöket, ångra-remsa efter radering och en textarea i stället för Monaco på smal skärm.
+
+**Inte levererat ännu:** datasets, sökvägsregler (`ProjectPathConfig` skrivs men läses aldrig) och diskintegration.
 
 ## Start
 
@@ -46,7 +52,7 @@ Endast byggda statiska appfiler publiceras. Inga serverfunktioner, CDN, externa 
 
 Samma information finns på `#/security` i appen.
 
-Verktyget är byggt för att minska oavsiktlig delning av privata värden, bevara dem när kod uppdateras samt stödja delbar export och återställning. De senare delarna levereras i sina milstolpar.
+Verktyget är byggt för att minska oavsiktlig delning av privata värden, bevara dem när kod uppdateras samt stödja delbar export och återställning. Allt tre finns.
 
 Det skyddar **inte** mot skadlig kod, keyloggers, annan användare på samma OS-konto, webbläsartillägg som kan läsa DOM/IndexedDB, diskforensik, manuellt skickade hemligheter eller en komprometterad GitHub Pages-app/supply chain.
 
