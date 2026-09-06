@@ -231,14 +231,14 @@ test('keeps several files in a project, each with its own text and language', as
   await page.locator('.code-editor').click();
   await page.keyboard.type('$second = "two"\n');
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
-  await page.getByLabel('Språk').selectOption('python');
+  await page.getByLabel('Språk', { exact: true }).selectOption('python');
   await expect(page.getByRole('tab', { name: 'del2.py' })).toBeVisible();
 
   // Switching back shows the first file untouched, still PowerShell.
   await page.getByRole('tab', { name: 'script.ps1' }).click();
   await expect(page.locator('.editor-body')).toContainText('$first');
   await expect(page.locator('.editor-body')).not.toContainText('$second');
-  await expect(page.getByLabel('Språk')).toHaveValue('powershell');
+  await expect(page.getByLabel('Språk', { exact: true })).toHaveValue('powershell');
 
   // And it survives a reload, which is where a session-only file list would show.
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
@@ -309,4 +309,35 @@ test('binds the whole string literal, not the part a double click caught', async
   // And the AI projection carries the placeholder's value, not a fragment of the real one.
   await page.getByRole('tab', { name: 'AI' }).click();
   await expect(page.locator('.editor-body')).not.toContainText('Hunter2');
+});
+
+// Report F9 and F10. description, tags and status were set once at creation and never editable,
+// while the project search matched against tags the user had no way to add.
+test('makes project metadata editable and the list worth reading', async ({ page }) => {
+  await type(page, '$a = "one"\n');
+  await page.getByRole('button', { name: 'Ändra projektnamn' }).click();
+  await page.getByLabel('Projektnamn').fill('Rapportskript');
+  await page.getByLabel('Projektnamn').press('Enter');
+
+  await page.getByRole('button', { name: 'Om projektet' }).click();
+  await page.getByLabel('Beskrivning').fill('Plockar ut månadsrapporten');
+  await page.getByLabel('Taggar').fill('rapport, drift');
+  await page.getByLabel('Projektstatus').selectOption('stable');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+  await page.evaluate(() => (location.hash = '#/projects'));
+  const card = page.locator('.project-card').filter({ hasText: 'Rapportskript' });
+  await expect(card).toContainText('Plockar ut månadsrapporten');
+  await expect(card).toContainText('rapport');
+  await expect(card).toContainText('Stabil');
+
+  // The search now matches a tag, which it always claimed to do.
+  await page.getByLabel('Sök i alla projekt').fill('drift');
+  await expect(page.locator('.project-card')).toHaveCount(1);
+  await page.getByLabel('Sök i alla projekt').fill('');
+
+  // And a status filter that excludes it empties the list.
+  await page.getByLabel('Filtrera på status').selectOption('broken');
+  await expect(page.locator('.project-card')).toHaveCount(0);
 });

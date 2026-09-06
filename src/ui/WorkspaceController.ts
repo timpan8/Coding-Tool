@@ -228,6 +228,15 @@ export class WorkspaceController {
     this.lastProjectId = null;
     this.publish({ session: blank(), phase: 'saved', error: '' });
   }
+  /** Re-reads the project record after metadata changed outside the draft path. */
+  async reloadProject() {
+    const s = this.state.session;
+    if (!s.project) return;
+    const project = await this.storage.getProject(s.project.id);
+    if (!project) return;
+    this.session({ project });
+    this.publish({ projects: [project, ...this.state.projects.filter(p => p.id !== project.id)] });
+  }
   async reloadVersions() { const s = this.state.session; if (s.project) this.session({ versions: await this.storage.listVersions(s.project.id) }); }
   async reloadSettings() { this.publish({ settings: await this.storage.getSettings() }); }
   async refreshProjects() { this.publish({ projects: await this.storage.listProjects() }); }

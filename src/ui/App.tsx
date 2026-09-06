@@ -12,7 +12,8 @@ import { WorkspaceController } from './WorkspaceController';
 import { CodeEditor, type Selection } from './editor/CodeEditor';
 import { BindingDialog } from './components/BindingDialog';
 import { Modal } from './components/Modal';
-import { ProjectBrowser, projectMatches } from './components/ProjectBrowser';
+import { ProjectBrowser } from './components/ProjectBrowser';
+import { filterProjects, ProjectCard, ProjectFilters, sortProjects, useProjectFacts, type SortKey } from './components/ProjectsPage';
 import { BackupPanel } from './components/BackupPanel';
 import { RulesPanel } from './components/RulesPanel';
 import { useConfirm } from './components/ConfirmDialog';
@@ -20,6 +21,7 @@ import { collectIssues, IssuePanel, type LocatedIssue } from './components/Issue
 import { FindingsPanel, useDismissals, useScanner } from './components/FindingsPanel';
 import { FileTabs } from './components/FileTabs';
 import { VersionPanel } from './components/VersionPanel';
+import { ProjectDetails } from './components/ProjectDetails';
 import { DiffEditor } from './editor/DiffEditor';
 import { scan, type Finding } from '../domain/scanner';
 import type { ScannerRule } from '../types/models';
@@ -119,10 +121,11 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [route, setRoute] = useState(location.hash || '#/'), routeRef = useRef(route);
   const [bindings, setBindings] = useState<Binding[]>([]), [mode, setMode] = useState<Mode>('template');
   const [drawer, setDrawer] = useState(false), [query, setQuery] = useState('');
+  const [sort, setSort] = useState<SortKey>('updated'), [languageFilter, setLanguageFilter] = useState(''), [statusFilter, setStatusFilter] = useState('');
   const [busy, setBusy] = useState(false), busyRef = useRef(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [bindingDialog, setBindingDialog] = useState<{ binding: Binding; selection?: Selection } | null>(null);
   const [showSecrets, setShowSecrets] = useState(false), [focusName, setFocusName] = useState(''), [focusLine, setFocusLine] = useState<number>();
-  const [viewing, setViewing] = useState<{ version: Version; compareTo: Version | null } | null>(null), [labelling, setLabelling] = useState(false);
+  const [viewing, setViewing] = useState<{ version: Version; compareTo: Version | null } | null>(null), [labelling, setLabelling] = useState(false), [details, setDetails] = useState(false);
   const [copyMode, setCopyMode] = useState<'local' | 'ai' | null>(null), [reviewed, setReviewed] = useState(false), [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
   const [deviceName, setDeviceName] = useState(''), currentLine = useRef(1);
   const [theme, setTheme] = useState<ThemeChoice>(paintHint()), [systemDark, setSystemDark] = useState(systemPrefersDark);
@@ -214,7 +217,9 @@ export function App({ storage }: { storage: StorageProvider }) {
   const activeBindings = bindings.filter(b => resolveBinding(b.name, bindings, options.projectId, options.versionId)?.id === b.id)
     .sort((a, b) => Number(Boolean(resolveValue(a, options.profileId))) - Number(Boolean(resolveValue(b, options.profileId))) || a.name.localeCompare(b.name));
   const saveStatus = phase === 'loading' ? 'Öppnar lokalt valv…' : phase === 'error' ? 'Fel vid sparning' : phase === 'saved' ? 'Sparat lokalt' : 'Sparar lokalt…';
-  const currentId = controller.getLastProjectId(), filtered = projects.filter(p => projectMatches(p, query));
+  const currentId = controller.getLastProjectId();
+  const filtered = sortProjects(filterProjects(projects, query, languageFilter, statusFilter), sort);
+  const facts = useProjectFacts(storage, projects, route === '#/projects');
   async function removeVersion(version: Version) {
     await run(async () => {
       if (version.id === session.baseVersionId) throw new Error('Utkastet bygger på den här versionen. Återställ en annan först.');
@@ -384,7 +389,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <div className="workspace" hidden={!workspaceVisible}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : 'BÖRJA DIREKT'}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
         <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => controller.changeLanguage(e.target.value as LanguageId)}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? `${session.files.length} ${session.files.length === 1 ? 'fil' : 'filer'}` : 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
-      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
+      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
         <div className="work-grid"><section className={`editor-panel mode-${mode}`}>
           <FileTabs files={session.files} activeId={session.activeFileId} disabled={busy}
             onSelect={id => { controller.selectFile(id); changeMode('template'); }}
@@ -421,8 +426,8 @@ export function App({ storage }: { storage: StorageProvider }) {
       </div>
       <div className="overview-scroll" ref={overview} hidden={route !== '#/projects'} onScroll={e => { if (route === '#/projects') overviewScroll.current = e.currentTarget.scrollTop; }}><section className="dashboard">
         <div className="dashboard-heading"><div><span className="eyebrow">DITT LOKALA VALV</span><h1>Alla projekt</h1><p>Ditt pågående arbete ligger kvar medan du letar.</p></div><div className="heading-actions">{currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}<button className="primary" onClick={() => void navigate('#/')}>＋ Ny kod</button></div></div>
-        <div className="search-wrap"><span>⌕</span><input aria-label="Sök i alla projekt" placeholder="Sök namn, tagg eller filnamn…" value={query} onChange={e => setQuery(e.target.value)} /></div><div className="section-title"><h2>Senast ändrade</h2><span>{filtered.length} projekt</span></div>
-        <div className="project-cards">{filtered.map(p => <button className={`project-card ${p.id === currentId ? 'current-project' : ''}`} key={p.id} onClick={() => void navigate(`#/project/${p.id}`)}><div className="card-top"><span className="code-glyph">{'{ }'}</span><span className="language-pill">{p.language}</span></div><h3>{p.name}</h3><p>{p.files[0]?.name}</p><div className="card-footer"><span>{new Date(p.updatedAt).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}</span><span>{p.id === currentId ? 'Pågående →' : 'Öppna →'}</span></div></button>)}</div>
+        <ProjectFilters query={query} onQuery={setQuery} sort={sort} onSort={setSort} language={languageFilter} onLanguage={setLanguageFilter} status={statusFilter} onStatus={setStatusFilter} count={filtered.length} />
+        <div className="project-cards">{filtered.map(p => <ProjectCard key={p.id} project={p} facts={facts[p.id]} current={p.id === currentId} open={() => void navigate(`#/project/${p.id}`)} />)}</div>
         {!filtered.length && <p className="empty-project-list">{projects.length ? 'Inga projekt matchar sökningen.' : 'Inga projekt ännu. Välj Ny kod och klistra in för att börja.'}</p>}
       </section></div>
       <div hidden={route !== '#/security'}><Security /></div>
@@ -450,6 +455,11 @@ export function App({ storage }: { storage: StorageProvider }) {
       <p className="notice">Skrivskyddad mall som den såg ut när versionen sparades. Ditt utkast är orört{viewing.version.files && viewing.version.files.length > 1 ? `. Visar ${session.files.find(f => f.id === session.activeFileId)?.name} av ${viewing.version.files.length} filer` : ''}.</p>
       <div className="dialog-actions"><button onClick={() => setViewing(null)}>Stäng</button><button className="primary" onClick={() => { const v = viewing.version; setViewing(null); void applyVersion(v); }}>Återställ den här versionen</button></div>
     </Modal>}
+    {details && project && <ProjectDetails project={project} close={() => setDetails(false)} save={async patch => {
+      await storage.saveProject({ ...project, ...patch, updatedAt: new Date().toISOString() });
+      await controller.reloadProject();
+      setNotice('Projektuppgifterna är sparade.');
+    }} />}
     {labelling && <SaveVersionDialog next={Math.max(0, ...versions.map(v => v.number)) + 1} save={label => void saveVersion(label)} close={() => setLabelling(false)} />}
     {confirmDialog}
     {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
