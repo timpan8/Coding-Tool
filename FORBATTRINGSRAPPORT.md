@@ -411,7 +411,8 @@ beräknas och sparas vid varje `saveVersion()`.
 
 ## 7. Kodhälsa (kort — påverkar hastigheten på allt ovan)
 
-- **K-a · `App.tsx` gör för mycket.** 207 rader, men 24 `useState`, routing, genvägar, kopiering, bindinghantering, service
+- **K-a · `App.tsx` gör för mycket.** *(Åtgärdat i två vågor. Kvar i `App.tsx`: tillstånd, routing,
+  genvägar och komposition. Längsta raden gick från 3 543 till under 500 tecken.)* 207 rader, men 24 `useState`, routing, genvägar, kopiering, bindinghantering, service
   worker-registrering och fyra hela vyer i samma komponent. Rader på 400–900 tecken gör diffar svårlästa. Bryt ut routing,
   kopieringsflödet och de tre dokumentsidorna innan nya funktioner läggs till.
 - **K-b · Ingen linter och ingen formatering.** Inget ESLint, inget Prettier, ingen CI-konfiguration i repot. Med en AI som ska
