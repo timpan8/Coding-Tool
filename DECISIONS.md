@@ -121,3 +121,15 @@ som hade skrivit tillbaka fel stavning i användarens egen kod.
 **Blocklistan följer med i båda backupformerna.** Termen är ett privat värde med ett beslut vidhängt,
 alltså samma familj som bindings, profiler och regler. Utan det hade svaret på "kommer allt tillbaka?"
 blivit nej dagen listan togs i bruk.
+
+**Appen erbjuder där den förut bara vägrade.** Läckagekollen har hela tiden vetat vilken binding som
+äger ett värde den hittar; den kunskapen användes bara till att blockera kopieringen. Nu erbjuds
+bytet också: i bindingdialogen när markeringen redan finns i valvet, och i problemlistan när ett känt
+värde ligger oskyddat i mallen. Det är ett val och aldrig automatik — samma gräns som DECISIONS.md
+sedan tidigare drar för återmatchningens tredje nivå. Erbjudandet visas bara där appen faktiskt kan
+rätta det: bindingen måste gå att lösa upp här och värdet måste finnas kvar i mallen.
+
+**"Ersätt alla förekomster" är avmarkerad som standard och räknar de andra.** Den räknade tidigare
+med den markerade förekomsten, så ett unikt värde erbjöd sig att ersätta "alla identiska förekomster
+(1 st)". Att skriva om varje förekomst i filen är dessutom ett beslut, och förhandsvisningen ovanför
+rutan visar bara en rad av det.

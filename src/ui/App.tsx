@@ -118,7 +118,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const setNotice = (text: string) => { setNoticeText(text); setNoticeTone('info'); };
   const warn = (text: string) => { setNoticeText(text); setNoticeTone('warn'); };
 
-  const [bindingDialog, setBindingDialog] = useState<{ binding: Binding; selection?: Selection } | null>(null);
+  const [bindingDialog, setBindingDialog] = useState<{ binding: Binding; selection?: Selection; reuse?: string } | null>(null);
   const [showSecrets, setShowSecrets] = useState(false), [focusName, setFocusName] = useState(''), [focusLine, setFocusLine] = useState<number>();
   const [viewing, setViewing] = useState<{ version: Version; compareTo: Version | null } | null>(null), [labelling, setLabelling] = useState(false), [details, setDetails] = useState(false);
   const [copyMode, setCopyMode] = useState<'local' | 'ai' | null>(null), [reviewed, setReviewed] = useState(false), [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
@@ -311,6 +311,33 @@ export function App({ storage }: { storage: StorageProvider }) {
     if (issue.kind !== 'leak') setFocusName(issue.name);
   }
   function changeMode(next: Mode) { setMode(next); setShowSecrets(false); setFocusName(''); setFocusLine(undefined); }
+  /** The private value a leak issue is about, when it is one the app can actually put right: the
+   * binding has to resolve here, and its value has to still be in the template. A value that reaches
+   * the AI output some other way — through another binding's AI value, say — is not fixed by
+   * rewriting the template, so nothing is offered for it. */
+  function leakedValue(issue: LocatedIssue): string | undefined {
+    if (issue.kind !== 'leak') return undefined;
+    const binding = resolveBinding(issue.name, bindings, options.projectId, options.versionId);
+    const value = binding && resolveValue(binding, options.profileId);
+    return value && template.includes(value) ? value : undefined;
+  }
+  /** The leak check has known which binding owns the value since it was written; it used that only
+   * to refuse the copy. Here it offers the swap instead — a choice, not automatic matching. */
+  function replaceLeak(issue: LocatedIssue) {
+    const value = leakedValue(issue);
+    if (!value) return;
+    const before = template;
+    // Placeholders are stepped over, so a value that happens to read like part of one is safe.
+    const parts = template.split(/(\{\{[A-Z][A-Z0-9_]*\}\})/g);
+    let count = 0;
+    for (let i = 0; i < parts.length; i += 2) {
+      count += parts[i].split(value).length - 1;
+      parts[i] = parts[i].split(value).join(`{{${issue.name}}}`);
+    }
+    controller.changeText(parts.join(''));
+    setNotice(t.issues.replaced(issue.name, count));
+    offerUndo({ label: t.issues.replaceUndo(issue.name), restore: async () => { controller.changeText(before); await controller.flush(); } });
+  }
   function createBinding(selection: Selection, finding?: Finding) {
     // Report U7. Ctrl+B in the Local view used to do nothing at all, with nothing said.
     if (mode === 'local') { warn(t.refusal.bindingInLocal); return; }
@@ -343,7 +370,12 @@ export function App({ storage }: { storage: StorageProvider }) {
         if (start < 0 || template.indexOf(selection.text, start + 1) >= 0) throw new BindingRefusal(t.binding.selectInTemplate);
         selection = { ...selection, start, end: start + selection.text.length };
       }
-      setBindingDialog({ binding, selection });
+      // A value already in the vault does not need a second binding. Project before global, the
+      // order resolveBinding would resolve them in.
+      const owner = [...bindings].sort((a, b) => (a.scope === 'global' ? 1 : 0) - (b.scope === 'global' ? 1 : 0))
+        .find(b => resolveBinding(b.name, bindings, options.projectId, options.versionId)?.id === b.id
+          && Object.values(b.values).includes(selection.text));
+      setBindingDialog({ binding, selection, reuse: owner?.name });
     });
   }
   /** Neither editor gives us a paste event we can trust, so a large jump in one change is what a
@@ -651,7 +683,7 @@ export function App({ storage }: { storage: StorageProvider }) {
             onEdit={b => setBindingDialog({ binding: b })}
             onDelete={b => void removeBinding(b)}
             onCreate={() => void newBinding()} />
-          <IssuePanel issues={issues} onSelect={showIssue} />
+          <IssuePanel issues={issues} onSelect={showIssue} fix={{ offered: issue => Boolean(leakedValue(issue)), apply: replaceLeak }} />
           <FindingsPanel findings={findings} onShow={f => { changeMode('template'); setFocusLine(f.line); }}
             onBind={bindFinding} onDismiss={f => void dismissFinding(f)} />
           <VersionPanel versions={versions} baseVersionId={session.baseVersionId} disabled={busy}
@@ -682,13 +714,21 @@ export function App({ storage }: { storage: StorageProvider }) {
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>{t.app.footerNote}</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={drawerQuery} onQuery={setDrawerQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
-    {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} profiles={profiles} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0}
+    {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} profiles={profiles}
+      // The other occurrences, not all of them: counting the selected one made a value that appears
+      // exactly once offer to "replace all identical occurrences (1)".
+      count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 2 : 0}
       preview={bindingDialog.selection && (() => {
         const s = bindingDialog.selection!;
         const lineStart = template.lastIndexOf('\n', s.start - 1) + 1;
         const lineEnd = template.indexOf('\n', s.end) === -1 ? template.length : template.indexOf('\n', s.end);
         return { line: template.slice(lineStart, lineEnd), start: s.start - lineStart, end: s.end - lineStart };
       })() || undefined}
+      reuse={bindingDialog.reuse && bindingDialog.selection ? { name: bindingDialog.reuse, use: () => {
+        const s = bindingDialog.selection!;
+        controller.changeText(template.slice(0, s.start) + `{{${bindingDialog.reuse!}}}` + template.slice(s.end));
+        changeMode('template'); setFocusName(bindingDialog.reuse!);
+      } } : undefined}
       save={storeBinding} close={() => setBindingDialog(null)} />}
     {copyMode && <CopyDialog mode={copyMode} coverage={cover} issues={ai.issues.length} replaced={ai.used.length}
       findings={copyFindings} seriousFindings={seriousFindings} reviewed={reviewed} onReviewed={setReviewed}

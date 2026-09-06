@@ -25,11 +25,14 @@ async function paste(page: Page, code: string) {
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 }
 
-async function bind(page: Page, word: string, privateValue: string, category?: string) {
+/** `all` ticks "replace the other identical occurrences too", which is off by default: rewriting
+ * every occurrence of a value across the file is a choice, and the preview shows only one line. */
+async function bind(page: Page, word: string, privateValue: string, category?: string, all = false) {
   await page.getByText(word, { exact: false }).first().dblclick();
   await page.keyboard.press('Control+b');
   if (category) await page.getByLabel('Kategori').selectOption(category);
   await page.getByLabel('Privat värde · standard').fill(privateValue);
+  if (all) await page.getByLabel(/Ersätt även/).check();
   await page.getByRole('button', { name: 'Spara binding' }).click();
   await expect(page.locator('dialog[open]')).toHaveCount(0);
 }
@@ -328,6 +331,43 @@ test('takes back a blocklist substitution in one step', async ({ page }) => {
   await expect(page.locator('.editor-body')).not.toContainText('{{MITTFORETAG_SE}}');
 });
 
+// Punkterna 10 och 2. Appen har hela tiden vetat vilken binding som äger ett värde — läckagekollen
+// är byggd på det — men använde kunskapen till att vägra i stället för att erbjuda.
+test('offers the binding that already holds the value instead of a second one', async ({ page }) => {
+  await type(page, '$host = "sql01.corp.local"\n$backup = "sql01.corp.local"\n');
+  await bind(page, 'sql01', 'sql01.corp.local', 'infrastructure');
+  await expect(page.locator('.editor-body')).toContainText('{{HOST}}');
+
+  // The second occurrence was left alone: replacing every occurrence is a choice now, not the
+  // default, so it is still there to be bound.
+  await page.getByText('sql01', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+  await expect(page.locator('.reuse-offer')).toContainText('HOST');
+  await page.getByRole('button', { name: 'Använd {{HOST}}' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+  // One binding, two placeholders — not a second binding holding the same private value.
+  await expect(page.locator('.editor-body')).not.toContainText('sql01.corp.local');
+  await page.evaluate(() => (location.hash = '#/bindings'));
+  await expect(page.locator('.binding-card')).toHaveCount(1);
+});
+
+// The leak check blocked the copy and said what was wrong. Saying it is one thing; the app knows
+// enough to put it right, and now offers to.
+test('puts a known value back behind its placeholder from the issue panel', async ({ page }) => {
+  await type(page, '$host = "sql01.corp.local"\n');
+  await bind(page, 'sql01', 'sql01.corp.local', 'infrastructure');
+
+  // Code coming back with the real value in it — what happens when it is pasted from somewhere else.
+  await paste(page, '$host = "{{HOST}}"\n$backup = "sql01.corp.local"\n$port = 1433\n');
+  await expect(page.locator('.issue-panel')).toContainText('HOST');
+
+  await page.locator('.issue-row').getByRole('button', { name: 'Byt mot {{HOST}}' }).click();
+  await expect(page.locator('.issue-panel')).toHaveCount(0);
+  await expect(page.locator('.editor-body')).not.toContainText('sql01.corp.local');
+  await expect(page.locator('.inline-notice')).toContainText('byttes mot platshållaren');
+});
+
 // Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did
 // exist were native dialogs, two of which opened on top of an already open <dialog>.
 test('requires a typed confirmation before deleting a project', async ({ page }) => {
@@ -618,7 +658,7 @@ test('creates a binding without a selection and warns when it is unused', async 
 // solved the problem by removing the feature.
 test('renames a binding and rewrites its placeholder everywhere', async ({ page }) => {
   await type(page, '$a = "Hunter2!"\n$b = "Hunter2!"\n');
-  await bind(page, 'Hunter2', 'Hunter2!', 'secret');
+  await bind(page, 'Hunter2', 'Hunter2!', 'secret', true);
   await expect(page.locator('.binding-card')).toContainText('2 förekomster');
 
   await page.locator('.binding-card').getByLabel(/^Redigera /).click();

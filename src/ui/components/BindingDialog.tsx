@@ -4,15 +4,19 @@ import { t } from '../text';
 import { categories } from '../../types/models';
 import { BindingRefusal, defaults, validateBinding } from '../../domain/bindings';
 import { Modal } from './Modal';
-export function BindingDialog({ initial, bindings, count, preview, profiles, save, close }: {
+export function BindingDialog({ initial, bindings, count, preview, profiles, reuse, save, close }: {
   initial: Binding; bindings: Binding[]; count: number; profiles?: Profile[];
+  /** A binding that already holds this exact value. The app knew this all along — the leak check is
+   * built on it — and used it only to refuse the copy afterwards. Offered here instead, as a choice
+   * rather than as automatic matching. */
+  reuse?: { name: string; use: () => void };
   /** The line, and the span within it the placeholder takes over, so replacing the wrong text is
    * visible before it happens rather than after. The name is interpolated here rather than by the
    * caller: the caller only has the suggestion, and the preview has to follow the field. */
   preview?: { line: string; start: number; end: number };
   save: (binding: Binding, all: boolean) => Promise<void>; close: () => void;
 }) {
-  const [value, setValue] = useState(initial), [show, setShow] = useState(false), [all, setAll] = useState(true), [error, setError] = useState(''), [busy, setBusy] = useState(false), [acknowledged, setAcknowledged] = useState(false), [edited, setEdited] = useState(false);
+  const [value, setValue] = useState(initial), [show, setShow] = useState(false), [all, setAll] = useState(false), [error, setError] = useState(''), [busy, setBusy] = useState(false), [acknowledged, setAcknowledged] = useState(false), [edited, setEdited] = useState(false);
   const existing = bindings.some(b => b.id === initial.id);
   // An AI value that is not obviously a placeholder is the one field that leaves the vault, so it
   // gets a check the user has to answer rather than a dialog they can dismiss by reflex.
@@ -48,7 +52,13 @@ export function BindingDialog({ initial, bindings, count, preview, profiles, sav
     </div>
     {value.escapeMode === 'raw' && <p className="inline-warning" role="status">{t.bindingDialog.rawNote}</p>}
     {vagueSecret && <label className="check inline-warning"><input type="checkbox" checked={acknowledged} onChange={e => { setAcknowledged(e.target.checked); setError(''); }} />{t.bindingDialog.vagueBefore}<code>&lt;PASSWORD&gt;</code>{t.bindingDialog.vagueAfter}</label>}
+    {/* Off by default. Rewriting every occurrence of a value across the file is a choice, and one
+        the preview above only shows one line of. */}
     {count > 0 && <label className="check"><input type="checkbox" checked={all} onChange={e => setAll(e.target.checked)} />{t.bindingDialog.replaceAll(count)}</label>}
+    {reuse && <div className="reuse-offer" role="status">
+      <span>{t.bindingDialog.reuseLead(reuse.name)}</span>
+      <button onClick={() => { reuse.use(); close(); }}>{t.bindingDialog.reuseAction(reuse.name)}</button>
+    </div>}
     {preview && <div className="binding-preview"><code className="before">{preview.line}</code><code className="after">{preview.line.slice(0, preview.start)}{`{{${value.name}}}`}{preview.line.slice(preview.end)}</code></div>}
     <p className="muted">{t.bindingDialog.lead}</p>
     {error ? <p role="alert" className="error">{error}</p>

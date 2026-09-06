@@ -332,6 +332,8 @@ export const sv = {
     name: 'Namn',
     nameLabel: 'Bindingnamn',
     renameNote: 'Platshållaren skrivs om i alla versioner och utkast som använder den.',
+    reuseLead: (name: string) => `Värdet ligger redan i valvet som ${name}.`,
+    reuseAction: (name: string) => `Använd {{${name}}}`,
     category: 'Kategori',
     scope: 'Scope',
     scopeProject: 'Projekt',
@@ -347,7 +349,9 @@ export const sv = {
     description: 'Beskrivning',
     vagueBefore: 'AI-värdet ser inte ut som en tydlig platshållare, till exempel ',
     vagueAfter: '. Jag har granskat att det är ofarligt att dela.',
-    replaceAll: (n: number) => `Ersätt alla identiska förekomster i filen (${n} st)`,
+    replaceAll: (n: number) => n === 1
+      ? 'Ersätt även den andra identiska förekomsten i filen'
+      : `Ersätt även de ${n} andra identiska förekomsterna i filen`,
     lead: 'Ange privata värden utan kodens escaping. Endast AI-värdet visas i den sanerade vyn.',
     saving: 'Sparar…',
     save: 'Spara binding',
@@ -493,6 +497,10 @@ export const sv = {
   },
   issues: {
     blocksBoth: 'blockerar båda kopieringarna',
+    replaceWith: (name: string) => `Byt mot {{${name}}}`,
+    replaced: (name: string, count: number) =>
+      `${count} ${count === 1 ? 'förekomst' : 'förekomster'} av värdet bakom ${name} byttes mot platshållaren.`,
+    replaceUndo: (name: string) => `Värdet bakom ${name} är utbytt mot platshållaren.`,
   },
   editorHover: {
     bindingNoValue: 'binding · värde saknas',
