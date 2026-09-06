@@ -5,7 +5,7 @@ import type { StorageProvider } from '../storage/StorageProvider';
 import { resolveBinding, resolveValue, suggestBinding, defaults } from '../domain/bindings';
 import { expandToLiteral } from '../domain/bindings/literal';
 import { render, usage } from '../domain/render';
-import { auditForCopy } from '../domain/render/audit';
+import { auditForCopy, promptBlock } from '../domain/render/audit';
 import { buildValueIndex } from '../domain/render/leak';
 import { type Coverage } from '../domain/render/coverage';
 import { WorkspaceController } from './WorkspaceController';
@@ -24,6 +24,7 @@ import { VersionPanel } from './components/VersionPanel';
 import { ProjectDetails } from './components/ProjectDetails';
 import { BindingPanel, toRows } from './components/BindingPanel';
 import { ProfileManager, ProfilePicker } from './components/ProfilePicker';
+import { IngestDialog } from './components/IngestDialog';
 // Also lazy: it pulls in the same editor bundle, and version history is not on the first screen.
 const DiffEditor = lazy(() => import('./editor/DiffEditor').then(m => ({ default: m.DiffEditor })));
 import { scan, type Finding } from '../domain/scanner';
@@ -147,6 +148,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [storageInfo, setStorageInfo] = useState<StorageState | null>(null), asked = useRef(false);
   const [confirm, confirmDialog] = useConfirm();
   const [rules, setRules] = useState<ScannerRule[]>([]), [profiles, setProfiles] = useState<Profile[]>([]), [managingProfiles, setManagingProfiles] = useState(false);
+  const [ingesting, setIngesting] = useState(false);
   const [dismissed, refreshDismissals] = useDismissals(() => project ? storage.listDismissals(project.id) : Promise.resolve([]), project?.id ?? '');
   const findings = useScanner(mode === 'template' ? template : '', rules, dismissed);
   const [countdown, setCountdown] = useState<number | null>(null), pendingClear = useRef<string | null>(null);
@@ -381,6 +383,12 @@ export function App({ storage }: { storage: StorageProvider }) {
       body: <><p>Det nuvarande arbetsutkastet ersätts av innehållet i v{version.number}.</p><p>Sparade versioner påverkas inte och går att gå tillbaka till.</p></> })) return;
     await run(async () => { await controller.applyVersion(version); if (save) await controller.saveVersion(`Återgång till v${version.number}`); changeMode('template'); });
   }
+  /** Only the AI copy gets the instruction block; the local copy goes into an editor. */
+  function withPrompt(text: string, which: 'local' | 'ai') {
+    if (which !== 'ai' || !settings?.includeAiPromptBlock || !settings.aiPromptText.trim()) return text;
+    const block = promptBlock(settings.aiPromptText, language);
+    return block ? `${block}\n\n${text}` : text;
+  }
   async function writeClipboard(text: string, which: 'local' | 'ai') {
     try {
       await navigator.clipboard.writeText(text); setCopyMode(null);
@@ -408,7 +416,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     const result = auditForCopy(template, bindings, { ...options, mode: which });
     if (!result.canCopy) { setError('Kopiering blockerad. Åtgärda problemen i panelen.'); return; }
     if (which === 'ai' || result.secretRanges.length) { setReviewed(false); setCopyMode(which); return; }
-    await writeClipboard(result.text, which);
+    await writeClipboard(withPrompt(result.text, which), which);
   }
   function openDrawer() { setDrawer(true); void controller.refreshProjects().catch(() => setError('Projektlistan kunde inte läsas. Din kod finns kvar.')); }
   useEffect(() => {
@@ -448,7 +456,7 @@ export function App({ storage }: { storage: StorageProvider }) {
                 body: <><p>Filens innehåll försvinner ur arbetsutkastet.</p><p>Sparade versioner behåller sin kopia, så den går att få tillbaka därifrån.</p></> })) return;
               await controller.removeFile(id);
             })} />
-          <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions">{Boolean(issues.length) && <span id="copy-blocked" className="copy-blocked">{issues.length} problem hindrar kopiering — se panelen</span>}<button disabled={!template.trim() || Boolean(local.issues.length)} aria-describedby={local.issues.length ? 'copy-blocked' : undefined} title={local.issues.length ? `Blockerad: ${local.issues.length} problem i Local-vyn` : undefined} onClick={() => void copy('local')}>Copy Local</button><button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} aria-describedby={ai.issues.length ? 'copy-blocked' : undefined} title={ai.issues.length ? `Blockerad: ${ai.issues.length} problem i AI-vyn` : undefined} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
+          <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions"><button disabled={!project} onClick={() => setIngesting(true)}>Klistra in från AI ↙</button>{Boolean(issues.length) && <span id="copy-blocked" className="copy-blocked">{issues.length} problem hindrar kopiering — se panelen</span>}<button disabled={!template.trim() || Boolean(local.issues.length)} aria-describedby={local.issues.length ? 'copy-blocked' : undefined} title={local.issues.length ? `Blockerad: ${local.issues.length} problem i Local-vyn` : undefined} onClick={() => void copy('local')}>Copy Local</button><button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} aria-describedby={ai.issues.length ? 'copy-blocked' : undefined} title={ai.issues.length ? `Blockerad: ${ai.issues.length} problem i AI-vyn` : undefined} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
           <div className="view-banner" key={mode}><strong>{mode === 'template' ? '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN' : mode === 'local' ? '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN' : '◇ AI — SANERAD'}</strong><span>{mode === 'template' ? 'Redigerbar källa' : 'Skrivskyddad projektion'}</span></div>
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj värden' : 'Visa värden'}</button></div>}
           <div className="editor-body">{!template && mode === 'template' && <div className="paste-prompt"><strong>Klistra in din kod här</strong><span>Projektet skapas automatiskt och sparas lokalt.</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>eller prova med exempelkod</button>}</div>}
@@ -479,6 +487,8 @@ export function App({ storage }: { storage: StorageProvider }) {
       </section></div>
       <div hidden={route !== '#/security'}><Security /></div>
       <article className="document" hidden={route !== '#/settings'}><span className="eyebrow">DEN HÄR INSTALLATIONEN</span><h1>Inställningar</h1><p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p><dl><dt>Aktuellt origin</dt><dd>{location.origin}</dd><dt>App-sökväg</dt><dd>{location.pathname}</dd><dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd><dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd><dt>Beständig lagring</dt><dd>{!storageInfo ? 'Läser…' : !storageInfo.supported ? 'Stöds inte av webbläsaren' : storageInfo.persisted ? 'Ja · valvet vräks inte vid diskbrist' : 'Nej · webbläsaren får radera valvet'}</dd><dt>Utrymme</dt><dd>{storageInfo?.supported ? `${formatBytes(storageInfo.usedBytes)} av ${formatBytes(storageInfo.quotaBytes)}` : 'okänt'}</dd></dl>{storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert"><strong>Valvet kan raderas av webbläsaren</strong><p>Utan beständig lagring får webbläsaren slänga valvet när enheten får ont om utrymme. Det finns ingen backup att återställa från.</p><button onClick={() => void requestPersistence().then(state => { setStorageInfo(state); setNotice(state.persisted ? 'Beständig lagring beviljad.' : 'Webbläsaren nekade beständig lagring.'); })}>Begär beständig lagring</button></div>}<label>Enhetsnamn<input value={deviceName} onChange={e => setDeviceName(e.target.value)} /></label>
+      <label className="check"><input type="checkbox" checked={settings?.includeAiPromptBlock ?? true} onChange={e => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, includeAiPromptBlock: e.target.checked }); await controller.reloadSettings(); } })} />Lägg en instruktion överst i AI-kopian</label>
+      {settings?.includeAiPromptBlock && <label>Instruktionens text<textarea aria-label="Instruktion till AI" rows={3} defaultValue={settings.aiPromptText} onBlur={e => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, aiPromptText: e.target.value }); await controller.reloadSettings(); } })} /><small>Kopieras som en kommentar före koden, i det språk filen har. Gör det troligare att platshållarna kommer tillbaka orörda.</small></label>}
       <label>Rensa urklipp efter Copy Local<select aria-label="Rensa urklipp efter Copy Local" value={settings?.clipboardAutoClearSeconds ?? 0} onChange={e => void run(async () => { if (settings) await storage.saveSettings({ ...settings, clipboardAutoClearSeconds: Number(e.target.value) }); await controller.reloadSettings(); })}><option value={0}>Aldrig</option><option value={30}>Efter 30 sekunder</option><option value={60}>Efter 1 minut</option><option value={300}>Efter 5 minuter</option></select><small>Skriver över urklippet när tiden gått. Nedräkningen visas och går att avbryta. Urklippshistorik och molnsynk ligger utanför appens kontroll.</small></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><p className="notice">Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.</p><RulesPanel storage={storage} rules={rules} notify={setNotice} onChange={() => void storage.listScannerRules().then(setRules)} /><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></article>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>Lokalt valv · M1</span></footer>
   </div>
@@ -492,7 +502,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         return { before: line, after: line.slice(0, s.start - lineStart) + `{{${bindingDialog.binding.name}}}` + line.slice(s.end - lineStart) };
       })() || undefined}
       save={storeBinding} close={() => setBindingDialog(null)} />}
-    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} findings={copyFindings} />}{copyMode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.</label>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound && !seriousFindings ? 'primary' : ''} disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound && !seriousFindings ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
+    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} findings={copyFindings} />}{copyMode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.</label>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound && !seriousFindings ? 'primary' : ''} disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(withPrompt(result.text, copyMode), copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound && !seriousFindings ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
     {viewing && <Modal title={viewing.compareTo ? `v${viewing.compareTo.number} → v${viewing.version.number}` : `v${viewing.version.number}${viewing.version.label ? ` · ${viewing.version.label}` : ''}`} close={() => setViewing(null)}>
       <div className="version-view">
         <Suspense fallback={<p className="muted">Laddar jämförelsen…</p>}><DiffEditor language={language} theme={resolvedTheme}
@@ -506,6 +516,10 @@ export function App({ storage }: { storage: StorageProvider }) {
       await storage.saveProject({ ...project, ...patch, updatedAt: new Date().toISOString() });
       await controller.reloadProject();
       setNotice('Projektuppgifterna är sparade.');
+    }} />}
+    {ingesting && <IngestDialog bindings={bindings} close={() => setIngesting(false)} apply={next => {
+      controller.changeText(next); setIngesting(false); changeMode('template');
+      setNotice('Mallen är ersatt. Granska innan du sparar en version.');
     }} />}
     {managingProfiles && <ProfileManager profiles={profiles} close={() => setManagingProfiles(false)}
       onCreate={async name => { const time = new Date().toISOString();

@@ -110,6 +110,7 @@ export const settingsSchema = z.object({
   clipboardAutoClearSeconds: z.number().int().nonnegative(),
   maskSecretsInUi: z.boolean(),
   theme: z.enum(['system', 'light', 'dark']).default('system'),
+  aiPromptText: z.string().default(''),
 });
 
 /** Everything needed to rebuild the vault. */

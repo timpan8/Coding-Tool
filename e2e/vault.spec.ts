@@ -458,3 +458,29 @@ test.describe('narrow screen', () => {
     await expect(page.locator('.plain-editor')).toHaveValue(/Hunter2/);
   });
 });
+
+// Report F5 and F6. Code went out with placeholders and came back changed, and the values had to
+// be put back by hand — which is where they get lost.
+test('puts placeholders back into code that comes home from an AI', async ({ page }) => {
+  await type(page, '$host = "sql01.corp.local"\n');
+  await bind(page, 'sql01', 'sql01.corp.local', 'infrastructure');
+  await page.locator('.binding-card').getByLabel(/^Redigera /).click();
+  await page.getByLabel('AI-värde').fill('server.example.test');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Klistra in från AI ↙' }).click();
+  // What an AI typically returns: the example value back in place, plus new code around it.
+  await page.locator('textarea[aria-label="Kod från AI"]').fill('$host = "server.example.test"\n$port = 1433\n');
+  await expect(page.locator('.ingest-decisions')).toContainText('Återställd');
+  await page.getByRole('button', { name: 'Ersätt mallen' }).click();
+
+  await expect(page.locator('.editor-body')).toContainText('$host = "{{');
+  await expect(page.locator('.editor-body')).toContainText('$port = 1433');
+  await expect(page.locator('.editor-body')).not.toContainText('server.example.test');
+
+  // And the private value is behind the placeholder again, not lost.
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
+  await expect(page.locator('.editor-body')).toContainText('sql01.corp.local');
+});

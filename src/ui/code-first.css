@@ -849,3 +849,27 @@ dialog:has(.version-view) {
     flex-wrap: wrap;
   }
 }
+
+.ingest-decisions {
+  margin: 0 0 14px;
+  padding: 10px 12px 10px 26px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-sunken);
+  font-size: 0.75rem;
+}
+.ingest-decisions li {
+  margin-bottom: 6px;
+}
+.ingest-decisions li small {
+  display: block;
+  color: var(--text-muted);
+}
+.ingest-decisions .accepted b {
+  color: var(--accent-text);
+}
+.ingest-decisions .suggested b {
+  color: var(--warn-text);
+}

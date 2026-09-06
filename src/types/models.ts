@@ -52,7 +52,7 @@ export interface ScannerRule {
 export interface ScanDismissal { projectId: string; fingerprint: string; ruleId: string; reason: string; createdAt: Iso; deviceId: string }
 export interface Settings {
   deviceId: string; deviceName: string; globalRootPath: string; aiRootPath: string; defaultSubfolders: string[];
-  activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean;
+  activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean; aiPromptText: string;
   clipboardAutoClearSeconds: number; maskSecretsInUi: boolean; theme: 'system' | 'light' | 'dark';
 }
 export interface WorkspaceSnapshot { projects: Project[]; versions: Version[]; drafts: ProjectDraft[]; bindings: Binding[]; profiles: Profile[]; datasets: Dataset[]; rules: ScannerRule[]; dismissals: ScanDismissal[]; settings: Settings }

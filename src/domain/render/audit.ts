@@ -2,6 +2,24 @@ import type { Binding } from '../../types/models';
 import { coverage, type Coverage } from './coverage';
 import { buildValueIndex, findLeaks, type LeakHit, type ValueIndex } from './leak';
 import { render, type RenderIssue, type RenderOptions, type RenderResult } from './index';
+import type { LanguageId } from '../../types/models';
+
+const lineComment: Partial<Record<LanguageId, string>> = {
+  powershell: '#', python: '#', shell: '#', yaml: '#', javascript: '//', typescript: '//',
+};
+
+/** Prepended to the AI copy so the model is told what the placeholders are and to leave them
+ * alone. It raises the chance the code comes back in a shape ingest() can put together again.
+ * Written as a comment where the language has one, and omitted where it does not, rather than
+ * pasted as loose prose that would break the file. */
+export function promptBlock(text: string, language: LanguageId): string {
+  const marker = lineComment[language];
+  if (!marker) return '';
+  return text
+    .split('\n')
+    .map((line) => `${marker} ${line}`.trimEnd())
+    .join('\n');
+}
 
 export interface CopyAudit extends RenderResult {
   leaks: LeakHit[];

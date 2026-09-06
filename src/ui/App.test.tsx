@@ -58,7 +58,12 @@ it('creates a project from first input, binds a selected value, renders both vie
   fireEvent.click(screen.getByRole('button', { name: /Copy for AI/ }));
   expect(clipboard).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByRole('button', { name: 'Jag har granskat · kopiera för AI' }));
-  await waitFor(() => expect(clipboard).toHaveBeenCalledWith('$username = "example.user"'));
+  // The AI copy now carries an instruction block above the code, as a comment in the file's own
+  // language, telling the model to leave the placeholders alone.
+  await waitFor(() => expect(clipboard).toHaveBeenCalled());
+  const copied = clipboard.mock.calls.at(-1)![0];
+  expect(copied).toContain('$username = "example.user"');
+  expect(copied).toContain('# Koden nedan har privata värden');
   const projects = await storage.listProjects(), versions = await storage.listVersions(projects[0].id);
   expect(versions[0].templates[projects[0].files[0].id]).toBe('$username = "{{ADMIN_USERNAME}}"');
 });

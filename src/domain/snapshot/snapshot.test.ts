@@ -16,6 +16,7 @@ const settings = {
   clipboardAutoClearSeconds: 0,
   maskSecretsInUi: true,
   theme: 'system' as const,
+  aiPromptText: 'Behåll platshållarna.',
 };
 
 function workspace(): WorkspaceSnapshot {
