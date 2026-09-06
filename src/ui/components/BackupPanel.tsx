@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ImportResolution, ImportResult } from '../../types/models';
 import type { StorageProvider } from '../../storage/StorageProvider';
 import { parseSnapshot, planImport, toSnapshot, type ImportPlan, type Snapshot, type SnapshotKind } from '../../domain/snapshot';
-import type { ConfirmRequest } from './ConfirmDialog';
+import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
 
 function download(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -25,7 +25,7 @@ export function BackupPanel({
 }: {
   storage: StorageProvider;
   notify: (message: string) => void;
-  confirm: (request: ConfirmRequest) => Promise<boolean>;
+  confirm: (request: ConfirmRequest) => Promise<ConfirmResult>;
 }) {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ snapshot: Snapshot; plan: ImportPlan } | null>(null);

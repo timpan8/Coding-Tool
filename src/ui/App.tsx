@@ -22,6 +22,7 @@ import { FindingsPanel, useDismissals, useScanner } from './components/FindingsP
 import { FileTabs } from './components/FileTabs';
 import { VersionPanel } from './components/VersionPanel';
 import { ProjectDetails } from './components/ProjectDetails';
+import { BindingPanel, toRows } from './components/BindingPanel';
 import { DiffEditor } from './editor/DiffEditor';
 import { scan, type Finding } from '../domain/scanner';
 import type { ScannerRule } from '../types/models';
@@ -32,7 +33,19 @@ import { clearClipboard } from './clipboard';
 import './code-first.css';
 
 type Mode = 'template' | 'local' | 'ai';
-const fixture = '$username = "example.user"\n$password = "<PASSWORD>"\n$exportPath = "C:\\Temp\\Example"\n';
+/** One per language: the empty state previously offered a sample only when the language happened
+ * to be PowerShell, which is every language but one. */
+const samples: Partial<Record<LanguageId, string>> = {
+  powershell: '$username = "example.user"\n$password = "<PASSWORD>"\n$exportPath = "C:\\Temp\\Example"\n',
+  python: 'username = "example.user"\npassword = "<PASSWORD>"\nexport_path = "/tmp/example"\n',
+  javascript: 'const username = "example.user";\nconst password = "<PASSWORD>";\nconst host = "server.example.test";\n',
+  typescript: 'const username: string = "example.user";\nconst password: string = "<PASSWORD>";\n',
+  json: '{\n  "username": "example.user",\n  "password": "<PASSWORD>"\n}\n',
+  yaml: 'username: example.user\npassword: "<PASSWORD>"\nhost: server.example.test\n',
+  shell: 'USERNAME="example.user"\nPASSWORD="<PASSWORD>"\nHOST="server.example.test"\n',
+  xml: '<config>\n  <user>example.user</user>\n  <password>&lt;PASSWORD&gt;</password>\n</config>\n',
+  plaintext: 'anvandare: example.user\nlosenord: <PASSWORD>\n',
+};
 function ProjectName({ name, change }: { name: string; change: (name: string) => void }) {
   const [editing, setEditing] = useState(false), [text, setText] = useState(name);
   const cancelled = useRef(false);
@@ -308,6 +321,17 @@ export function App({ storage }: { storage: StorageProvider }) {
       setBindingDialog({ binding, selection });
     });
   }
+  function newBinding() {
+    const current = controller.getSnapshot();
+    if (!current.session.project || !current.settings) return;
+    const time = new Date().toISOString();
+    // No selection, so nothing is replaced in the template: the placeholder is typed by hand or
+    // picked from the editor's completion. Useful for preparing a value before the code exists.
+    setBindingDialog({ binding: { id: crypto.randomUUID(), name: '', category: 'secret', scope: 'project',
+      scopeRef: current.session.project.id, description: '', aiReplacement: defaults.secret, values: {},
+      escapeMode: 'auto', matchHints: { lastVariableNames: [], previousAiValues: [], aliases: [] },
+      createdAt: time, updatedAt: time, deviceId: current.settings.deviceId } });
+  }
   async function storeBinding(binding: Binding, all: boolean) {
     const selection = bindingDialog?.selection;
     await storage.saveBinding({ ...binding, updatedAt: new Date().toISOString() }); setBindings(await storage.listBindings());
@@ -327,9 +351,18 @@ export function App({ storage }: { storage: StorageProvider }) {
       // read the entire vault back out.
       const versions = project ? await storage.listVersions(project.id) : [];
       const locations = versions.filter(v => v.bindingUsage.some(u => u.bindingName === binding.name));
-      if (!await confirm({ title: `Radera ${binding.name}?`, danger: true, confirmLabel: 'Radera bindingen',
-        body: <><p>Bindingen används i {locations.length} sparade versioner av det här projektet.</p><p>Platshållarna blir kvar i koden men får inget värde, så kopiering blockeras tills du åtgärdar dem.</p></> })) return;
+      const value = resolveValue(binding, options.profileId);
+      const here = template.split(`{{${binding.name}}}`).length - 1;
+      const answer = await confirm({ title: `Radera ${binding.name}?`, danger: true, confirmLabel: 'Radera bindingen',
+        body: <><p>Bindingen används i {locations.length} sparade versioner av det här projektet{here ? `, och ${here} gånger i den öppna filen` : ''}.</p>
+          <p>{value ? 'Det privata värdet försvinner ur valvet.' : 'Bindingen har inget privat värde.'} Sparade versioner behåller sina platshållare.</p></>,
+        // Deleting used to leave {{NAME}} behind with nothing to resolve it, which blocks copying
+        // until the user tracks down every one by hand.
+        option: value && here ? { label: `Skriv tillbaka det privata värdet på ${here === 1 ? 'platsen' : `de ${here} platserna`} i den här filen`, defaultChecked: true } : undefined });
+      if (!answer) return;
+      if (answer.optionChecked && value) controller.changeText(template.split(`{{${binding.name}}}`).join(value));
       await storage.deleteBinding(binding.id); setBindings(await storage.listBindings());
+      await controller.flush();
     });
   }
   async function applyVersion(version: Version, save = false) {
@@ -406,13 +439,15 @@ export function App({ storage }: { storage: StorageProvider }) {
           <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions">{Boolean(issues.length) && <span id="copy-blocked" className="copy-blocked">{issues.length} problem hindrar kopiering — se panelen</span>}<button disabled={!template.trim() || Boolean(local.issues.length)} aria-describedby={local.issues.length ? 'copy-blocked' : undefined} title={local.issues.length ? `Blockerad: ${local.issues.length} problem i Local-vyn` : undefined} onClick={() => void copy('local')}>Copy Local</button><button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} aria-describedby={ai.issues.length ? 'copy-blocked' : undefined} title={ai.issues.length ? `Blockerad: ${ai.issues.length} problem i AI-vyn` : undefined} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
           <div className="view-banner" key={mode}><strong>{mode === 'template' ? '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN' : mode === 'local' ? '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN' : '◇ AI — SANERAD'}</strong><span>{mode === 'template' ? 'Redigerbar källa' : 'Skrivskyddad projektion'}</span></div>
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj värden' : 'Visa värden'}</button></div>}
-          <div className="editor-body">{!template && mode === 'template' && <div className="paste-prompt" aria-hidden="true"><strong>Klistra in din kod här</strong><span>Ctrl+V · Projektet skapas automatiskt och sparas lokalt.</span></div>}
+          <div className="editor-body">{!template && mode === 'template' && <div className="paste-prompt"><strong>Klistra in din kod här</strong><span>Projektet skapas automatiskt och sparas lokalt.</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>eller prova med exempelkod</button>}</div>}
             <CodeEditor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => controller.changeText(text)} onBinding={createBinding}
               onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} substitutions={mode === 'template' ? [] : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }} />
           </div><div className="editor-footer"><span>{visible.split('\n').length} rader · {used.length} bindings</span><span>{mode === 'local' ? 'Använd endast i din lokala kodmiljö' : 'Utkast sparas automatiskt · ingen kod körs'}</span></div>
-        </section><aside className="binding-panel"><div className="panel-title"><h2>Bindings</h2><span className="count">{activeBindings.length}</span></div><p className="muted">Markera ett värde och tryck <kbd>Ctrl+B</kbd> för att koppla det till en platshållare.</p>
-          {activeBindings.map(b => <div className="binding-card" key={b.id}><button className="binding-name" onClick={() => { setMode('template'); setFocusName(b.name); }}>{b.name}</button><div className="binding-meta"><span>{b.category}</span><span>{b.scope}</span></div><div className="binding-value">{resolveValue(b, options.profileId) ? b.category === 'secret' ? '••••••••' : 'Privat värde angivet' : <span className="danger-text">⚠ VÄRDE SAKNAS</span>}</div><div className="binding-example">AI: {b.aiReplacement}</div><div className="binding-actions"><small>{used.find(u => u.bindingName === b.name)?.occurrences ?? 0} förekomster</small><button className="text-button" onClick={() => setBindingDialog({ binding: b })}>Redigera</button><button className="text-button" aria-label={`Radera ${b.name}`} onClick={() => void removeBinding(b)}>×</button></div></div>)}
-          {!activeBindings.length && <div className="bindings-empty">{'{{NAMN}}'}<p>Dina privata värden får en egen plats här.</p>{!template && language === 'powershell' && <button onClick={() => controller.changeText(fixture)}>Prova med exempelkod</button>}</div>}
+        </section><aside className="binding-panel"><BindingPanel rows={toRows(activeBindings, used, options.profileId)} canCreate={Boolean(project)}
+            onFocus={b => { setMode('template'); setFocusName(b.name); }}
+            onEdit={b => setBindingDialog({ binding: b })}
+            onDelete={b => void removeBinding(b)}
+            onCreate={() => void newBinding()} />
           <IssuePanel issues={issues} onSelect={showIssue} />
           <FindingsPanel findings={findings} onShow={f => { changeMode('template'); setFocusLine(f.line); }}
             onBind={bindFinding} onDismiss={f => void dismissFinding(f)} />

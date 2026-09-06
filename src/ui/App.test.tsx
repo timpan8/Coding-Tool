@@ -36,7 +36,7 @@ it('creates a project from first input, binds a selected value, renders both vie
   fireEvent.change(screen.getByLabelText('Projektnamn'), { target: { value: 'Create-ADUsers' } });
   fireEvent.keyDown(screen.getByLabelText('Projektnamn'), { key: 'Enter' });
   fireEvent.click(screen.getByRole('button', { name: 'Testmarkering' }));
-  fireEvent.change(await screen.findByLabelText('Namn'), { target: { value: 'ADMIN_USERNAME' } });
+  fireEvent.change(await screen.findByLabelText('Bindingnamn'), { target: { value: 'ADMIN_USERNAME' } });
   fireEvent.change(screen.getByLabelText('Privat värde · standard'), { target: { value: 'synthetic.user' } });
   fireEvent.click(screen.getByRole('button', { name: 'Spara binding' }));
   await waitFor(() => expect((editor as HTMLTextAreaElement).value).toContain('{{ADMIN_USERNAME}}'));

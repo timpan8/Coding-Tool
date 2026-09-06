@@ -341,3 +341,34 @@ test('makes project metadata editable and the list worth reading', async ({ page
   await page.getByLabel('Filtrera på status').selectOption('broken');
   await expect(page.locator('.project-card')).toHaveCount(0);
 });
+
+// Report F14, F16 and F17. Deleting a binding left {{NAME}} behind with nothing to resolve it, so
+// copying stayed blocked until every one was found by hand.
+test('offers to write the value back when a binding is deleted', async ({ page }) => {
+  await type(page, '$p = "Hunter2!"\n');
+  await bind(page, 'Hunter2', 'Hunter2!', 'secret');
+  await expect(page.locator('.editor-body')).toContainText('{{');
+
+  await page.locator('.binding-card').getByLabel(/^Radera /).click();
+  const dialog = page.locator('dialog[open]');
+  await expect(dialog).toContainText('Skriv tillbaka det privata värdet');
+  await dialog.getByRole('button', { name: 'Radera bindingen' }).click();
+
+  // The value is back in the template rather than an unresolvable placeholder.
+  await expect(page.locator('.editor-body')).toContainText('Hunter2!');
+  await expect(page.locator('.editor-body')).not.toContainText('{{');
+  await expect(page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ })).toBeEnabled();
+});
+
+// A binding can also be prepared before the code that uses it exists.
+test('creates a binding without a selection and warns when it is unused', async ({ page }) => {
+  await type(page, '$p = "placeholder"\n');
+  await page.locator('.binding-panel').getByRole('button', { name: '＋ Ny' }).click();
+  await page.getByLabel('Bindingnamn').fill('FUTURE_TOKEN');
+  await page.getByLabel('Privat värde · standard').fill('abc123');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara binding' }).click();
+
+  await expect(page.locator('.binding-card')).toContainText('FUTURE_TOKEN');
+  await expect(page.locator('.binding-card')).toContainText('0 förekomster');
+  await expect(page.locator('.orphan-note')).toBeVisible();
+});

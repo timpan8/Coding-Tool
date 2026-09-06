@@ -750,3 +750,19 @@ dialog:has(.version-view) {
   background: var(--warn-surface);
   color: var(--warn-text);
 }
+
+.orphan-note {
+  margin-bottom: 12px;
+  padding: 9px 11px;
+  border-radius: 7px;
+  background: var(--warn-surface);
+  border: 1px solid var(--warn-border);
+  font-size: 0.75rem;
+  color: var(--text);
+}
+.binding-card.orphan {
+  border-style: dashed;
+}
+.panel-title .text-button {
+  margin-left: auto;
+}
