@@ -8,6 +8,10 @@ export function resolveBinding(name: string, bindings: Binding[], projectId: str
 export function resolveValue(binding: Binding, profileId: string | null): string | undefined {
   return (profileId ? binding.values[profileId] : undefined) ?? binding.values.__default__;
 }
+/** A refusal the user can act on, as opposed to a failure they cannot. The dialog prints the message
+ * of this class and nothing else's, so invariant 5 holds by construction: only text we wrote here
+ * reaches the screen, never a storage error that might carry a key or a value. */
+export class BindingRefusal extends Error {}
 export function validateBinding(binding: Binding, others: Binding[]): string[] {
   const errors: string[] = [];
   if (!/^[A-Z][A-Z0-9_]{1,63}$/.test(binding.name)) errors.push('Namn måste vara 2–64 tecken: A–Z, siffror och understreck, med bokstav först.');
@@ -22,12 +26,36 @@ export const defaults: Record<Category, string> = {
   secret: '<PASSWORD>', identity: 'example.user', infrastructure: 'server.example.test',
   environment: 'C:\\Temp\\Example', configuration: 'EXAMPLE_VALUE', testdata: 'example.test',
 };
-export function suggestBinding(lineBefore: string, selected: string): { name: string; category: Category } {
+/** The name is derived from the variable to the left of the selection, so two lines assigning to the
+ * same variable produce the same name. Without `taken` the second one was proposed anyway and then
+ * rejected on save with "Namnet används redan i detta scope." — an error the user did not cause and
+ * could not act on without inventing a name themselves. Every caller that creates a binding
+ * programmatically (a scanner finding, a blocklist term) would inherit the same collision. */
+export function suggestBinding(
+  lineBefore: string,
+  selected: string,
+  bindings: Binding[],
+  scope: Pick<Binding, 'scope' | 'scopeRef'>,
+): { name: string; category: Category } {
   const variable = /["'$]?([A-Za-z_][A-Za-z0-9_]*)["']?\s*[:=][^=]*$/.exec(lineBefore)?.[1] || 'VALUE';
-  const name = variable.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().slice(0, 64);
+  const base = variable.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().slice(0, 64);
   const category: Category = /pass|secret|token|key/i.test(variable) ? 'secret'
     : /^(?:[a-z]:[\\/]|\\\\|\/)/i.test(selected) ? 'environment'
     : /server|host|domain|ip/i.test(variable) ? 'infrastructure' : 'identity';
-  return { name: name.length > 1 ? name : `${name}_VALUE`, category };
+  return { name: freeName(base.length > 1 ? base : `${base}_VALUE`, bindings, scope), category };
+}
+
+/** Counts up until the name is free in the scope the binding will land in — the same comparison
+ * validateBinding makes, so a suggestion can never be rejected by it. The suffix is trimmed back
+ * into the 64 characters the name rule allows rather than pushing the name past it. */
+function freeName(base: string, bindings: Binding[], scope: Pick<Binding, 'scope' | 'scopeRef'>): string {
+  const used = new Set(bindings.filter(b => b.scope === scope.scope && b.scopeRef === scope.scopeRef).map(b => b.name));
+  if (!used.has(base)) return base;
+  for (let n = 2; n < 1000; n++) {
+    const suffix = `_${n}`;
+    const candidate = base.slice(0, 64 - suffix.length) + suffix;
+    if (!used.has(candidate)) return candidate;
+  }
+  return base;
 }
 

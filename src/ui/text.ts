@@ -143,7 +143,7 @@ export const sv = {
   },
   binding: {
     selectInTemplate: 'Markera värdet i Mall-vyn så att rätt förekomst kan identifieras.',
-    templateChanged: 'Mallen har ändrats. Bindingen är sparad; markera rätt text igen.',
+    templateChanged: 'Mallen har ändrats sedan du markerade. Ingenting sparades; markera värdet igen.',
     deleteTitle: (name: string) => `Radera ${name}?`,
     deleteConfirm: 'Radera bindingen',
     valueGone: 'Det privata värdet försvinner ur valvet.',

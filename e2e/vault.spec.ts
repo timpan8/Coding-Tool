@@ -300,6 +300,48 @@ test('labels versions, compares them and deletes one', async ({ page }) => {
   await expect(page.locator('.version-history')).toContainText('andra');
 });
 
+// Punkt 11a. The name is derived from the variable to the left of the selection, so two lines that
+// assign to the same variable produced the same name twice. The second one was proposed anyway and
+// then rejected on save with "Namnet används redan i detta scope." — an error the user had not
+// caused and could not clear without inventing a name themselves.
+test('proposes a name that is free when the obvious one is taken', async ({ page }) => {
+  await type(page, '$username = "anna"\n$username = "bertil"\n');
+  await bind(page, 'anna', 'anna');
+
+  await page.getByText('bertil', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+  await expect(page.getByLabel('Bindingnamn', { exact: true })).toHaveValue('USERNAME_2');
+
+  // The preview follows the field. It used to keep showing the suggestion the dialog opened with,
+  // so a renamed binding previewed a placeholder that was never written.
+  await page.getByLabel('Bindingnamn', { exact: true }).fill('USERNAME_ALT');
+  await expect(page.locator('.binding-preview .after')).toContainText('{{USERNAME_ALT}}');
+
+  await page.getByLabel('Privat värde · standard').fill('bertil');
+  await page.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await expect(page.locator('.editor-body')).toContainText('{{USERNAME_ALT}}');
+  await expect(page.locator('.editor-body')).not.toContainText('bertil');
+});
+
+// The name rule is checked while the user types, not only when they press save, and a rejection
+// clears as soon as they start correcting it.
+test('says a name is taken while it is being typed, and stops saying so once it is fixed', async ({ page }) => {
+  await type(page, '$username = "anna"\n$host = "srv1"\n');
+  await bind(page, 'anna', 'anna');
+
+  await page.getByText('srv1', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+  await page.getByLabel('Bindingnamn', { exact: true }).fill('USERNAME');
+  await expect(page.locator('dialog[open]')).toContainText('Namnet används redan i detta scope.');
+
+  await page.getByLabel('Bindingnamn', { exact: true }).fill('HOSTNAME');
+  await expect(page.locator('dialog[open]')).not.toContainText('Namnet används redan i detta scope.');
+  await page.getByLabel('Privat värde · standard').fill('srv1');
+  await page.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+});
+
 // Report F20. Double-clicking a value stops at a word boundary, so `Hunter2!` selected `Hunter2`
 // and the template kept the exclamation mark: half the password stayed, and everything after that
 // looked like it had worked.

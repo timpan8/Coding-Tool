@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalSt
 import type { Binding, LanguageId, Settings, Version } from '../types/models';
 import { languages } from '../types/models';
 import type { StorageProvider } from '../storage/StorageProvider';
-import { resolveBinding, resolveValue, suggestBinding, defaults } from '../domain/bindings';
+import { resolveBinding, resolveValue, suggestBinding, defaults, BindingRefusal } from '../domain/bindings';
 import { expandToLiteral } from '../domain/bindings/literal';
 import { render, usage } from '../domain/render';
 import { auditForCopy, auditSelection, promptBlock } from '../domain/render/audit';
@@ -315,7 +315,8 @@ export function App({ storage }: { storage: StorageProvider }) {
         const widened = expandToLiteral(current.session.text, selection.start, selection.end, current.session.language);
         if (widened.widened) selection = { ...selection, start: widened.start, end: widened.end, text: widened.text };
       }
-      const hint = suggestBinding(selection.lineBefore, selection.text), time = new Date().toISOString();
+      const scope = { scope: 'project' as const, scopeRef: current.session.project.id };
+      const hint = suggestBinding(selection.lineBefore, selection.text, bindings, scope), time = new Date().toISOString();
       // The name heuristic reads only the variable name, so `$p = "Hunter2"` came out as identity
       // and a password rendered unmasked. Running the rules over the value itself is the missing
       // half: what a value looks like says more than what it was called.
@@ -323,12 +324,12 @@ export function App({ storage }: { storage: StorageProvider }) {
         .sort((a, b) => (a.severity === 'critical' ? -1 : b.severity === 'critical' ? 1 : 0))[0];
       const category = matched?.category ?? hint.category;
       const aiValue = matched?.suggestedAiReplacement ?? defaults[category];
-      const binding: Binding = { id: crypto.randomUUID(), name: hint.name, category, scope: 'project', scopeRef: current.session.project.id,
+      const binding: Binding = { id: crypto.randomUUID(), name: hint.name, category, ...scope,
         description: '', aiReplacement: mode === 'ai' ? selection.text : aiValue, values: mode === 'ai' ? {} : { __default__: selection.text },
         escapeMode: 'auto', matchHints: { lastVariableNames: [], previousAiValues: [], aliases: [] }, createdAt: time, updatedAt: time, deviceId: current.settings.deviceId };
       if (mode === 'ai') {
         const start = template.indexOf(selection.text);
-        if (start < 0 || template.indexOf(selection.text, start + 1) >= 0) throw new Error(t.binding.selectInTemplate);
+        if (start < 0 || template.indexOf(selection.text, start + 1) >= 0) throw new BindingRefusal(t.binding.selectInTemplate);
         selection = { ...selection, start, end: start + selection.text.length };
       }
       setBindingDialog({ binding, selection });
@@ -382,6 +383,11 @@ export function App({ storage }: { storage: StorageProvider }) {
   async function storeBinding(binding: Binding, all: boolean) {
     const selection = bindingDialog?.selection;
     const previous = bindings.find(b => b.id === binding.id);
+    // The guard belongs before the writes, not after them. It used to run once the binding was
+    // already saved, so a template that had moved under the open dialog left a binding behind that
+    // replaced nothing — and the dialog reported the generic save failure rather than saying so.
+    const source = controller.getSnapshot().session.text;
+    if (selection && source.slice(selection.start, selection.end) !== selection.text) throw new BindingRefusal(t.binding.templateChanged);
     // A rename has to rewrite every template that uses the placeholder, in one transaction, or the
     // templates end up pointing at a name that no longer resolves.
     if (previous && previous.name !== binding.name) {
@@ -391,8 +397,6 @@ export function App({ storage }: { storage: StorageProvider }) {
     }
     await storage.saveBinding({ ...binding, updatedAt: new Date().toISOString() }); setBindings(await storage.listBindings());
     if (selection) {
-      const source = controller.getSnapshot().session.text;
-      if (source.slice(selection.start, selection.end) !== selection.text) throw new Error(t.binding.templateChanged);
       const token = `{{${binding.name}}}`;
       const text = all ? source.split(/(\{\{[A-Z][A-Z0-9_]*\}\})/g).map((part, index) => index % 2 ? part : part.split(selection.text).join(token)).join('')
         : source.slice(0, selection.start) + token + source.slice(selection.end);
@@ -616,8 +620,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         const s = bindingDialog.selection!;
         const lineStart = template.lastIndexOf('\n', s.start - 1) + 1;
         const lineEnd = template.indexOf('\n', s.end) === -1 ? template.length : template.indexOf('\n', s.end);
-        const line = template.slice(lineStart, lineEnd);
-        return { before: line, after: line.slice(0, s.start - lineStart) + `{{${bindingDialog.binding.name}}}` + line.slice(s.end - lineStart) };
+        return { line: template.slice(lineStart, lineEnd), start: s.start - lineStart, end: s.end - lineStart };
       })() || undefined}
       save={storeBinding} close={() => setBindingDialog(null)} />}
     {copyMode && <CopyDialog mode={copyMode} coverage={cover} issues={ai.issues.length} replaced={ai.used.length}
