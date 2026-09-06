@@ -37,7 +37,17 @@ export function collectIssues(template: string, local: { text: string; issues: R
 const label = (blocks: ('local' | 'ai')[]) =>
   blocks.length === 2 ? t.issues.blocksBoth : blocks[0] === 'ai' ? 'blockerar Copy for AI' : 'blockerar Copy Local';
 
-export function IssuePanel({ issues, onSelect }: { issues: LocatedIssue[]; onSelect: (issue: LocatedIssue) => void }) {
+export function IssuePanel({
+  issues,
+  onSelect,
+  fix,
+}: {
+  issues: LocatedIssue[];
+  onSelect: (issue: LocatedIssue) => void;
+  /** A repair the app can make itself, offered per issue rather than for the panel as a whole:
+   * `offered` is false for the issues it cannot help with, and those get no button. */
+  fix?: { offered: (issue: LocatedIssue) => boolean; apply: (issue: LocatedIssue) => void };
+}) {
   if (!issues.length) return null;
   return (
     <div className="issue-panel" role="alert">
@@ -45,15 +55,22 @@ export function IssuePanel({ issues, onSelect }: { issues: LocatedIssue[]; onSel
         {issues.length} {issues.length === 1 ? 'problem' : 'problem'} hindrar kopiering
       </h3>
       {issues.map((issue) => (
-        <button key={`${issue.kind}:${issue.name}:${issue.start}`} className="issue-item" onClick={() => onSelect(issue)}>
-          <span className="issue-head">
-            <b>{issue.name}</b>
-            <small>
-              rad {issue.line} · {label(issue.blocks)}
-            </small>
-          </span>
-          <span>{issue.message}</span>
-        </button>
+        <div className="issue-row" key={`${issue.kind}:${issue.name}:${issue.start}`}>
+          <button className="issue-item" onClick={() => onSelect(issue)}>
+            <span className="issue-head">
+              <b>{issue.name}</b>
+              <small>
+                rad {issue.line} · {label(issue.blocks)}
+              </small>
+            </span>
+            <span>{issue.message}</span>
+          </button>
+          {fix?.offered(issue) && (
+            <button className="issue-fix" onClick={() => fix.apply(issue)}>
+              {t.issues.replaceWith(issue.name)}
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );

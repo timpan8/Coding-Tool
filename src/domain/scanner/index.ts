@@ -125,12 +125,20 @@ export function scan(text: string, rules: ScannerRule[] | CompiledRule[], option
 
   // One finding per span: the most severe rule that matched it wins, so a password caught by both
   // the assignment rule and the entropy rule is reported once.
+  //
+  // Except against the entropy rule, which is the fallback for values nothing can name. A rule that
+  // names the value wins even when it is milder, because the name is the useful part: a GUID
+  // reported as "random string" gets `<SECRET>` for an AI value instead of a GUID, and a JWT was
+  // called a random string too. Nothing here blocks a copy, so severity is advice, not a gate.
   const order = { critical: 0, high: 1, medium: 2, low: 3 } as const;
+  const fallback = (finding: Finding) => finding.ruleId === 'builtin:entropy';
   const best = new Map<string, Finding>();
   for (const finding of findings) {
     const key = `${finding.start}:${finding.end}`;
     const existing = best.get(key);
-    if (!existing || order[finding.severity] < order[existing.severity]) best.set(key, finding);
+    const wins = !existing || (fallback(existing) && !fallback(finding))
+      || (fallback(existing) === fallback(finding) && order[finding.severity] < order[existing.severity]);
+    if (wins) best.set(key, finding);
   }
   return [...best.values()].sort((a, b) => a.start - b.start);
 }

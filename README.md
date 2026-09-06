@@ -64,6 +64,8 @@ Det skyddar **inte** mot skadlig kod, keyloggers, annan användare på samma OS-
 
 Appen redovisar vad den faktiskt kontrollerat och säger aldrig att säkerhet är garanterad. Före AI-kopiering blockeras saknade värden, osäkra renderingskontexter och exakta kända privata värden, och dialogen visar hur många av kodens strängvärden som är kopplade till bindings. Är inget kopplat sägs det rakt ut i stället för att beskedet låter godkännande. En heuristisk scanner letar dessutom efter värden som liknar hemligheter och varnar per träff, men heuristik hårdblockerar aldrig: falska positiva som inte går att kvittera leder till att verktyget kringgås. Okända och transformerade värden kan fortfarande förekomma. Escaping är konservativ textbearbetning och ersätter inte en fullständig språkparser.
 
+**Blocklistan är en lista du själv fyller i, inte ett skydd som hittar termer åt dig.** Termer du lägger till byts mot en platshållare när text klistras in eller en fil öppnas — ordagrant, skiftlägesokänsligt och vid ordgräns. Den ser inte stavfel, förkortningar, sammansättningar eller en term som skrivs isär, och den rör inte text som redan ligger i arbetsytan när termen läggs till. Ersättningen visas och går att ångra i ett steg.
+
 ## Verifiering
 
 `pnpm lint`, `pnpm test` och `pnpm test:e2e` körs i CI vid varje pull request. `pnpm test` kör Vitest, fake-indexeddb och fast-check; `pnpm test:e2e` kör Playwright mot produktionsbygget, eftersom flera fel bara syns med den riktiga editorn. Domänlogik saknar DOM-beroenden. Storage-kontraktet kan köras mot framtida providers med samma tester. Tester använder endast syntetiska värden.

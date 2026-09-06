@@ -53,10 +53,13 @@ function AiCopyReview({ coverage, issues, replaced, findings }: { coverage: Cove
  * and the file — sit behind the same review checkbox, and neither knows how to produce the text.
  * The workspace re-audits on the current text and does that. */
 export function CopyDialog({
-  mode, coverage, issues, replaced, findings, seriousFindings, reviewed, onReviewed, onCopy, onDownload, close,
+  mode, coverage, issues, replaced, findings, seriousFindings, profile, reviewed, onReviewed, onCopy, onDownload, close,
 }: {
   mode: 'local' | 'ai';
   coverage: Coverage;
+  /** The active profile's name, or undefined when the default values are in play. Copy Local writes
+   * real values, and which set of them depends on a picker in a different corner of the screen. */
+  profile?: string;
   issues: number;
   replaced: number;
   findings: Finding[];
@@ -73,6 +76,7 @@ export function CopyDialog({
   return <Modal title={mode === 'local' ? t.review.localTitle : t.review.aiTitle} close={close}>
     {mode === 'local' ? <>
       <p>{t.review.localWarning}</p>
+      <p className="notice">{profile ? t.review.localProfile(profile) : t.review.localDefaultProfile}</p>
       <p className="notice">{t.review.localClipboardNote}</p>
     </> : <AiCopyReview coverage={coverage} issues={issues} replaced={replaced} findings={findings} />}
 

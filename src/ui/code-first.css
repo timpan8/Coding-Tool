@@ -464,10 +464,21 @@
   font-weight: 600;
   color: var(--danger-text);
 }
+.issue-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.issue-fix {
+  flex: none;
+  align-self: center;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
 .issue-item {
   display: block;
   width: 100%;
-  margin-bottom: 8px;
   padding: 9px 11px;
   text-align: left;
   font-weight: 400;
@@ -525,6 +536,28 @@
 .finding.severity-medium {
   border-left-color: var(--warn-text);
 }
+.findings-bulk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.findings-bulk .check {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+.finding-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.finding-top input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  flex: none;
+}
 .finding-head {
   display: flex;
   justify-content: space-between;
@@ -558,7 +591,8 @@
   gap: 10px;
 }
 
-.rules-panel {
+.rules-panel,
+.blocklist-panel {
   margin-top: 32px;
   padding-top: 24px;
   border-top: 1px solid var(--border);
@@ -743,6 +777,22 @@ dialog:has(.version-view) {
   width: 1100px;
 }
 
+.ai-sees {
+  margin: 10px 0 4px;
+  font-size: 0.8125rem;
+}
+.ai-sees code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+}
+.disclosure {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .binding-preview {
   display: grid;
   gap: 4px;

@@ -54,5 +54,29 @@ describe('ingest', () => {
     const result = ingest('Write-Output "hej"', [password, host]);
     expect(result.template).toBe('Write-Output "hej"');
     expect(result.decisions).toEqual([]);
+    // Nothing was there to lose: without a previous template there is nothing to compare against.
+    expect(result.lost).toEqual([]);
+  });
+
+  // The most dangerous outcome of the whole round trip, and the one that used to be silent: the AI
+  // handed back the real value where the placeholder stood. Nothing matches any tier, so the report
+  // read "0 platshållare på plats, 0 att granska" and replacing the template removed the protection
+  // without a word.
+  it('says which placeholders the returned code no longer has', () => {
+    const before = '$h = "{{DB_HOST}}"\n$b = "{{DB_HOST}}"\n$p = "{{ADMIN_PASSWORD}}"';
+    const result = ingest('$h = "prod-sql-07.acme.internal"\n$b = "prod-sql-07.acme.internal"\n$p = "{{ADMIN_PASSWORD}}"', [password, host], before);
+    expect(result.lost).toEqual([{ bindingName: 'DB_HOST', occurrences: 2 }]);
+  });
+
+  it('counts a placeholder that came back fewer times than it went out', () => {
+    const result = ingest('$a = "{{DB_HOST}}"', [host], '$a = "{{DB_HOST}}"\n$b = "{{DB_HOST}}"');
+    expect(result.lost).toEqual([{ bindingName: 'DB_HOST', occurrences: 1 }]);
+  });
+
+  it('says nothing when every placeholder came home', () => {
+    const before = '$h = "{{DB_HOST}}"';
+    expect(ingest('$h = "{{DB_HOST}}"\n$new = 1', [host], before).lost).toEqual([]);
+    // Restored by tier 2 counts as home: the placeholder is back in the template that would be saved.
+    expect(ingest('$h = "server.example.test"', [host], before).lost).toEqual([]);
   });
 });

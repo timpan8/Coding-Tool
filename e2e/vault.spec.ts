@@ -16,11 +16,23 @@ async function type(page: Page, code: string) {
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 }
 
-async function bind(page: Page, word: string, privateValue: string, category?: string) {
+/** The app treats a large jump in one change as a paste — no editor gives it a paste event it can
+ * trust — so the tests that exercise that path have to paste for real rather than type. */
+async function paste(page: Page, code: string) {
+  await page.locator('.code-editor').click();
+  await page.evaluate(text => navigator.clipboard.writeText(text), code);
+  await page.keyboard.press('Control+v');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+}
+
+/** `all` ticks "replace the other identical occurrences too", which is off by default: rewriting
+ * every occurrence of a value across the file is a choice, and the preview shows only one line. */
+async function bind(page: Page, word: string, privateValue: string, category?: string, all = false) {
   await page.getByText(word, { exact: false }).first().dblclick();
   await page.keyboard.press('Control+b');
   if (category) await page.getByLabel('Kategori').selectOption(category);
   await page.getByLabel('Privat värde · standard').fill(privateValue);
+  if (all) await page.getByLabel(/Ersätt även/).check();
   await page.getByRole('button', { name: 'Spara binding' }).click();
   await expect(page.locator('dialog[open]')).toHaveCount(0);
 }
@@ -266,6 +278,199 @@ test('clears what it says it clears, and says what it does not', async ({ page }
   await page.evaluate(() => (location.hash = '#/projects'));
   await expect(page.locator('.project-card')).toHaveCount(0);
   await expect(page.locator('.empty-project-list')).toBeVisible();
+});
+
+// Punkt 7. Granskningsreglerna pekar ut och låter dig avgöra, en i taget. Blocklistan är den andra
+// halvan: termer där beslutet redan är fattat byts mot en platshållare i samma stund de landar i
+// arbetsytan, så företagsnamnet inte hinner följa med in i en AI-kopia.
+test('puts a blocklisted term away by itself when code is pasted', async ({ page }) => {
+  await go(page, 'Inställningar', '.blocklist-panel');
+  await page.getByLabel('Term', { exact: true }).fill('mittforetag.se');
+  await page.getByLabel('Vad AI:n ser (valfritt)').fill('example.com');
+  await page.getByRole('button', { name: 'Lägg till term' }).click();
+  await expect(page.locator('.blocklist-panel')).toContainText('{{MITTFORETAG_SE}}');
+
+  await go(page, '＋ Ny kod', '.code-editor');
+  // A real paste, not typing: the blocklist runs on text that arrives whole, and keyboard.type()
+  // delivers one character at a time.
+  await paste(page, '$url = "https://mittforetag.se/api"\n$mail = "post@mittforetag.se"\n');
+  await expect(page.locator('.editor-body')).toContainText('{{MITTFORETAG_SE}}');
+  await expect(page.locator('.editor-body')).not.toContainText('mittforetag.se');
+  await expect(page.locator('.inline-notice')).toContainText('förekomster');
+
+  // The AI view carries the harmless value, the Local view the real one — the term became an
+  // ordinary binding, so nothing else in the app had to learn about the blocklist.
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.locator('.editor-body')).toContainText('example.com');
+  await expect(page.locator('.editor-body')).not.toContainText('mittforetag.se');
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
+  await expect(page.locator('.editor-body')).toContainText('mittforetag.se');
+
+  // And code that comes home from an AI finds its way back onto the placeholder.
+  await page.getByRole('tab', { name: 'Mall' }).click();
+  await page.getByRole('button', { name: 'Klistra in från AI ↙' }).click();
+  await page.locator('textarea[aria-label="Kod från AI"]').fill('$url = "https://example.com/api"\n');
+  await expect(page.locator('.ingest-decisions')).toContainText('Återställd');
+  await page.getByRole('button', { name: 'Ersätt mallen' }).click();
+  await expect(page.locator('.editor-body')).toContainText('{{MITTFORETAG_SE}}');
+});
+
+// The substitution is one act and has to come back in one step, with the pasted text as it stood.
+test('takes back a blocklist substitution in one step', async ({ page }) => {
+  await go(page, 'Inställningar', '.blocklist-panel');
+  await page.getByLabel('Term', { exact: true }).fill('mittforetag.se');
+  await page.getByRole('button', { name: 'Lägg till term' }).click();
+
+  await go(page, '＋ Ny kod', '.code-editor');
+  await paste(page, '$url = "https://mittforetag.se/api"\n');
+  await expect(page.locator('.editor-body')).toContainText('{{MITTFORETAG_SE}}');
+
+  await page.locator('.undo-bar').getByRole('button', { name: 'Ångra', exact: true }).click();
+  await expect(page.locator('.editor-body')).toContainText('mittforetag.se');
+  await expect(page.locator('.editor-body')).not.toContainText('{{MITTFORETAG_SE}}');
+});
+
+// Punkterna 10 och 2. Appen har hela tiden vetat vilken binding som äger ett värde — läckagekollen
+// är byggd på det — men använde kunskapen till att vägra i stället för att erbjuda.
+test('offers the binding that already holds the value instead of a second one', async ({ page }) => {
+  await type(page, '$host = "sql01.corp.local"\n$backup = "sql01.corp.local"\n');
+  await bind(page, 'sql01', 'sql01.corp.local', 'infrastructure');
+  await expect(page.locator('.editor-body')).toContainText('{{HOST}}');
+
+  // The second occurrence was left alone: replacing every occurrence is a choice now, not the
+  // default, so it is still there to be bound.
+  await page.getByText('sql01', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+  await expect(page.locator('.reuse-offer')).toContainText('HOST');
+  await page.getByRole('button', { name: 'Använd {{HOST}}' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+  // One binding, two placeholders — not a second binding holding the same private value.
+  await expect(page.locator('.editor-body')).not.toContainText('sql01.corp.local');
+  await page.evaluate(() => (location.hash = '#/bindings'));
+  await expect(page.locator('.binding-card')).toHaveCount(1);
+});
+
+// The leak check blocked the copy and said what was wrong. Saying it is one thing; the app knows
+// enough to put it right, and now offers to.
+test('puts a known value back behind its placeholder from the issue panel', async ({ page }) => {
+  await type(page, '$host = "sql01.corp.local"\n');
+  await bind(page, 'sql01', 'sql01.corp.local', 'infrastructure');
+
+  // Code coming back with the real value in it — what happens when it is pasted from somewhere else.
+  await paste(page, '$host = "{{HOST}}"\n$backup = "sql01.corp.local"\n$port = 1433\n');
+  await expect(page.locator('.issue-panel')).toContainText('HOST');
+
+  await page.locator('.issue-row').getByRole('button', { name: 'Byt mot {{HOST}}' }).click();
+  await expect(page.locator('.issue-panel')).toHaveCount(0);
+  await expect(page.locator('.editor-body')).not.toContainText('sql01.corp.local');
+  await expect(page.locator('.inline-notice')).toContainText('byttes mot platshållaren');
+});
+
+// Punkt 4. Den farligaste händelsen i hela rundturen, och tidigare helt tyst: AI:n ger tillbaka det
+// riktiga värdet där platshållaren stod. Ingenting matchar någon nivå, så rapporten löd "0
+// platshållare på plats, 0 att granska" och "Ersätt mallen" tog bort skyddet utan ett ord.
+test('says which placeholders the code from the AI no longer has', async ({ page }) => {
+  await type(page, '$host = "sql01.corp.local"\n');
+  await bind(page, 'sql01', 'sql01.corp.local', 'infrastructure');
+  await expect(page.locator('.editor-body')).toContainText('{{HOST}}');
+
+  await page.getByRole('button', { name: 'Klistra in från AI ↙' }).click();
+  await page.locator('textarea[aria-label="Kod från AI"]').fill('$host = "prod-sql-07.acme.internal"\n');
+  await expect(page.locator('dialog[open]')).toContainText('En platshållare försvinner');
+  await expect(page.locator('dialog[open]')).toContainText('HOST');
+
+  // The button says what it would do rather than reading like the ordinary path.
+  await page.getByRole('button', { name: 'Ersätt mallen ändå' }).click();
+  await expect(page.locator('.editor-body')).toContainText('prod-sql-07.acme.internal');
+
+  // And when everything comes home it says nothing at all.
+  await page.getByRole('button', { name: 'Klistra in från AI ↙' }).click();
+  await page.locator('textarea[aria-label="Kod från AI"]').fill('$host = "{{HOST}}"\n$port = 1433\n');
+  await expect(page.locator('dialog[open]')).not.toContainText('försvinner');
+  await page.getByRole('button', { name: 'Ersätt mallen', exact: true }).click();
+  await expect(page.locator('.editor-body')).toContainText('{{HOST}}');
+});
+
+// Punkt 1. Ett fynd i taget betydde en dialog per fynd, och en fil som kommer in med ett dussin av
+// dem är precis när det är värst. Punkt 3: kategorin läses ur raden, inte ur markeringen ensam.
+test('binds a whole set of findings in one go', async ({ page }) => {
+  await type(page, '$password = "Hunter2!"\n$host = "sql01.corp.local"\n$mail = "anna@company.se"\n');
+  await expect(page.locator('.finding')).toHaveCount(3);
+
+  await page.getByLabel('Markera alla').check();
+  await page.getByRole('button', { name: 'Skapa 3 bindings' }).click();
+  await expect(page.locator('.findings-panel')).toHaveCount(0);
+  await expect(page.locator('.editor-body')).not.toContainText('Hunter2!');
+  await expect(page.locator('.editor-body')).not.toContainText('sql01.corp.local');
+  await expect(page.locator('.editor-body')).not.toContainText('anna@company.se');
+
+  // The password was categorised from the assignment on its line, not from the word Hunter2 alone,
+  // so its AI value masks rather than reading like a name.
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.locator('.editor-body')).toContainText('<PASSWORD>');
+
+  // Undo takes the bindings with it: they were made without anyone seeing them.
+  await page.locator('.undo-bar').getByRole('button', { name: 'Ångra', exact: true }).click();
+  await page.getByRole('tab', { name: 'Mall' }).click();
+  await expect(page.locator('.editor-body')).toContainText('Hunter2!');
+  await page.evaluate(() => (location.hash = '#/bindings'));
+  await expect(page.locator('.binding-card')).toHaveCount(0);
+});
+
+// Punkt 5 och 6. Copy Local skriver riktiga värden, och vilka beror på en väljare i ett annat hörn
+// av skärmen. Backupsidan sa ingenting om hur gammal den senaste filen är.
+test('names the profile it is about to copy and says how old the last backup is', async ({ page }) => {
+  await go(page, 'Backup', '.backup-panel');
+  await expect(page.locator('.backup-panel')).toContainText('aldrig exporterats');
+
+  await go(page, '＋ Ny kod', '.code-editor');
+  await type(page, '$host = "prod.example.test"\n');
+  await bind(page, 'prod', 'prod.internal', 'infrastructure');
+  await page.locator('.copy-actions').getByRole('button', { name: 'Copy Local' }).click();
+  await expect(page.locator('dialog[open]')).toContainText('Ingen profil är vald');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Avbryt' }).click();
+
+  await page.getByLabel('Aktiv profil').selectOption('__manage__');
+  await page.getByLabel('Ny profil').fill('Test');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Lägg till' }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Stäng', exact: true }).click();
+  await page.getByLabel('Aktiv profil').selectOption({ label: 'Test' });
+  await page.locator('.copy-actions').getByRole('button', { name: 'Copy Local' }).click();
+  await expect(page.locator('dialog[open]')).toContainText('profilen Test');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Avbryt' }).click();
+
+  await go(page, 'Backup', '.backup-panel');
+  await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Exportera hela valvet' }).click(),
+  ]);
+  await expect(page.locator('.backup-panel')).toContainText('Senast exporterat i dag');
+});
+
+// Punkt 11b. Det vanligaste fallet är värde markerat → namn → klart. Allt annat har ett fungerande
+// standardvärde och ligger bakom progressive disclosure — men AI-värdet står kvar på skärmen som
+// text, eftersom det är det enda fält som lämnar valvet.
+test('asks only for a name in the ordinary case', async ({ page }) => {
+  await type(page, '$password = "Hunter2!"\n');
+  await page.getByText('Hunter2', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+
+  const dialog = page.locator('dialog[open]');
+  await expect(dialog.getByLabel('Bindingnamn')).toBeVisible();
+  await expect(dialog.getByLabel('Scope')).toBeHidden();
+  await expect(dialog.getByLabel('AI-värde')).toBeHidden();
+  // Folded away, not hidden: what an AI would see is on screen either way.
+  await expect(dialog.locator('.ai-sees')).toContainText('<PASSWORD>');
+
+  await dialog.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await expect(page.locator('.editor-body')).toContainText('{{PASSWORD}}');
+
+  // Opening an existing binding is opening it for one of those fields, so they start unfolded.
+  await page.locator('.binding-card').getByLabel(/^Redigera /).click();
+  await expect(page.locator('dialog[open]').getByLabel('AI-värde')).toBeVisible();
 });
 
 // Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did
@@ -558,7 +763,7 @@ test('creates a binding without a selection and warns when it is unused', async 
 // solved the problem by removing the feature.
 test('renames a binding and rewrites its placeholder everywhere', async ({ page }) => {
   await type(page, '$a = "Hunter2!"\n$b = "Hunter2!"\n');
-  await bind(page, 'Hunter2', 'Hunter2!', 'secret');
+  await bind(page, 'Hunter2', 'Hunter2!', 'secret', true);
   await expect(page.locator('.binding-card')).toContainText('2 förekomster');
 
   await page.locator('.binding-card').getByLabel(/^Redigera /).click();
@@ -840,6 +1045,9 @@ test('lists every binding in the vault, including global ones', async ({ page })
   // scope is a choice, and the page is what makes the global one reachable at all.
   await page.getByRole('button', { name: '＋ Ny binding' }).click();
   await page.getByLabel('Bindingnamn').fill('SHARED_TOKEN');
+  // Scope is behind the disclosure now: the common case is a value in the open project, and naming
+  // it is the only decision that case has left.
+  await page.getByRole('button', { name: /Fler val/ }).click();
   await page.getByLabel('Scope').selectOption('global');
   await page.getByLabel('Privat värde · standard').fill('token-abc-123');
   await page.getByRole('button', { name: 'Spara binding' }).click();

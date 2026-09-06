@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { Binding, LanguageId, Settings, Version } from '../types/models';
+import type { Binding, BlocklistEntry, LanguageId, Settings, Version } from '../types/models';
 import { languages } from '../types/models';
 import type { StorageProvider } from '../storage/StorageProvider';
 import { resolveBinding, resolveValue, suggestBinding, defaults, BindingRefusal } from '../domain/bindings';
 import { expandToLiteral } from '../domain/bindings/literal';
+import { applyBlocklist } from '../domain/blocklist';
 import { render, usage } from '../domain/render';
 import { auditForCopy, auditSelection, promptBlock } from '../domain/render/audit';
 import { buildValueIndex } from '../domain/render/leak';
@@ -117,7 +118,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const setNotice = (text: string) => { setNoticeText(text); setNoticeTone('info'); };
   const warn = (text: string) => { setNoticeText(text); setNoticeTone('warn'); };
 
-  const [bindingDialog, setBindingDialog] = useState<{ binding: Binding; selection?: Selection } | null>(null);
+  const [bindingDialog, setBindingDialog] = useState<{ binding: Binding; selection?: Selection; reuse?: string } | null>(null);
   const [showSecrets, setShowSecrets] = useState(false), [focusName, setFocusName] = useState(''), [focusLine, setFocusLine] = useState<number>();
   const [viewing, setViewing] = useState<{ version: Version; compareTo: Version | null } | null>(null), [labelling, setLabelling] = useState(false), [details, setDetails] = useState(false);
   const [copyMode, setCopyMode] = useState<'local' | 'ai' | null>(null), [reviewed, setReviewed] = useState(false), [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
@@ -127,6 +128,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [confirm, confirmDialog] = useConfirm();
   const [offerUndo, undoBar] = useUndo(setNotice);
   const [rules, setRules] = useState<ScannerRule[]>([]), [profiles, setProfiles] = useState<Profile[]>([]), [managingProfiles, setManagingProfiles] = useState(false);
+  const [blocklist, setBlocklist] = useState<BlocklistEntry[]>([]);
   const [ingesting, setIngesting] = useState(false), [showShortcuts, setShowShortcuts] = useState(false), [dropping, setDropping] = useState(false);
   const [dismissed, refreshDismissals] = useDismissals(() => project ? storage.listDismissals(project.id) : Promise.resolve([]), project?.id ?? '');
   const findings = useScanner(mode === 'template' ? template : '', rules, dismissed);
@@ -189,6 +191,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   useEffect(() => { void storageState().then(setStorageInfo); }, []);
   useEffect(() => { void storage.listScannerRules().then(setRules).catch(() => {}); }, [storage]);
   useEffect(() => { void storage.listProfiles().then(setProfiles).catch(() => {}); }, [storage]);
+  useEffect(() => { void storage.listBlocklist().then(setBlocklist).catch(() => {}); }, [storage]);
   // Asking on an empty first visit would prompt Firefox users before they have anything to lose.
   useEffect(() => {
     if (!project || asked.current) return;
@@ -285,6 +288,54 @@ export function App({ storage }: { storage: StorageProvider }) {
     createBinding({ text: value, start: finding.start, end: finding.end, line: finding.line,
       lineBefore: template.slice(template.lastIndexOf('\n', finding.start) + 1, finding.start) }, finding);
   }
+  /** Binding one finding at a time meant a dialog for each, and a file that arrives with a dozen of
+   * them is exactly when that hurts most. Nothing here needs a decision the finding has not already
+   * made: the rule says what the value is and what an AI may see instead. The dialog stays for the
+   * one-at-a-time path, where the point is to look at it.
+   *
+   * Undoing removes the bindings as well as the substitution. They were created without anyone
+   * seeing them, so leaving them behind would leave a mess nobody asked for. */
+  async function bindFindings(chosen: Finding[]) {
+    await run(async () => {
+      await controller.flush();
+      const current = controller.getSnapshot();
+      if (!current.settings) return;
+      const scope = current.session.project
+        ? { scope: 'project' as const, scopeRef: current.session.project.id }
+        : { scope: 'global' as const, scopeRef: null };
+      const before = current.session.text;
+      const created: Binding[] = [];
+      const time = new Date().toISOString();
+      let text = before;
+      // Back to front, so replacing one value does not move the next one's offsets.
+      for (const finding of [...chosen].sort((a, b) => b.start - a.start)) {
+        const value = before.slice(finding.start, finding.end);
+        // The same value twice is one binding, here as everywhere else.
+        const owner = [...bindings, ...created].find(b => Object.values(b.values).includes(value)
+          && (b.scope === 'global' || (b.scope === scope.scope && b.scopeRef === scope.scopeRef)));
+        let name = owner?.name;
+        if (!name) {
+          const lineBefore = before.slice(before.lastIndexOf('\n', finding.start) + 1, finding.start);
+          name = suggestBinding(lineBefore, value, [...bindings, ...created], scope).name;
+          created.push({ id: crypto.randomUUID(), name, category: finding.category, ...scope, description: '',
+            aiReplacement: finding.suggestedAiReplacement || defaults[finding.category],
+            values: { __default__: value }, escapeMode: 'auto',
+            matchHints: { lastVariableNames: [], previousAiValues: [], aliases: [] },
+            createdAt: time, updatedAt: time, deviceId: current.settings.deviceId });
+        }
+        text = text.slice(0, finding.start) + `{{${name}}}` + text.slice(finding.end);
+      }
+      for (const binding of created) await storage.saveBinding(binding);
+      setBindings(await storage.listBindings());
+      controller.changeText(text); changeMode('template'); await controller.flush();
+      setNotice(t.findings.boundMany(created.length));
+      offerUndo({ label: t.findings.boundManyUndo(created.length), restore: async () => {
+        for (const binding of created) await storage.deleteBinding(binding.id);
+        setBindings(await storage.listBindings());
+        controller.changeText(before); await controller.flush();
+      } });
+    });
+  }
   /** Report F-2.7. One click on a 68×21 px button silenced a finding for good — in the panel and
    * in the copy dialog, which filters on the same set. There was no confirmation, no undo and no
    * list of what had been dismissed, while `deleteDismissal` sat implemented in the storage layer
@@ -308,6 +359,33 @@ export function App({ storage }: { storage: StorageProvider }) {
     if (issue.kind !== 'leak') setFocusName(issue.name);
   }
   function changeMode(next: Mode) { setMode(next); setShowSecrets(false); setFocusName(''); setFocusLine(undefined); }
+  /** The private value a leak issue is about, when it is one the app can actually put right: the
+   * binding has to resolve here, and its value has to still be in the template. A value that reaches
+   * the AI output some other way — through another binding's AI value, say — is not fixed by
+   * rewriting the template, so nothing is offered for it. */
+  function leakedValue(issue: LocatedIssue): string | undefined {
+    if (issue.kind !== 'leak') return undefined;
+    const binding = resolveBinding(issue.name, bindings, options.projectId, options.versionId);
+    const value = binding && resolveValue(binding, options.profileId);
+    return value && template.includes(value) ? value : undefined;
+  }
+  /** The leak check has known which binding owns the value since it was written; it used that only
+   * to refuse the copy. Here it offers the swap instead — a choice, not automatic matching. */
+  function replaceLeak(issue: LocatedIssue) {
+    const value = leakedValue(issue);
+    if (!value) return;
+    const before = template;
+    // Placeholders are stepped over, so a value that happens to read like part of one is safe.
+    const parts = template.split(/(\{\{[A-Z][A-Z0-9_]*\}\})/g);
+    let count = 0;
+    for (let i = 0; i < parts.length; i += 2) {
+      count += parts[i].split(value).length - 1;
+      parts[i] = parts[i].split(value).join(`{{${issue.name}}}`);
+    }
+    controller.changeText(parts.join(''));
+    setNotice(t.issues.replaced(issue.name, count));
+    offerUndo({ label: t.issues.replaceUndo(issue.name), restore: async () => { controller.changeText(before); await controller.flush(); } });
+  }
   function createBinding(selection: Selection, finding?: Finding) {
     // Report U7. Ctrl+B in the Local view used to do nothing at all, with nothing said.
     if (mode === 'local') { warn(t.refusal.bindingInLocal); return; }
@@ -328,7 +406,20 @@ export function App({ storage }: { storage: StorageProvider }) {
       // The name heuristic reads only the variable name, so `$p = "Hunter2"` came out as identity
       // and a password rendered unmasked. Running the rules over the value itself is the missing
       // half: what a value looks like says more than what it was called.
-      const matched = finding ?? scan(selection.text, rules, { skipRanges: [] })
+      //
+      // Over the whole line, though, and not the selection alone. Several rules are about the
+      // assignment rather than the value — `password = "…"` is what makes `Hunter2!` a secret, and
+      // `Hunter2!` on its own is just a word with a digit in it. Only findings that cover the
+      // selection count, so the variable on the same line cannot categorise it by accident.
+      const source = current.session.text;
+      const lineStart = source.lastIndexOf('\n', selection.start - 1) + 1;
+      const lineEnd = source.indexOf('\n', selection.end);
+      const line = source.slice(lineStart, lineEnd === -1 ? source.length : lineEnd);
+      const onLine = scan(line, rules, { skipRanges: [] })
+        // Only a finding that covers the selection counts, so a value elsewhere on the line cannot
+        // categorise this one. The assignment rule reports its captured value, not the whole line.
+        .filter(f => f.start + lineStart <= selection.start && f.end + lineStart >= selection.end);
+      const matched = finding ?? onLine
         .sort((a, b) => (a.severity === 'critical' ? -1 : b.severity === 'critical' ? 1 : 0))[0];
       const category = matched?.category ?? hint.category;
       const aiValue = matched?.suggestedAiReplacement ?? defaults[category];
@@ -340,19 +431,68 @@ export function App({ storage }: { storage: StorageProvider }) {
         if (start < 0 || template.indexOf(selection.text, start + 1) >= 0) throw new BindingRefusal(t.binding.selectInTemplate);
         selection = { ...selection, start, end: start + selection.text.length };
       }
-      setBindingDialog({ binding, selection });
+      // A value already in the vault does not need a second binding. Project before global, the
+      // order resolveBinding would resolve them in.
+      const owner = [...bindings].sort((a, b) => (a.scope === 'global' ? 1 : 0) - (b.scope === 'global' ? 1 : 0))
+        .find(b => resolveBinding(b.name, bindings, options.projectId, options.versionId)?.id === b.id
+          && Object.values(b.values).includes(selection.text));
+      setBindingDialog({ binding, selection, reuse: owner?.name });
     });
   }
-  /** Fires on a paste, not on typing: a guess from the first character is worthless, and after
-   * that the file is no longer empty. A large jump in one change is what a paste looks like from
-   * here, and it works for both editors. Never overrides a language the user picked, and stays
-   * quiet unless the guess is unambiguous — the language decides how values are escaped. */
+  /** Neither editor gives us a paste event we can trust, so a large jump in one change is what a
+   * paste looks like from here. A guess from the first character is worthless, and after that the
+   * file is no longer empty. */
+  const pasted = (next: string) => next.length - template.length >= 20;
+  /** Never overrides a language the user picked, and stays quiet unless the guess is unambiguous —
+   * the language decides how values are escaped. */
   function noteLanguage(text: string) {
-    if (languageChosen.current.has(session.activeFileId) || text.length - template.length < 20) return;
+    if (languageChosen.current.has(session.activeFileId)) return;
     const guess = detectLanguage(text);
     if (guess && guess !== language) {
       controller.changeLanguage(guess);
       setNotice(t.workspace.languageSet(guess));
+    }
+  }
+  /** The blocklist runs on text that arrives whole — a paste or a dropped file — and never while
+   * typing: half a term is not the term, and rewriting the line under the cursor mid-word is help
+   * nobody asked for.
+   *
+   * The bindings it creates are global. A term on the blocklist is a decision about the whole vault,
+   * not about one project, and making them global is also what lets the same term be recognised
+   * again in the next project rather than collecting a binding per project.
+   *
+   * The pasted text is already in the tab before this runs, so a failure here leaves the user's text
+   * where they put it and says so — it never swallows the paste. */
+  async function screenForBlocklist(text: string) {
+    const scope = { scope: 'global' as const, scopeRef: null };
+    const result = applyBlocklist(text, blocklist, bindings, scope);
+    if (!result.replacements) return;
+    try {
+      const current = controller.getSnapshot();
+      if (!current.settings) return;
+      const time = new Date().toISOString();
+      for (const match of result.matches.filter(m => !m.existing)) {
+        // Categorised from the value itself, the same way a binding made by hand is.
+        const found = scan(match.matched, rules, { skipRanges: [] })[0];
+        const category = found?.category ?? 'configuration';
+        await storage.saveBinding({ id: crypto.randomUUID(), name: match.name, category, ...scope,
+          description: t.blocklist.fromTerm(match.entry.term),
+          aiReplacement: match.entry.replacement || found?.suggestedAiReplacement || defaults[category],
+          values: { __default__: match.matched }, escapeMode: 'auto',
+          matchHints: { lastVariableNames: [], previousAiValues: [], aliases: [] },
+          createdAt: time, updatedAt: time, deviceId: current.settings.deviceId });
+      }
+      setBindings(await storage.listBindings());
+      // Typing may have carried on while the bindings were being written. Replacing the text then
+      // would take those keystrokes with it, so the substitution is dropped instead.
+      if (controller.getSnapshot().session.text !== text) return;
+      controller.changeText(result.text);
+      setNotice(t.blocklist.replaced(result.replacements, result.matches.length));
+      offerUndo({ label: t.blocklist.undoLabel(result.replacements), restore: async () => {
+        controller.changeText(text); await controller.flush();
+      } });
+    } catch {
+      warn(t.blocklist.failed);
     }
   }
   async function openFiles(files: FileList | null) {
@@ -370,6 +510,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       // exists too; the first save writes both. The name is what a drop carries that typing does not.
       await controller.renameFile(fileId, file.name);
       setNotice(t.workspace.fileRead(file.name));
+      await screenForBlocklist(text);
     });
   }
   /** No selection, so nothing is replaced in the template: the placeholder is typed by hand or
@@ -587,7 +728,7 @@ export function App({ storage }: { storage: StorageProvider }) {
           <div className={`view-banner ${mode === 'ai' && !ai.used.length ? 'nothing-replaced' : ''}`} key={mode}><strong>{mode === 'template' ? t.workspace.bannerTemplate : mode === 'local' ? t.workspace.bannerLocal : ai.used.length ? t.workspace.bannerAi(ai.used.length) : t.workspace.bannerAiNothing}</strong><span>{mode === 'template' ? t.workspace.editableSource : t.workspace.readOnlyProjection}</span></div>
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>{t.workspace.editAsTemplate}</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? t.workspace.hideValues : t.workspace.showValues}</button></div>}
           <div className="editor-body" id="kodvy" role="tabpanel" aria-labelledby={`vy-${mode}`}>{!template && mode === 'template' && <div className="paste-prompt"><strong>{t.workspace.pasteHere}</strong><span>{t.workspace.pasteHereHint}</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>{t.workspace.trySample}</button>}</div>}
-            <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { noteLanguage(text); controller.changeText(text); }} onBinding={createBinding}
+            <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { if (pasted(text)) { noteLanguage(text); void screenForBlocklist(text); } controller.changeText(text); }} onBinding={createBinding}
               onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }}
               fontSize={fontSize} wordWrap={wrap} onSelectionChange={setSelected} onFocused={() => setFocusName('')} />
           </div><div className="editor-footer"><span>{t.workspace.lines(visible.split('\n').length)} · {t.workspace.bindingCount(used.length)}</span>
@@ -603,9 +744,9 @@ export function App({ storage }: { storage: StorageProvider }) {
             onEdit={b => setBindingDialog({ binding: b })}
             onDelete={b => void removeBinding(b)}
             onCreate={() => void newBinding()} />
-          <IssuePanel issues={issues} onSelect={showIssue} />
+          <IssuePanel issues={issues} onSelect={showIssue} fix={{ offered: issue => Boolean(leakedValue(issue)), apply: replaceLeak }} />
           <FindingsPanel findings={findings} onShow={f => { changeMode('template'); setFocusLine(f.line); }}
-            onBind={bindFinding} onDismiss={f => void dismissFinding(f)} />
+            onBind={bindFinding} onBindMany={f => void bindFindings(f)} onDismiss={f => void dismissFinding(f)} />
           <VersionPanel versions={versions} baseVersionId={session.baseVersionId} disabled={busy}
             onPreview={v => setViewing({ version: v, compareTo: null })}
             onCompare={v => setViewing({ version: v, compareTo: versions[versions.indexOf(v) + 1] ?? null })}
@@ -624,25 +765,36 @@ export function App({ storage }: { storage: StorageProvider }) {
         onEdit={b => setBindingDialog({ binding: b })} onDelete={b => void removeBinding(b)} onCreate={newBinding} /></div>
       {/* Its own page rather than the last section of a long settings page. It is the only way back
           after a browser clears its storage, and it was three scroll-lengths below the fold. */}
-      <div className="overview-scroll" hidden={route !== '#/backup'}><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></div>
+      <div className="overview-scroll" hidden={route !== '#/backup'}><BackupPanel storage={storage} notify={setNotice} confirm={confirm}
+        lastExportAt={settings?.lastExportAt} onExported={() => void controller.reloadSettings()} /></div>
       <div hidden={route !== '#/security'}><Security /></div>
       <div hidden={route !== '#/settings'}><SettingsPage settings={settings} storage={storage} storageInfo={storageInfo}
         onStorageInfo={setStorageInfo} deviceName={deviceName} onDeviceName={setDeviceName} rules={rules}
         onRules={() => void storage.listScannerRules().then(setRules)} save={patch => changeEditor(patch)} notify={setNotice}
+        blocklist={blocklist} onBlocklist={() => void storage.listBlocklist().then(setBlocklist)}
         showIntro={() => setIntro(true)} /></div>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>{t.app.footerNote}</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={drawerQuery} onQuery={setDrawerQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
-    {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} profiles={profiles} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0}
+    {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} profiles={profiles}
+      // The other occurrences, not all of them: counting the selected one made a value that appears
+      // exactly once offer to "replace all identical occurrences (1)".
+      count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 2 : 0}
       preview={bindingDialog.selection && (() => {
         const s = bindingDialog.selection!;
         const lineStart = template.lastIndexOf('\n', s.start - 1) + 1;
         const lineEnd = template.indexOf('\n', s.end) === -1 ? template.length : template.indexOf('\n', s.end);
         return { line: template.slice(lineStart, lineEnd), start: s.start - lineStart, end: s.end - lineStart };
       })() || undefined}
+      reuse={bindingDialog.reuse && bindingDialog.selection ? { name: bindingDialog.reuse, use: () => {
+        const s = bindingDialog.selection!;
+        controller.changeText(template.slice(0, s.start) + `{{${bindingDialog.reuse!}}}` + template.slice(s.end));
+        changeMode('template'); setFocusName(bindingDialog.reuse!);
+      } } : undefined}
       save={storeBinding} close={() => setBindingDialog(null)} />}
     {copyMode && <CopyDialog mode={copyMode} coverage={cover} issues={ai.issues.length} replaced={ai.used.length}
       findings={copyFindings} seriousFindings={seriousFindings} reviewed={reviewed} onReviewed={setReviewed}
+      profile={profiles.find(p => p.id === options.profileId)?.name}
       close={() => setCopyMode(null)} onDownload={() => downloadCopy(copyMode)}
       onCopy={() => {
         // Re-audited on the current text: the dialog must not be able to copy what it last saw.
@@ -663,7 +815,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <table className="shortcut-table"><tbody>{editorShortcuts.map(s => <tr key={s.label}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}</tbody></table>
       <div className="dialog-actions"><button className="primary" onClick={() => setShowShortcuts(false)}>{t.dialog.close}</button></div>
     </Modal>}
-    {ingesting && <IngestDialog bindings={bindings} close={() => setIngesting(false)} apply={next => {
+    {ingesting && <IngestDialog bindings={bindings} template={template} close={() => setIngesting(false)} apply={next => {
       controller.changeText(next); setIngesting(false); changeMode('template');
       setNotice(t.version.templateReplaced);
     }} />}

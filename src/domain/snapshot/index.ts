@@ -9,7 +9,7 @@ export interface AppIdentity {
   deviceId: string;
   deviceName: string;
 }
-export type EntityKind = 'projekt' | 'version' | 'utkast' | 'binding' | 'profil' | 'dataset' | 'regel';
+export type EntityKind = 'projekt' | 'version' | 'utkast' | 'binding' | 'profil' | 'dataset' | 'regel' | 'blocklistterm';
 /** The kinds an import can keep both copies of. A duplicate needs a fresh id that nothing else
  * points at, and only these two have one: a project carries its own name, a binding its own
  * placeholder. A version is numbered within its project and pointed at by `currentVersionId`; a
@@ -34,8 +34,8 @@ export type ParseResult = { ok: true; snapshot: Snapshot } | { ok: false; proble
 export function toSnapshot(workspace: WorkspaceSnapshot, kind: SnapshotKind, app: AppIdentity): Snapshot {
   const head = { format: 'ai-code-vault.snapshot' as const, schemaVersion: SNAPSHOT_VERSION, exportedAt: new Date().toISOString(), app };
   if (kind === 'private') {
-    const { bindings, profiles, rules, settings }: PrivatePayload = workspace;
-    return { ...head, kind: 'private', payload: { bindings, profiles, rules, settings } };
+    const { bindings, profiles, rules, blocklist, settings }: PrivatePayload = workspace;
+    return { ...head, kind: 'private', payload: { bindings, profiles, rules, blocklist, settings } };
   }
   return { ...head, kind: 'full', payload: workspace };
 }
@@ -86,6 +86,7 @@ export function planImport(snapshot: Snapshot, current: WorkspaceSnapshot): Impo
   classify('profil', payload.profiles, current.profiles, (p) => p.name);
   classify('dataset', 'datasets' in payload ? payload.datasets : [], current.datasets, (d) => d.name);
   classify('regel', payload.rules, current.rules, (r) => r.name);
+  classify('blocklistterm', payload.blocklist, current.blocklist, (e) => e.term);
   for (const draft of drafts) {
     const match = current.drafts.find((d) => d.projectId === draft.projectId);
     entities.push({

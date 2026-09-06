@@ -86,6 +86,12 @@ export const builtInRules: ScannerRule[] = [
     'En riktig e-postadress är en personuppgift.', 'example.user@example.test'),
   rule('personnummer', 'Personnummer', String.raw`\b(?:19|20)?\d{6}[-+]?\d{4}\b`, 'high', 'identity',
     'Ser ut som ett personnummer.', '19700101-0000'),
+  // The AI value keeps the shape rather than the meaning: code that parses a GUID still parses one,
+  // and a reader can see at a glance what the placeholder stands for. The nil GUID would look like
+  // an unset value and invite exactly the wrong assumption.
+  rule('guid', 'GUID', String.raw`\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b`,
+    'low', 'configuration', 'Ett GUID pekar ofta ut en katalog, en prenumeration eller en resurs.',
+    '00000000-1111-2222-3333-444444444444'),
 ];
 
 /** Only the vetted built-ins may be regular expressions.

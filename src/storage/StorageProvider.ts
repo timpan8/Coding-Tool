@@ -1,4 +1,4 @@
-import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ProjectSummary, ScanDismissal, ScannerRule, Settings, Version, VersionSummary, WorkspaceSnapshot } from '../types/models';
+import type { Binding, BindingFilter, BlocklistEntry, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ProjectSummary, ScanDismissal, ScannerRule, Settings, Version, VersionSummary, WorkspaceSnapshot } from '../types/models';
 import type { ProjectDraft, ProjectDraftMetadata, ProjectFile } from '../types/models';
 
 export class DraftConflictError extends Error {
@@ -37,6 +37,11 @@ export interface StorageProvider {
   deleteProfile(id: string): Promise<void>;
   listDatasets(filter?: DatasetFilter): Promise<Dataset[]>;
   saveDataset(d: Dataset): Promise<void>;
+  /** Terms that become bindings on their own the moment they land in the workspace. Sorted by term,
+   * because the list is read far more often than it is written. */
+  listBlocklist(): Promise<BlocklistEntry[]>;
+  saveBlocklistEntry(e: BlocklistEntry): Promise<void>;
+  deleteBlocklistEntry(id: string): Promise<void>;
   /** Returns the built-ins merged with any stored overrides, so disabling one sticks and new
    * built-ins appear without a migration. */
   listScannerRules(): Promise<ScannerRule[]>;

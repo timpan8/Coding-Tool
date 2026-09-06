@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type { StorageProvider } from './StorageProvider';
 import { DraftConflictError } from './StorageProvider';
 import type { ProjectDraft, ProjectDraftMetadata, ProjectFile } from '../types/models';
-import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ScanDismissal, ScannerRule, Settings, Version, WorkspaceSnapshot } from '../types/models';
+import type { Binding, BindingFilter, BlocklistEntry, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ScanDismissal, ScannerRule, Settings, Version, WorkspaceSnapshot } from '../types/models';
 import { validateBinding } from '../domain/bindings';
 import { mergeRules } from '../domain/scanner/rules';
 import { renameInTemplates } from '../domain/bindings/rewrite';
@@ -10,6 +10,7 @@ import { renameInTemplates } from '../domain/bindings/rewrite';
 class VaultDatabase extends Dexie {
   projects!: Table<Project, string>; versions!: Table<Version, string>; bindings!: Table<Binding, string>;
   profiles!: Table<Profile, string>; datasets!: Table<Dataset, string>; rules!: Table<ScannerRule, string>;
+  blocklist!: Table<BlocklistEntry, string>;
   settings!: Table<Settings & { key: string }, string>;
   drafts!: Table<ProjectDraft, string>;
   dismissals!: Table<ScanDismissal, [string, string]>;
@@ -19,6 +20,7 @@ class VaultDatabase extends Dexie {
       bindings: 'id,[scope+scopeRef],name', profiles: 'id', datasets: 'id,projectId', rules: 'id', settings: 'key' });
     this.version(2).stores({ drafts: 'projectId,updatedAt' });
     this.version(3).stores({ dismissals: '[projectId+fingerprint],projectId' });
+    this.version(4).stores({ blocklist: 'id' });
   }
 }
 export class IndexedDbProvider implements StorageProvider {
@@ -167,6 +169,9 @@ export class IndexedDbProvider implements StorageProvider {
   async saveDataset(d: Dataset) { await this.db.datasets.put(d); }
   // Built-ins are not written to the table: merging on read means a new built-in appears on
   // upgrade, and one the user disabled stays disabled, with no migration either way.
+  async listBlocklist() { return (await this.db.blocklist.toArray()).sort((a, b) => a.term.localeCompare(b.term, 'sv')); }
+  async saveBlocklistEntry(e: BlocklistEntry) { await this.db.blocklist.put(e); }
+  async deleteBlocklistEntry(id: string) { await this.db.blocklist.delete(id); }
   async listScannerRules() { return mergeRules(await this.db.rules.toArray()); }
   async deleteScannerRule(id: string) { await this.db.rules.delete(id); }
   async listDismissals(projectId: string) { return this.db.dismissals.where('projectId').equals(projectId).toArray(); }
@@ -194,7 +199,8 @@ export class IndexedDbProvider implements StorageProvider {
     await this.getSettings();
     return this.db.transaction('r', this.db.tables, async () => ({ projects: await this.listProjects(), versions: await this.db.versions.toArray(), drafts: await this.db.drafts.toArray(),
       bindings: await this.listBindings(), profiles: await this.listProfiles(), datasets: await this.listDatasets(),
-      rules: await this.db.rules.toArray(), dismissals: await this.db.dismissals.toArray(), settings: (await this.db.settings.get('settings'))! }));
+      rules: await this.db.rules.toArray(), blocklist: await this.db.blocklist.toArray(),
+      dismissals: await this.db.dismissals.toArray(), settings: (await this.db.settings.get('settings'))! }));
   }
   /** One transaction over every table: either the whole payload lands or none of it does, so a
    * failure halfway through cannot leave a vault that is part one backup and part another. */
@@ -230,6 +236,7 @@ export class IndexedDbProvider implements StorageProvider {
       await apply(this.db.profiles, payload.profiles, p => p.id);
       await apply(this.db.datasets, payload.datasets, d => d.id);
       await apply(this.db.rules, payload.rules, r => r.id);
+      await apply(this.db.blocklist, payload.blocklist, e => e.id);
       for (const dismissal of payload.dismissals ?? []) {
         if (!await this.db.dismissals.get([dismissal.projectId, dismissal.fingerprint])) { await this.db.dismissals.put(dismissal); result.added++; }
         else result.skipped++;

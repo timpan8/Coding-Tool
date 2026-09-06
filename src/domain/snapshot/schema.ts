@@ -89,6 +89,11 @@ export const profileSchema = z.object({
 export const datasetSchema = z.looseObject({ id, name: z.string() });
 export const ruleSchema = z.looseObject({ id, name: z.string(), pattern: z.string() });
 
+/** Holds a private value in `term`, so it travels with the private backup rather than the full one
+ * alone. Loose like the rule schema: a term added by a later version must not make an older one
+ * refuse the whole file. */
+export const blocklistSchema = z.looseObject({ id, term: z.string(), replacement: z.string(), enabled: z.boolean(), createdAt: iso });
+
 export const dismissalSchema = z.object({
   projectId: id,
   fingerprint: z.string(),
@@ -114,6 +119,7 @@ export const settingsSchema = z.object({
   editorFontSize: z.number().int().min(10).max(24).default(14),
   editorWordWrap: z.boolean().default(true),
   introSeen: z.boolean().default(true),
+  lastExportAt: iso.optional(),
 });
 
 /** Everything needed to rebuild the vault. */
@@ -125,6 +131,7 @@ const fullPayload = z.strictObject({
   profiles: z.array(profileSchema),
   datasets: z.array(datasetSchema),
   rules: z.array(ruleSchema),
+  blocklist: z.array(blocklistSchema).default([]),
   dismissals: z.array(dismissalSchema),
   settings: settingsSchema,
 });
@@ -139,6 +146,7 @@ const privatePayload = z.strictObject({
   bindings: z.array(bindingSchema),
   profiles: z.array(profileSchema),
   rules: z.array(ruleSchema),
+  blocklist: z.array(blocklistSchema).default([]),
   settings: settingsSchema,
 });
 
@@ -170,7 +178,7 @@ export interface SnapshotHead {
   exportedAt: string;
   app: { version: string; deviceId: string; deviceName: string };
 }
-export type PrivatePayload = Pick<WorkspaceSnapshot, 'bindings' | 'profiles' | 'rules' | 'settings'>;
+export type PrivatePayload = Pick<WorkspaceSnapshot, 'bindings' | 'profiles' | 'rules' | 'blocklist' | 'settings'>;
 export type Snapshot =
   | (SnapshotHead & { kind: 'full'; payload: WorkspaceSnapshot })
   | (SnapshotHead & { kind: 'private'; payload: PrivatePayload });

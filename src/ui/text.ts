@@ -22,7 +22,7 @@
  * down rather than derived. */
 const plurals: Record<string, string> = {
   projekt: 'projekt', version: 'versioner', utkast: 'utkast', binding: 'bindings',
-  profil: 'profiler', dataset: 'dataset', regel: 'regler',
+  profil: 'profiler', dataset: 'dataset', regel: 'regler', blocklistterm: 'blocklisttermer',
 };
 const plural = (kind: string) => plurals[kind] ?? kind;
 const swedishList = (items: string[]) => items.length < 2 ? items.join('')
@@ -319,6 +319,8 @@ export const sv = {
     localTitle: '⚠ Kopiera riktiga värden',
     aiTitle: 'AI-export · granska före kopiering',
     localWarning: 'Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.',
+    localProfile: (name: string) => `Värdena kommer från profilen ${name}. Bindings utan eget värde där använder standardvärdet.`,
+    localDefaultProfile: 'Värdena är standardvärdena. Ingen profil är vald.',
     localClipboardNote: 'Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.',
     acknowledge: (n: number) => `Jag har tittat på de ${n} misstänkta värdena och vill ändå kopiera.`,
     download: 'Ladda ned som fil',
@@ -332,12 +334,17 @@ export const sv = {
     name: 'Namn',
     nameLabel: 'Bindingnamn',
     renameNote: 'Platshållaren skrivs om i alla versioner och utkast som använder den.',
+    reuseLead: (name: string) => `Värdet ligger redan i valvet som ${name}.`,
+    reuseAction: (name: string) => `Använd {{${name}}}`,
     category: 'Kategori',
     scope: 'Scope',
     scopeProject: 'Projekt',
     scopeGlobal: 'Globalt',
     scopeVersion: 'Version',
     aiValue: 'AI-värde',
+    aiSees: 'AI:n ser ',
+    more: '▸ Fler val · AI-värde, räckvidd, profiler',
+    fewer: '▾ Färre val',
     defaultValue: 'Privat värde · standard',
     profileValue: (profile: string) => `Privat värde för ${profile}`,
     showValue: 'Visa privat värde',
@@ -347,7 +354,9 @@ export const sv = {
     description: 'Beskrivning',
     vagueBefore: 'AI-värdet ser inte ut som en tydlig platshållare, till exempel ',
     vagueAfter: '. Jag har granskat att det är ofarligt att dela.',
-    replaceAll: (n: number) => `Ersätt alla identiska förekomster i filen (${n} st)`,
+    replaceAll: (n: number) => n === 1
+      ? 'Ersätt även den andra identiska förekomsten i filen'
+      : `Ersätt även de ${n} andra identiska förekomsterna i filen`,
     lead: 'Ange privata värden utan kodens escaping. Endast AI-värdet visas i den sanerade vyn.',
     saving: 'Sparar…',
     save: 'Spara binding',
@@ -395,6 +404,13 @@ export const sv = {
     literalNote: 'Matchas ordagrant, oavsett stora eller små bokstäver. Reguljära uttryck stöds inte.',
   },
   findings: {
+    selectAll: 'Markera alla',
+    choose: (rule: string, line: number) => `Välj ${rule} på rad ${line}`,
+    bindChosen: (count: number) => count === 0 ? 'Skapa bindings'
+      : count === 1 ? 'Skapa binding för den valda'
+      : `Skapa ${count} bindings`,
+    boundMany: (count: number) => `${count} bindings skapade. Värdena är utbytta mot platshållare.`,
+    boundManyUndo: (count: number) => `${count} bindings skapade från granskningsfynden.`,
     title: 'Misstänkta värden',
     dismissed: (rule: string) => `${rule} är avfärdad i det här projektet.`,
   },
@@ -407,6 +423,13 @@ export const sv = {
     codeLabel: 'Kod från AI',
     summary: (applied: number, suggestions: number) => `${applied} platshållare på plats, ${suggestions} att granska`,
     replacesTemplate: 'Den öppna filens mall ersätts. Spara en version först om du vill kunna gå tillbaka.',
+    replace: 'Ersätt mallen',
+    replaceAnyway: 'Ersätt mallen ändå',
+    lostTitle: (count: number) => count === 1 ? 'En platshållare försvinner' : `${count} platshållare försvinner`,
+    lostItem: (name: string, occurrences: number) =>
+      `${name} — ${occurrences} ${occurrences === 1 ? 'förekomst' : 'förekomster'} i mallen, ingen i den nya koden`,
+    lostLead:
+      'Där platshållaren stod står nu något annat. Ersätter du mallen är värdet inte längre skyddat, och nästa Copy for AI skickar det som står där i stället.',
   },
   backup: {
     privateExported: 'Privata värden exporterade.',
@@ -429,6 +452,10 @@ export const sv = {
     clearNoUndo: 'Det finns ingen ångra. Exportera en backup först om du kan behöva något av det igen.',
     cleared: 'Valvet är rensat.',
     plaintextWarning: 'Båda filerna innehåller dina riktiga värden i klartext.',
+    neverExported: 'Valvet har aldrig exporterats. En fil är den enda vägen tillbaka om webbläsardata rensas.',
+    lastExport: (days: number) => days === 0 ? 'Senast exporterat i dag.'
+      : days === 1 ? 'Senast exporterat i går.'
+      : `Senast exporterat för ${days} dagar sedan.`,
     restore: 'Återställ',
     fileRejected: 'Filen kunde inte användas',
     replacedElsewhere: 'Valvet har bytts ut under den öppna sessionen. Ladda om innan du arbetar vidare.',
@@ -458,6 +485,28 @@ export const sv = {
     replaceBindings: (now: number, incoming: number) =>
       `${now} ${now === 1 ? 'binding' : 'bindings'} i valvet raderas, ${incoming} kommer från filen`,
   },
+  blocklist: {
+    heading: 'Blocklista',
+    lead: 'Termer som aldrig får nå en AI. De byts mot en platshållare direkt när text klistras in eller en fil öppnas — till skillnad från granskningsreglerna, som pekar ut och låter dig avgöra. Bindingen blir global, eftersom beslutet gäller hela valvet och inte ett projekt.',
+    termLabel: 'Term',
+    termHint: 'Matchas ordagrant och skiftlägesokänsligt, vid ordgräns. Inga reguljära uttryck.',
+    /** Deliberately not "AI-värde", which is the binding dialog's own field: Playwright's getByLabel
+     * matches substrings, and two controls whose names contain one another are a test that fails
+     * somewhere else entirely. */
+    replacementLabel: 'Vad AI:n ser (valfritt)',
+    replacementHint: 'Vad en AI får se i stället. Lämnas det tomt väljs ett ofarligt standardvärde för kategorin.',
+    defaultReplacement: 'standardvärde',
+    add: 'Lägg till term',
+    added: (term: string) => `${term} läggs nu undan automatiskt.`,
+    duplicate: 'Termen finns redan i listan.',
+    remove: (term: string) => `Ta bort ${term}`,
+    enabledLabel: (term: string) => `${term} aktiv`,
+    fromTerm: (term: string) => `Från blocklistan: ${term}`,
+    replaced: (count: number, terms: number) =>
+      `${count} ${count === 1 ? 'förekomst' : 'förekomster'} av ${terms} ${terms === 1 ? 'term' : 'termer'} i blocklistan byttes mot platshållare.`,
+    undoLabel: (count: number) => `${count} ${count === 1 ? 'förekomst' : 'förekomster'} från blocklistan är utbytta.`,
+    failed: 'Termerna i blocklistan kunde inte bytas ut. Texten står kvar som den klistrades in.',
+  },
   versionPanel: {
     draftBasedOnThis: ' · utkastet bygger på den här',
     empty: 'Utkastet sparas automatiskt. Spara en version när du vill kunna komma tillbaka hit.',
@@ -471,6 +520,10 @@ export const sv = {
   },
   issues: {
     blocksBoth: 'blockerar båda kopieringarna',
+    replaceWith: (name: string) => `Byt mot {{${name}}}`,
+    replaced: (name: string, count: number) =>
+      `${count} ${count === 1 ? 'förekomst' : 'förekomster'} av värdet bakom ${name} byttes mot platshållaren.`,
+    replaceUndo: (name: string) => `Värdet bakom ${name} är utbytt mot platshållaren.`,
   },
   editorHover: {
     bindingNoValue: 'binding · värde saknas',

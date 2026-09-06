@@ -33,17 +33,36 @@ export function useScanner(text: string, rules: ScannerRule[], dismissed: Set<st
   return findings;
 }
 
+const keyOf = (finding: Finding) => `${finding.start}:${finding.ruleId}`;
+
 export function FindingsPanel({
   findings,
   onBind,
+  onBindMany,
   onDismiss,
   onShow,
 }: {
   findings: Finding[];
   onBind: (finding: Finding) => void;
+  /** Binding one at a time meant a dialog per finding, and a file that comes in with a dozen of them
+   * is exactly when that is worst. Names are free before the first is written, so the whole set can
+   * be bound in one pass. */
+  onBindMany: (findings: Finding[]) => void;
   onDismiss: (finding: Finding) => void;
   onShow: (finding: Finding) => void;
 }) {
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  // A finding disappears once it is bound or dismissed, so a selection that outlives the list would
+  // count things that no longer exist.
+  const chosen = findings.filter((f) => picked.has(keyOf(f)));
+  const toggle = (finding: Finding, on: boolean) =>
+    setPicked((previous) => {
+      const next = new Set(previous);
+      if (on) next.add(keyOf(finding));
+      else next.delete(keyOf(finding));
+      return next;
+    });
+
   if (!findings.length) return null;
   return (
     <div className="findings-panel">
@@ -54,14 +73,47 @@ export function FindingsPanel({
       <p className="muted">
         Förslag, inte fynd. Ingen av dem blockerar kopiering — du avgör vad som är känsligt.
       </p>
-      {findings.map((finding) => (
-        <div className={`finding severity-${finding.severity}`} key={`${finding.start}:${finding.ruleId}`}>
-          <button className="finding-head" onClick={() => onShow(finding)}>
-            <b>{finding.ruleName}</b>
-            <small>
-              rad {finding.line} · {severityLabel[finding.severity]}
-            </small>
+      {findings.length > 1 && (
+        <div className="findings-bulk">
+          <label className="check">
+            <input
+              type="checkbox"
+              aria-label={t.findings.selectAll}
+              checked={chosen.length === findings.length}
+              onChange={(e) => setPicked(e.target.checked ? new Set(findings.map(keyOf)) : new Set())}
+            />
+            {t.findings.selectAll}
+          </label>
+          <button
+            className="text-button"
+            disabled={!chosen.length}
+            onClick={() => {
+              onBindMany(chosen);
+              setPicked(new Set());
+            }}
+          >
+            {t.findings.bindChosen(chosen.length)}
           </button>
+        </div>
+      )}
+      {findings.map((finding) => (
+        <div className={`finding severity-${finding.severity}`} key={keyOf(finding)}>
+          <div className="finding-top">
+            {findings.length > 1 && (
+              <input
+                type="checkbox"
+                aria-label={t.findings.choose(finding.ruleName, finding.line)}
+                checked={picked.has(keyOf(finding))}
+                onChange={(e) => toggle(finding, e.target.checked)}
+              />
+            )}
+            <button className="finding-head" onClick={() => onShow(finding)}>
+              <b>{finding.ruleName}</b>
+              <small>
+                rad {finding.line} · {severityLabel[finding.severity]}
+              </small>
+            </button>
+          </div>
           <code className="finding-excerpt">{finding.maskedExcerpt}</code>
           <p>{finding.explanation}</p>
           <div className="finding-actions">
