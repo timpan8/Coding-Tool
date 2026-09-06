@@ -23,9 +23,10 @@ import { FileTabs } from './components/FileTabs';
 import { VersionPanel } from './components/VersionPanel';
 import { ProjectDetails } from './components/ProjectDetails';
 import { BindingPanel, toRows } from './components/BindingPanel';
+import { ProfileManager, ProfilePicker } from './components/ProfilePicker';
 import { DiffEditor } from './editor/DiffEditor';
 import { scan, type Finding } from '../domain/scanner';
-import type { ScannerRule } from '../types/models';
+import type { Profile, ScannerRule } from '../types/models';
 import { Security } from './pages/Security';
 import { applyTheme, paintHint, resolveTheme, systemPrefersDark, watchSystemTheme, type ThemeChoice } from './theme';
 import { formatBytes, requestPersistence, storageState, type StorageState } from '../storage/persistence';
@@ -144,7 +145,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [theme, setTheme] = useState<ThemeChoice>(paintHint()), [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [storageInfo, setStorageInfo] = useState<StorageState | null>(null), asked = useRef(false);
   const [confirm, confirmDialog] = useConfirm();
-  const [rules, setRules] = useState<ScannerRule[]>([]);
+  const [rules, setRules] = useState<ScannerRule[]>([]), [profiles, setProfiles] = useState<Profile[]>([]), [managingProfiles, setManagingProfiles] = useState(false);
   const [dismissed, refreshDismissals] = useDismissals(() => project ? storage.listDismissals(project.id) : Promise.resolve([]), project?.id ?? '');
   const findings = useScanner(mode === 'template' ? template : '', rules, dismissed);
   const [countdown, setCountdown] = useState<number | null>(null), pendingClear = useRef<string | null>(null);
@@ -193,6 +194,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   useEffect(() => watchSystemTheme(setSystemDark), []);
   useEffect(() => { void storageState().then(setStorageInfo); }, []);
   useEffect(() => { void storage.listScannerRules().then(setRules).catch(() => {}); }, [storage]);
+  useEffect(() => { void storage.listProfiles().then(setProfiles).catch(() => {}); }, [storage]);
   // Asking on an empty first visit would prompt Firefox users before they have anything to lose.
   useEffect(() => {
     if (!project || asked.current) return;
@@ -421,7 +423,8 @@ export function App({ storage }: { storage: StorageProvider }) {
   return <div className="app-shell code-first"><div className="main-shell">
     <header className="topbar"><a className="brand" href="#/" onClick={e => { e.preventDefault(); void navigate('#/'); }}><span className="brand-icon">{'</>'}</span><span>AI Code Vault</span></a>
       <nav className="top-navigation" aria-label="Huvudnavigation"><button disabled={busy} onClick={() => void navigate('#/')}>＋ Ny kod</button><button disabled={busy} onClick={openDrawer}>Mina projekt <kbd>Ctrl K</kbd></button><button onClick={() => void navigate('#/security')}>Säkerhet</button><button onClick={() => void navigate('#/settings')}>Inställningar</button></nav>
-      <span className="profile-badge">Profil: Standard</span><label className="theme-choice">Tema<select aria-label="Tema" value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">System</option><option value="light">Ljust</option><option value="dark">Mörkt</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
+      <ProfilePicker profiles={profiles} activeId={settings?.activeProfileId ?? null} onManage={() => setManagingProfiles(true)}
+        onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} /><label className="theme-choice">Tema<select aria-label="Tema" value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">System</option><option value="light">Ljust</option><option value="dark">Mörkt</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>Försök spara igen</button></div>}
     {countdown !== null && <div className="clipboard-countdown" role="status">Urklippet rensas om {countdown} s<button onClick={() => { pendingClear.current = null; setCountdown(null); setNotice('Urklippet lämnas kvar.'); }}>Avbryt</button></div>}
     {notice && <div className="inline-notice" role="status">{notice}<button aria-label="Stäng meddelande" onClick={() => setNotice('')}>×</button></div>}
@@ -479,7 +482,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>Lokalt valv · M1</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
-    {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0}
+    {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} profiles={profiles} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0}
       preview={bindingDialog.selection && (() => {
         const s = bindingDialog.selection!;
         const lineStart = template.lastIndexOf('\n', s.start - 1) + 1;
@@ -503,6 +506,20 @@ export function App({ storage }: { storage: StorageProvider }) {
       await controller.reloadProject();
       setNotice('Projektuppgifterna är sparade.');
     }} />}
+    {managingProfiles && <ProfileManager profiles={profiles} close={() => setManagingProfiles(false)}
+      onCreate={async name => { const time = new Date().toISOString();
+        await storage.saveProfile({ id: crypto.randomUUID(), name, description: '', createdAt: time, updatedAt: time });
+        setProfiles(await storage.listProfiles()); }}
+      onRename={async (id, name) => { const existing = profiles.find(p => p.id === id); if (!existing) return;
+        await storage.saveProfile({ ...existing, name, updatedAt: new Date().toISOString() });
+        setProfiles(await storage.listProfiles()); }}
+      onDelete={async profile => {
+        const withValues = bindings.filter(b => profile.id in b.values).length;
+        if (!await confirm({ title: `Ta bort ${profile.name}?`, danger: true, confirmLabel: 'Ta bort profilen',
+          body: <><p>{withValues} bindings har ett eget värde för den här profilen. De värdena raderas.</p><p>Standardvärdena påverkas inte.</p></> })) return;
+        await storage.deleteProfile(profile.id);
+        setProfiles(await storage.listProfiles()); setBindings(await storage.listBindings()); await controller.reloadSettings();
+      }} />}
     {labelling && <SaveVersionDialog next={Math.max(0, ...versions.map(v => v.number)) + 1} save={label => void saveVersion(label)} close={() => setLabelling(false)} />}
     {confirmDialog}
     {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}

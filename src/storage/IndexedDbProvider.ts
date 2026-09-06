@@ -134,6 +134,19 @@ export class IndexedDbProvider implements StorageProvider {
   }
   async listProfiles() { return this.db.profiles.toArray(); }
   async saveProfile(p: Profile) { await this.db.profiles.put(p); }
+  async deleteProfile(id: string) {
+    await this.db.transaction('rw', [this.db.profiles, this.db.bindings, this.db.settings], async () => {
+      await this.db.profiles.delete(id);
+      for (const binding of await this.db.bindings.toArray()) {
+        if (!(id in binding.values)) continue;
+        const values = { ...binding.values };
+        delete values[id];
+        await this.db.bindings.put({ ...binding, values, updatedAt: new Date().toISOString() });
+      }
+      const settings = await this.db.settings.get('settings');
+      if (settings?.activeProfileId === id) await this.db.settings.put({ ...settings, activeProfileId: null });
+    });
+  }
   async listDatasets(filter?: DatasetFilter) { return this.db.datasets.filter(d => !filter || d.scope === 'global' || d.projectId === filter.projectId).toArray(); }
   async saveDataset(d: Dataset) { await this.db.datasets.put(d); }
   // Built-ins are not written to the table: merging on read means a new built-in appears on

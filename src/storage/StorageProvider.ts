@@ -29,6 +29,9 @@ export interface StorageProvider {
   renameBinding(id: string, name: string): Promise<{ occurrences: number }>;
   listProfiles(): Promise<Profile[]>;
   saveProfile(p: Profile): Promise<void>;
+  /** Removes a profile and the per-profile values that referenced it, so no binding is left with a
+   * value keyed by a profile that no longer exists. */
+  deleteProfile(id: string): Promise<void>;
   listDatasets(filter?: DatasetFilter): Promise<Dataset[]>;
   saveDataset(d: Dataset): Promise<void>;
   /** Returns the built-ins merged with any stored overrides, so disabling one sticks and new

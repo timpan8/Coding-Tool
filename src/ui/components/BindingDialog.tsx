@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { Binding, Category } from '../../types/models';
+import type { Binding, Category, Profile } from '../../types/models';
 import { categories } from '../../types/models';
 import { defaults, validateBinding } from '../../domain/bindings';
 import { Modal } from './Modal';
-export function BindingDialog({ initial, bindings, count, preview, save, close }: {
-  initial: Binding; bindings: Binding[]; count: number;
+export function BindingDialog({ initial, bindings, count, preview, profiles, save, close }: {
+  initial: Binding; bindings: Binding[]; count: number; profiles?: Profile[];
   /** The line as it stands and as it will read, so replacing the wrong span is visible before it
    * happens rather than after. */
   preview?: { before: string; after: string };
@@ -30,6 +30,8 @@ export function BindingDialog({ initial, bindings, count, preview, save, close }
       <label>AI-värde<input value={value.aiReplacement} onChange={e => setValue({ ...value, aiReplacement: e.target.value })} spellCheck={false} autoComplete="off" /></label>
       <label className="wide">Privat värde · standard<input type={show ? 'text' : 'password'} value={value.values.__default__ ?? ''} onChange={e => setValue({ ...value, values: { ...value.values, __default__: e.target.value } })} autoComplete="off" spellCheck={false} /></label>
       <label className="check"><input type="checkbox" checked={show} onChange={e => setShow(e.target.checked)} />Visa privat värde</label>
+      {profiles?.map(profile => <label className="wide" key={profile.id}>Privat värde · {profile.name}<input type={show ? 'text' : 'password'} aria-label={`Privat värde för ${profile.name}`} value={value.values[profile.id] ?? ''} autoComplete="off" spellCheck={false}
+        onChange={e => { const values = { ...value.values }; if (e.target.value) values[profile.id] = e.target.value; else delete values[profile.id]; setValue({ ...value, values }); }} /><small>Tomt betyder att standardvärdet används.</small></label>)}
       <label className="check"><input type="checkbox" checked={value.escapeMode === 'raw'} onChange={e => setValue({ ...value, escapeMode: e.target.checked ? 'raw' : 'auto' })} />Raw · ingen escaping</label>
       <label className="wide">Beskrivning<input value={value.description} onChange={e => setValue({ ...value, description: e.target.value })} /></label>
     </div>

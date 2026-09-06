@@ -394,3 +394,30 @@ test('renames a binding and rewrites its placeholder everywhere', async ({ page 
   // Still resolvable, so copying is not blocked by a dangling name.
   await expect(page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ })).toBeEnabled();
 });
+
+// Report F18. Binding.values was keyed by profile and resolveValue already had the fallback, but
+// the top bar showed a fixed "Profil: Standard" label that looked like a control and was not one.
+test('holds a separate value per profile and falls back to the default', async ({ page }) => {
+  await type(page, '$host = "prod.example.test"\n');
+  await bind(page, 'prod', 'prod.internal', 'infrastructure');
+
+  await page.getByLabel('Aktiv profil').selectOption('__manage__');
+  await page.getByLabel('Ny profil').fill('Test');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Lägg till' }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Stäng', exact: true }).click();
+
+  // Give the binding a value for that profile only.
+  await page.locator('.binding-card').getByLabel(/^Redigera /).click();
+  await page.getByLabel('Privat värde för Test').fill('test.internal');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara binding' }).click();
+
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
+  await expect(page.locator('.editor-body')).toContainText('prod.internal');
+
+  await page.getByLabel('Aktiv profil').selectOption({ label: 'Test' });
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
+  await expect(page.locator('.editor-body')).toContainText('test.internal');
+  await expect(page.locator('.editor-body')).not.toContainText('prod.internal');
+});
