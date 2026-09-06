@@ -3,6 +3,7 @@ import { FIELD_KINDS, type Field, type FieldKind } from '@engine/types'
 import { generateExample } from '@engine/examples'
 import { buildBlobExample } from '@engine/blob'
 import { matchRuleFor, suggestFieldName } from '@engine/fields'
+import { directoryPart } from '../review'
 import type { FieldRecord } from '@vault/model'
 import { ExampleInvalidError } from '@vault/session'
 import { getSession, toast } from '../state'
@@ -33,7 +34,10 @@ export function FieldForm(props: {
   const editing = props.editFieldId ? session.getField(props.editFieldId) : undefined
   const [kind, setKind] = useState<FieldKind>(editing?.kind ?? props.initial.kind ?? 'custom')
   const [name, setName] = useState(editing?.name ?? props.initial.name ?? suggestFieldName(props.initial.kind ?? 'custom', props.initial.bindingName))
-  const [real, setReal] = useState(props.initial.real ?? (editing ? (session.realValue(editing.id) ?? '') : ''))
+  const [real, setReal] = useState(
+    (props.initial.kind === 'path' && props.initial.real ? directoryPart(props.initial.real) : props.initial.real) ?? (editing ? (session.realValue(editing.id) ?? '') : ''),
+  )
+  const [derive, setDerive] = useState(true)
   const [scope, setScope] = useState<Field['scope']>(editing?.scope ?? props.initial.scope ?? 'global')
   const [rootPath, setRootPath] = useState(session.getSettings().rootPath ?? '')
   const [busy, setBusy] = useState(false)
@@ -55,6 +59,10 @@ export function FieldForm(props: {
 
   const needsRoot = kind === 'path' && !session.getSettings().rootPath
   const tooShort = real !== '' && matchRuleFor(real) === 'anchor-only'
+  const effectiveRoot = (session.getSettings().rootPath ?? rootPath).trim().replace(/[\\/]+$/, '')
+  const canDerive =
+    kind === 'path' && !editing && effectiveRoot.length > 2 && real.toLowerCase().startsWith(effectiveRoot.toLowerCase() + '\\') && real.length > effectiveRoot.length + 1
+  const derivedRest = canDerive ? real.slice(effectiveRoot.length + 1) : ''
 
   const submit = async () => {
     if (busy) return
@@ -65,6 +73,13 @@ export function FieldForm(props: {
     try {
       if (needsRoot && rootPath.trim()) await session.updateSettings({ rootPath: rootPath.trim() })
       let rec: FieldRecord
+      let template: string | undefined
+      if (canDerive && derive) {
+        // Ensure the global ROOT field exists, then derive this field from it.
+        let root = session.listFields().find((f) => f.kind === 'path' && f.name === 'ROOT')
+        if (!root) root = await session.createField({ name: 'ROOT', kind: 'path', real: effectiveRoot, scope: 'global', example: namespace.pathRoot })
+        template = `{{ROOT}}\\${derivedRest}`
+      }
       if (editing) {
         rec = await session.updateField(editing.id, {
           name: name.trim(),
@@ -80,6 +95,7 @@ export function FieldForm(props: {
           scope,
           ...(props.initial.bindingName ? { nameAnchors: [props.initial.bindingName] } : {}),
           ...(kind === 'blob' ? { example: examplePreview } : {}),
+          ...(template ? { template } : {}),
         })
       }
       props.onDone(rec)
@@ -149,6 +165,12 @@ export function FieldForm(props: {
           {props.scriptId && <option value="script">{t('field.scopeScript')}</option>}
         </select>
       </label>
+      {canDerive && (
+        <label class="cv-check">
+          <input type="checkbox" checked={derive} onChange={() => setDerive(!derive)} /> {t('field.deriveFromRoot', { rest: derivedRest })}
+          <span class="cv-hint">{t('field.deriveHint')}</span>
+        </label>
+      )}
       {needsRoot && (
         <label class="cv-label">
           {t('field.rootPath')}

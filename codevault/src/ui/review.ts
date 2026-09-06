@@ -8,6 +8,32 @@ import type { ReviewLogEntry } from '@vault/model'
 
 export type Decision = 'pending' | 'accept' | 'reject' | 'safe'
 
+const FILE_TAIL_RE = /[\\/][^\\/]*\.[A-Za-z0-9]{1,5}$/
+
+/** Directory part of a path literal: strips a trailing file name and trailing separators. */
+export function directoryPart(literal: string): string {
+  let s = literal
+  if (FILE_TAIL_RE.test(s)) s = s.replace(FILE_TAIL_RE, '')
+  return s.replace(/[\\/]+$/, '')
+}
+
+/**
+ * A path field covers the directory prefix only, so the AI's file name after
+ * it is kept as text. Shrinks the row span accordingly.
+ */
+export function trimPathRow(row: ReviewRow): ReviewRow {
+  const p = row.proposal
+  const u = row.unknown
+  const literal = p?.literal ?? u?.literal
+  if (!literal) return row
+  const dir = directoryPart(literal)
+  if (dir.length === 0 || dir.length >= literal.length) return row
+  const cut = literal.length - dir.length
+  if (p) return { ...row, proposal: { ...p, end: p.end - cut, literal: dir, suffix: literal.slice(dir.length) } }
+  if (u) return { ...row, unknown: { ...u, end: u.end - cut, literal: dir } }
+  return row
+}
+
 export interface ReviewRow {
   id: string
   kind: 'slot' | 'unknown'

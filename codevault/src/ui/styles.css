@@ -239,3 +239,12 @@ a { color: var(--cv-accent); }
 @media print {
   .cv-pill-ex, .cv-reveal, .cv-field-real { visibility: hidden; }
 }
+
+.cv-diff-controls { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.cv-label-inline { display: inline-flex; gap: 0.3rem; align-items: center; font-size: 0.85rem; }
+.cv-diff-host { border: 1px solid var(--cv-border); border-radius: 8px; overflow: auto; max-height: 65vh; background: var(--cv-panel); }
+.cv-diff-host .cm-mergeView { height: 100%; }
+.cv-diff-pill { background: var(--cv-info-bg); border: 1px solid var(--cv-accent); border-radius: 4px; padding: 0 0.15rem; }
+.cv-key-gutter { width: 1.4em; }
+.cv-key-marker { font-size: 0.8em; }
+.cv-inline { display: inline-flex; gap: 0.3rem; align-items: center; }

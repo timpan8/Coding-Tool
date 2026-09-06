@@ -418,13 +418,28 @@ export class VaultSession {
   }
 
   realValue(fieldId: string, profile = 'default'): string | undefined {
-    return this.fields.get(fieldId)?.valueByProfile[profile]
+    const rec = this.fields.get(fieldId)
+    return rec ? this.resolvedReal(rec, profile) : undefined
+  }
+
+  /** Real value with `{{NAME}}` references to other fields resolved (max depth 3). */
+  private resolvedReal(rec: FieldRecord, profile = 'default', depth = 0): string | undefined {
+    const own = rec.valueByProfile[profile]
+    if (!rec.template || depth > 3) return own
+    let ok = true
+    const resolved = rec.template.replace(/\{\{([^}]+)\}\}/g, (_, name: string) => {
+      const target = [...this.fields.values()].find((f) => f.name.toLowerCase() === name.trim().toLowerCase() && !f.tombstone)
+      const v = target ? this.resolvedReal(target, profile, depth + 1) : undefined
+      if (v === undefined) ok = false
+      return v ?? ''
+    })
+    return ok ? resolved : own
   }
 
   findFieldByRealValue(value: string): FieldRecord | undefined {
     const v = value.toLowerCase()
     return this.listFields().find((f) => {
-      const r = f.valueByProfile['default']
+      const r = this.resolvedReal(f)
       return r !== undefined && (f.compare === 'ci' ? r.toLowerCase() === v : r === value)
     })
   }
@@ -438,6 +453,8 @@ export class VaultSession {
     for (const f of this.fields.values()) {
       if (f.id === exceptId) continue
       for (const v of Object.values(f.valueByProfile)) if (v) out.push(v)
+      const resolved = this.resolvedReal(f)
+      if (resolved && !out.includes(resolved)) out.push(resolved)
     }
     return out
   }
@@ -645,7 +662,8 @@ export class VaultSession {
     const all: Field[] = []
     const real = new Map<string, string>()
     for (const rec of this.fields.values()) {
-      const { field, real: r } = splitField(rec)
+      const { field } = splitField(rec)
+      const r = this.resolvedReal(rec)
       if (r !== undefined) real.set(field.id, r)
       if (rec.tombstone) continue
       all.push(field)

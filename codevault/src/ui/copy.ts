@@ -66,7 +66,12 @@ export function checkRealExport(session: VaultSession, version: VersionRecord): 
   }
 }
 
-/** THE single real-value exit. Returns false when the checklist blocks or the clipboard write fails. */
+/** The only place real text is handed to the clipboard (banner, countdown, honest clearing). */
+async function writeRealToClipboard(text: string): Promise<boolean> {
+  return writeClipboard(text, 'real')
+}
+
+/** THE single real-value exit for versions. Returns false when the checklist blocks or the clipboard write fails. */
 export async function exportReal(session: VaultSession, script: ScriptRecord, version: VersionRecord): Promise<{ ok: boolean; check: RealCheck }> {
   const check = checkRealExport(session, version)
   if (!check.ok) return { ok: false, check }
@@ -76,9 +81,15 @@ export async function exportReal(session: VaultSession, script: ScriptRecord, ve
   const eolText = script.eol === 'crlf' ? '\r\n' : '\n'
   const body = rendered.text.replace(/\r\n?|\n/g, eolText)
   const prefix = script.language === 'powershell' ? SENTINEL_REAL + eolText : ''
-  const ok = await writeClipboard(prefix + body, 'real')
+  const ok = await writeRealToClipboard(prefix + body)
   if (ok) await session.updateScript(script.id, { lastCopiedRealAt: new Date().toISOString() })
   return { ok, check }
+}
+
+/** One-liner that creates a project folder; carries a real path, so it goes through the real exit. */
+export async function copyNewItemLine(path: string): Promise<boolean> {
+  const line = `New-Item -ItemType Directory -Path '${path.replace(/'/g, "''")}' -Force | Out-Null`
+  return writeRealToClipboard(line)
 }
 
 export interface AiCopyResult {

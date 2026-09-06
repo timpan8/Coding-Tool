@@ -5,7 +5,8 @@ import { contentHash } from '@engine/template'
 import type { FieldKind } from '@engine/types'
 import type { FieldRecord } from '@vault/model'
 import { engine, getSession, toast, useTick } from '../state'
-import { buildVersion, groupRows, initialRows, type ReviewRow } from '../review'
+import { buildVersion, groupRows, initialRows, trimPathRow, type ReviewRow } from '../review'
+import { diffDoc, diffStats, formatStats } from '../diff'
 import { kindLabel, mask, suggestTitle } from '../format'
 import { FieldForm } from './FieldForm'
 import { Modal } from './Modal'
@@ -46,6 +47,15 @@ export function PasteSheet(props: {
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
 
   const updateRow = (id: string, patch: Partial<ReviewRow>) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  /** Resolve a row to a field; path fields cover the directory prefix only. */
+  const resolveRow = (id: string, field: FieldRecord) =>
+    setRows((rs) =>
+      rs.map((r) => {
+        if (r.id !== id) return r
+        const next: ReviewRow = { ...r, fieldId: field.id, decision: 'accept', userLinked: true }
+        return field.kind === 'path' || field.kind === 'unc' ? trimPathRow(next) : next
+      }),
+    )
 
   const analyze = async () => {
     if (!raw.trim()) {
@@ -139,13 +149,15 @@ export function PasteSheet(props: {
         scriptId = s.id
       }
       const prev = session.latestVersion(scriptId)
+      let finalNote = note.trim()
+      if (!finalNote && prev) finalNote = formatStats(diffStats(diffDoc(prev.segments, fields), diffDoc(built.segments, fields)))
       const version = await session.addVersion({
         scriptId,
         segments: built.segments,
         source: mode === 'editor' ? 'editor' : 'ai',
         eol: normalized.eol,
         ...(prev ? { parentVersionId: prev.id } : {}),
-        ...(note.trim() ? { note: note.trim() } : {}),
+        ...(finalNote ? { note: finalNote } : {}),
         reviewLog: built.reviewLog,
         needsReview: built.needsReview,
       })
@@ -506,11 +518,11 @@ export function PasteSheet(props: {
               ...(blobRaw !== undefined ? { blobRaw } : {}),
             }}
             onDone={(f) => {
-              updateRow(rowForForm.id, { fieldId: f.id, decision: 'accept', userLinked: true })
+              resolveRow(rowForForm.id, f)
               setFieldFormFor(null)
             }}
             onLink={(f) => {
-              updateRow(rowForForm.id, { fieldId: f.id, decision: 'accept', userLinked: true })
+              resolveRow(rowForForm.id, f)
               setFieldFormFor(null)
             }}
             onCancel={() => setFieldFormFor(null)}
@@ -527,7 +539,7 @@ export function PasteSheet(props: {
                   type="button"
                   class="cv-btn cv-btn-block"
                   onClick={() => {
-                    updateRow(rowForLink.id, { fieldId: f.id, decision: 'accept', userLinked: true })
+                    resolveRow(rowForLink.id, f)
                     setLinkFor(null)
                   }}
                 >

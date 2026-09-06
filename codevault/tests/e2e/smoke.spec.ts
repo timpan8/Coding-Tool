@@ -119,6 +119,17 @@ test('core loop: create vault, import from editor, copy both ways, new version, 
   await expect(page.locator('.cv-version-selected')).toContainText('v2')
   await expect(page.locator('.cv-pill')).toHaveCount(3)
 
+  // diff between v1 and v2 on template level: markers, stats, no real values
+  await page.keyboard.press('Control+Shift+D')
+  const diff = page.locator('.cv-modal')
+  await expect(diff).toBeVisible()
+  await expect(diff.locator('.cv-diff-host .cm-content').first()).toBeVisible()
+  await expect(diff).toContainText('⟦SVC_PW⟧')
+  await expect(diff).not.toContainText(REAL_PW)
+  await expect(diff.locator('.cv-chip', { hasText: /\+\d+ −\d+/ })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(diff).toHaveCount(0)
+
   // sanitized copy of v2 still carries no real value
   await page.getByRole('button', { name: /Kopiera för AI/ }).click()
   const aiCopy2 = await readClipboard(page)

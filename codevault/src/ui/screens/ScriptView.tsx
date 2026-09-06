@@ -5,6 +5,7 @@ import type { FieldRecord } from '@vault/model'
 import { getSession, navigate, toast, useTick } from '../state'
 import { insertSlot, layoutSegments, removeSlot, selectionInfo, type SlotLayout } from '../layout'
 import { useShortcut } from '../keys'
+import { DiffView } from '../components/DiffView'
 import { Editor } from '../components/Editor'
 import { Exits } from '../components/Exits'
 import { FieldForm } from '../components/FieldForm'
@@ -14,6 +15,7 @@ import { PasteSheet } from '../components/PasteSheet'
 import { Reveal } from '../components/Reveal'
 import { VersionList } from '../components/VersionList'
 import { kindLabel } from '../format'
+import { copyNewItemLine } from '../copy'
 import { t } from '@i18n/index'
 
 export function ScriptView(props: { scriptId: string; versionId?: string }) {
@@ -30,11 +32,15 @@ export function ScriptView(props: { scriptId: string; versionId?: string }) {
   const [newVersion, setNewVersion] = useState<null | 'ai' | 'editor'>(null)
   const [pill, setPill] = useState<SlotLayout | null>(null)
   const [reveal, setReveal] = useState(false)
+  const [diffOpen, setDiffOpen] = useState(false)
+  const [diffA, setDiffA] = useState<string | null>(null)
+  const [diffB, setDiffB] = useState<string | null>(null)
 
   const select = (id: string) => navigate({ view: 'script', scriptId: props.scriptId, versionId: id })
 
   useShortcut('ctrl+shift+n', () => setNewVersion('ai'), !newVersion)
   useShortcut('ctrl+shift+m', () => startMark(), !newVersion)
+  useShortcut('ctrl+shift+d', () => openDiff(), !newVersion && versions.length > 1)
   useShortcut('alt+arrowup', () => {
     if (!version) return
     const i = versions.findIndex((v) => v.id === version.id)
@@ -52,6 +58,29 @@ export function ScriptView(props: { scriptId: string; versionId?: string }) {
   }
 
   const info = selection && selection.from !== selection.to ? selectionInfo(layout.text, selection.from, selection.to, script.language) : undefined
+
+  const openDiff = () => {
+    if (versions.length < 2) return
+    const idx = versions.findIndex((v) => v.id === version.id)
+    const stable = script.stableVersionId && script.stableVersionId !== version.id ? script.stableVersionId : undefined
+    const prev = idx > 0 ? versions[idx - 1]!.id : versions[versions.length - 2]!.id
+    setDiffA(stable ?? prev)
+    setDiffB(version.id)
+    setDiffOpen(true)
+  }
+
+  const pathFields = [...usedIdsOf(layout.slots)]
+    .map((id) => session.getField(id))
+    .filter((f): f is NonNullable<typeof f> => f !== undefined && (f.kind === 'path' || f.kind === 'unc') && session.realValue(f.id) !== undefined)
+  const [newItemField, setNewItemField] = useState<string>('')
+  const copyNewItem = async () => {
+    const f = pathFields.find((x) => x.id === newItemField) ?? pathFields[0]
+    if (!f) return
+    const real = session.realValue(f.id)
+    if (!real) return
+    if (await copyNewItemLine(real)) toast(t('script.newItemDone'), 'warn', 6000)
+    else toast(t('exit.clipboardFailed'), 'error')
+  }
 
   const startMark = () => {
     if (!info) {
@@ -95,7 +124,7 @@ export function ScriptView(props: { scriptId: string; versionId?: string }) {
     return selected
   }
 
-  const usedIds = new Set(layout.slots.map((s) => s.fieldId))
+  const usedIds = usedIdsOf(layout.slots)
   const pillField = pill ? session.getField(pill.fieldId) : undefined
   const pillReal = pill ? session.realValue(pill.fieldId) : undefined
 
@@ -122,6 +151,27 @@ export function ScriptView(props: { scriptId: string; versionId?: string }) {
             <button type="button" class="cv-btn" onClick={startMark} title={t('script.markHint')}>
               {t('script.mark')}
             </button>
+            {versions.length > 1 && (
+              <button type="button" class="cv-btn" onClick={openDiff} title="Ctrl+Shift+D">
+                {t('script.diff')}
+              </button>
+            )}
+            {pathFields.length > 0 && (
+              <span class="cv-inline">
+                {pathFields.length > 1 && (
+                  <select class="cv-input cv-input-small" value={newItemField || pathFields[0]!.id} onChange={(e) => setNewItemField((e.currentTarget as HTMLSelectElement).value)}>
+                    {pathFields.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button type="button" class="cv-btn cv-btn-small" onClick={() => void copyNewItem()}>
+                  {t('script.newItem')}
+                </button>
+              </span>
+            )}
           </div>
         </div>
         <Exits script={script} version={version} />
@@ -141,6 +191,12 @@ export function ScriptView(props: { scriptId: string; versionId?: string }) {
       <aside class="cv-col cv-col-right">
         <FieldsPanel usedIds={usedIds} scriptId={script.id} />
       </aside>
+
+      {diffOpen && diffA && diffB && (
+        <Modal title={t('diff.title')} onClose={() => setDiffOpen(false)} wide>
+          <DiffView script={script} versions={versions} aId={diffA} bId={diffB} onChangeA={setDiffA} onChangeB={setDiffB} />
+        </Modal>
+      )}
 
       {newVersion && (
         <Modal title={t('paste.title')} onClose={() => setNewVersion(null)} wide>
@@ -222,4 +278,8 @@ export function ScriptView(props: { scriptId: string; versionId?: string }) {
       )}
     </div>
   )
+}
+
+function usedIdsOf(slots: SlotLayout[]): Set<string> {
+  return new Set(slots.map((s) => s.fieldId))
 }
