@@ -20,6 +20,9 @@ describe('detectLanguage', () => {
     ['interface User { name: string }\n', 'typescript'],
     ['const a = 1;\nfunction b() {}\n', 'javascript'],
     ['---\nname: deploy\non: push\n', 'yaml'],
+    ['DATABASE_URL=postgres://localhost/app\nAPI_KEY=abc123\n', 'dotenv'],
+    ['resource "aws_db_instance" "main" {\n  password = "hunter2"\n}\n', 'hcl'],
+    ['SELECT id, name FROM users WHERE token = \'abc\';\n', 'sql'],
   ])('recognises %s', (code, expected) => {
     expect(detectLanguage(code)).toBe(expected);
   });
@@ -29,6 +32,17 @@ describe('detectLanguage', () => {
     expect(detectLanguage('')).toBeUndefined();
     expect(detectLanguage('hello world')).toBeUndefined();
     expect(detectLanguage('42')).toBeUndefined();
+  });
+
+  it('reads a dotenv name, which has no extension in the usual sense', () => {
+    for (const name of ['.env', '.env.local', '.env.production']) expect(languageForFile(name)).toBe('dotenv');
+    expect(languageForFile('main.tf')).toBe('hcl');
+    expect(languageForFile('seed.sql')).toBe('sql');
+  });
+
+  it('does not mistake a single shell assignment for a dotenv file', () => {
+    expect(detectLanguage('export PATH="$PATH:/opt/bin"\n')).toBe('shell');
+    expect(detectLanguage('A=1\n')).toBeUndefined();
   });
 
   it('does not call broken JSON JSON', () => {

@@ -38,6 +38,10 @@ export function contextAt(source: string, position: number, language: LanguageId
       break;
     }
   }
+  // Which characters actually open a string differs, and getting it wrong is not cosmetic: an
+  // apostrophe in an HCL comment would otherwise open a string that never closes, and a SQL double
+  // quote encloses an identifier rather than a value.
+  const quotes = language === 'hcl' ? '"' : language === 'sql' ? "'" : language === 'dotenv' ? '"\'' : null;
   let here = '';
   let quote = '', lineComment = false, blockComment = false, raw = false, triple = false, regex = false;
   for (let i = 0; i < position; i++) {
@@ -63,9 +67,13 @@ export function contextAt(source: string, position: number, language: LanguageId
       continue;
     }
     if (quote) {
+      // Where a backslash escapes the next character. Not in a POSIX single-quoted string, not in
+      // a dotenv single-quoted string, and not in SQL, where the standard escape is a doubled
+      // apostrophe and a backslash stands for itself.
+      const literal = (language === 'shell' || language === 'dotenv') && quote === "'";
       if ((language === 'powershell' && quote === '"' && c === '`')
-        || (language !== 'powershell' && !(language === 'shell' && quote === "'") && c === '\\')) { i++; continue; }
-      if ((language === 'powershell' || language === 'yaml') && quote === "'" && c === "'" && next === "'") { i++; continue; }
+        || (language !== 'powershell' && language !== 'sql' && !literal && c === '\\')) { i++; continue; }
+      if ((language === 'powershell' || language === 'yaml' || language === 'sql') && quote === "'" && c === "'" && next === "'") { i++; continue; }
       if (c === quote) {
         if (triple) { if (source.slice(i, i + 3) === quote.repeat(3)) { i += 2; quote = ''; triple = false; raw = false; } }
         else { quote = ''; raw = false; }
@@ -73,9 +81,16 @@ export function contextAt(source: string, position: number, language: LanguageId
       continue;
     }
     if (language === 'powershell' && c === '@' && (next === '"' || next === "'") && /^(?:\r?\n)/.test(source.slice(i + 2))) { here = next; i++; continue; }
-    if (language === 'shell' && c === '<' && next === '<') {
-      const opener = /^<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/.exec(source.slice(i));
+    if ((language === 'shell' || language === 'hcl') && c === '<' && next === '<') {
+      const opener = /^<<[-~]?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/.exec(source.slice(i));
       if (opener) { here = opener[1]; i += opener[0].length - 1; continue; }
+    }
+    // Postgres dollar quoting: $tag$ ... $tag$ interprets nothing at all inside.
+    if (language === 'sql' && c === '$') {
+      const opener = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(source.slice(i));
+      if (opener && source.indexOf(opener[0], i + opener[0].length) >= position) {
+        return { quote: '', blocked: 'Dollarciterad SQL-sträng tolkar ingenting alls. Flytta värdet till en vanlig sträng med apostrofer.' };
+      }
     }
     // A slash after an operator or the start of an expression opens a regular expression; after a
     // value it is division. Looking back at the last meaningful character separates the two.
@@ -86,8 +101,12 @@ export function contextAt(source: string, position: number, language: LanguageId
     if (language === 'powershell' && c === '<' && next === '#') { blockComment = true; i++; continue; }
     if (['javascript', 'typescript'].includes(language) && c === '/' && next === '*') { blockComment = true; i++; continue; }
     if (['javascript', 'typescript'].includes(language) && c === '/' && next === '/') { lineComment = true; i++; continue; }
-    if (['powershell', 'python', 'shell', 'yaml'].includes(language) && c === '#') { lineComment = true; continue; }
-    if (c === '"' || c === "'" || (['javascript', 'typescript'].includes(language) && c === '`')) {
+    if (['powershell', 'python', 'shell', 'yaml', 'dotenv', 'hcl'].includes(language) && c === '#') { lineComment = true; continue; }
+    if (language === 'hcl' && c === '/' && next === '*') { blockComment = true; i++; continue; }
+    if (language === 'hcl' && c === '/' && next === '/') { lineComment = true; i++; continue; }
+    if (language === 'sql' && c === '/' && next === '*') { blockComment = true; i++; continue; }
+    if (language === 'sql' && c === '-' && next === '-') { lineComment = true; i++; continue; }
+    if (quotes ? quotes.includes(c) : c === '"' || c === "'" || (['javascript', 'typescript'].includes(language) && c === '`')) {
       quote = c;
       if (language === 'python') {
         const prefix = /([rRuUfFbB]{1,2})$/.exec(source.slice(0, i))?.[1] || '';
@@ -97,8 +116,8 @@ export function contextAt(source: string, position: number, language: LanguageId
       }
     }
   }
-  if (here) return { quote: '', blocked: language === 'shell'
-    ? 'Shell here-document: inget är citerat där, så escaping skulle förvanska värdet. Flytta det till en citerad sträng.'
+  if (here) return { quote: '', blocked: language === 'shell' || language === 'hcl'
+    ? 'Here-document: inget är citerat där, så escaping skulle förvanska värdet. Flytta det till en citerad sträng.'
     : 'PowerShell here-string: flytta värdet till en vanlig citerad sträng.' };
   if (regex) return { quote: '', blocked: 'Platshållare i ett reguljärt uttryck stöds inte. Bygg uttrycket av en citerad sträng i stället.' };
   if (raw || triple) return { quote, blocked: 'Python raw-, f-, byte- eller trippelsträng: använd en vanlig sträng.' };
@@ -130,6 +149,41 @@ export function escapeValue(value: string, language: LanguageId, context: Contex
     if (q === '"') return { text: JSON.stringify(value).slice(1, -1) };
     if (q === "'") return /[\r\n]/.test(value) ? { text: '', error: 'YAML med radbrytning behöver en dubbelciterad sträng.' } : { text: value.replace(/'/g, "''") };
     return { text: JSON.stringify(value) };
+  }
+  if (language === 'dotenv') {
+    // Double quotes: most parsers expand $VAR and ${VAR} here, and which ones do is not knowable
+    // from the file, so a value containing a dollar is refused rather than escaped hopefully.
+    if (q === '"') {
+      if (value.includes('$')) return { text: '', error: 'Värdet innehåller $, som många .env-läsare expanderar. Använd apostrofer runt platshållaren i stället.' };
+      return { text: value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r/g, '\\r').replace(/\n/g, '\\n') };
+    }
+    // Single quotes are literal in every reader, which also means they can hold no apostrophe.
+    if (q === "'") {
+      if (/['\r\n]/.test(value)) return { text: '', error: 'En apostrofciterad .env-sträng kan varken innehålla apostrof eller radbrytning. Använd citattecken.' };
+      return { text: value };
+    }
+    if (/[\s#'"\\]/.test(value)) return { text: '', error: 'Ett ociterat .env-värde får inte innehålla blanksteg, #, citattecken eller bakstreck. Citera platshållaren.' };
+    return { text: value };
+  }
+  if (language === 'hcl') {
+    if (q !== '"') return { text: '', error: 'HCL-värden utanför en sträng är uttryck. Citera platshållaren.' };
+    // ${...} and %{...} are evaluated by Terraform. Doubling the sigil is how HCL writes one
+    // literally; without it a value could be made to read another variable.
+    return { text: value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')
+      // Function form deliberately: in a replacement string `$$` means a single `$`, so the
+      // literal '$${' would emit '${' and leave the interpolation live.
+      .replace(/\$\{/g, () => '$${').replace(/%\{/g, () => '%%{') };
+  }
+  if (language === 'sql') {
+    if (q === '"') return { text: '', error: 'Citattecken omger ett identifierarnamn i SQL, inte ett värde. Använd apostrofer.' };
+    if (q === "'") {
+      // MySQL treats a backslash as an escape by default; the standard and PostgreSQL do not.
+      // Either choice is wrong somewhere, so the value is refused instead.
+      if (value.includes('\\')) return { text: '', error: 'SQL-dialekter är oense om bakstreck i strängar. Lägg värdet i en parameter i stället för i texten.' };
+      return { text: value.replace(/'/g, "''") };
+    }
+    if (!/^-?\d+(?:\.\d+)?$/.test(value)) return { text: '', error: 'Ett ociterat SQL-värde måste vara ett tal. Citera platshållaren med apostrofer.' };
+    return { text: value };
   }
   if (!/^[A-Za-z0-9_./:\\-]+$/.test(value)) return { text: '', error: 'Värdet innehåller specialtecken utanför en sträng. Citera platshållaren eller granska raw-läge.' };
   return { text: value };

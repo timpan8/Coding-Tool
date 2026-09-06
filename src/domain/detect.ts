@@ -5,9 +5,13 @@ const byExtension: Record<string, LanguageId> = {
   py: 'python', js: 'javascript', mjs: 'javascript', cjs: 'javascript',
   ts: 'typescript', mts: 'typescript', json: 'json', xml: 'xml',
   yaml: 'yaml', yml: 'yaml', sh: 'shell', bash: 'shell', zsh: 'shell', txt: 'plaintext',
+  env: 'dotenv', tf: 'hcl', tfvars: 'hcl', hcl: 'hcl', sql: 'sql',
 };
 
 export function languageForFile(name: string): LanguageId | undefined {
+  // `.env`, `.env.local` and `.env.production` are all dotenv, and none of them has an extension in
+  // the usual sense — the whole name is the signal.
+  if (/^\.env(\.|$)/.test(name.trim())) return 'dotenv';
   return byExtension[name.split('.').pop()?.toLowerCase() ?? ''];
 }
 
@@ -38,7 +42,14 @@ export function detectLanguage(code: string): LanguageId | undefined {
   if (/\b(interface|type)\s+\w+\s*[={]|:\s*(string|number|boolean)\b/.test(text)) return 'typescript';
   if (/^\s*(const|let|var|function|=>|export|import)\b/m.test(text) && /[;{]/.test(text)) return 'javascript';
   if (/^\s*---\s*$/m.test(text) || /^[A-Za-z_][\w-]*:\s*\S/m.test(text)) return 'yaml';
+  // Terraform blocks and SQL statements are both recognisable from a single line, and neither
+  // resembles anything else in the list.
+  if (/^\s*(resource|variable|provider|module|data|terraform|output)\s+("[^"]*"\s*)*\{/m.test(text)) return 'hcl';
+  if (/^\s*(SELECT\s+[\s\S]*\sFROM\s|INSERT\s+INTO\s|UPDATE\s+\w+\s+SET\s|CREATE\s+(TABLE|DATABASE|USER)\s)/im.test(text)) return 'sql';
   if (/^\s*(export\s+)?[A-Z_]+=/m.test(text) && /\$\{?\w/.test(text)) return 'shell';
+  // A run of KEY=value lines with no shell syntax around them is a .env file. Checked after shell,
+  // which needs its own markers, and requires more than one line so a stray assignment is not enough.
+  if (!/[;{}()]/.test(text) && (text.match(/^\s*(?:export\s+)?[A-Za-z_][\w.]*=/gm)?.length ?? 0) >= 2) return 'dotenv';
   if (/\$[A-Za-z_]\w*\s*=/.test(text)) return 'powershell';
 
   return undefined;

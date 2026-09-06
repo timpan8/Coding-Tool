@@ -4,7 +4,7 @@ import { DraftConflictError } from '../storage/StorageProvider';
 import { usage } from '../domain/render';
 
 const now = () => new Date().toISOString();
-const extensions: Record<LanguageId, string> = { powershell: 'ps1', javascript: 'js', typescript: 'ts', python: 'py', json: 'json', xml: 'xml', yaml: 'yaml', shell: 'sh', plaintext: 'txt' };
+const extensions: Record<LanguageId, string> = { powershell: 'ps1', javascript: 'js', typescript: 'ts', python: 'py', json: 'json', xml: 'xml', yaml: 'yaml', shell: 'sh', dotenv: 'env', hcl: 'tf', sql: 'sql', plaintext: 'txt' };
 export interface WorkSession {
   key: string; project: Project | null; draft: ProjectDraft | null;
   files: ProjectFile[]; activeFileId: string; texts: Record<string, string>;
@@ -18,7 +18,11 @@ export interface WorkspaceState {
   session: WorkSession; settings: Settings | null; projects: Project[];
   phase: 'loading' | 'saved' | 'pending' | 'saving' | 'error'; error: string;
 }
-const fileName = (language: LanguageId, index: number) => `${index === 0 ? 'script' : `del${index + 1}`}.${extensions[language]}`;
+// A dotenv file is named by its extension alone, so it gets the conventional name rather than
+// script.env, which nothing would load.
+const fileName = (language: LanguageId, index: number) =>
+  language === 'dotenv' ? (index === 0 ? '.env' : `.env.del${index + 1}`)
+    : `${index === 0 ? 'script' : `del${index + 1}`}.${extensions[language]}`;
 function blank(): WorkSession {
   const file: ProjectFile = { id: crypto.randomUUID(), name: fileName('powershell', 0), language: 'powershell', order: 0 };
   return { key: crypto.randomUUID(), project: null, draft: null, files: [file], activeFileId: file.id, texts: { [file.id]: '' },

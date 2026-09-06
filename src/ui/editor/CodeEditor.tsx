@@ -13,17 +13,29 @@ import { language as python } from 'monaco-editor/languages/definitions/python/p
 import { language as xml } from 'monaco-editor/languages/definitions/xml/xml.js';
 import { language as yaml } from 'monaco-editor/languages/definitions/yaml/yaml.js';
 import { language as shell } from 'monaco-editor/languages/definitions/shell/shell.js';
+import { language as hcl } from 'monaco-editor/languages/definitions/hcl/hcl.js';
+import { language as sql } from 'monaco-editor/languages/definitions/sql/sql.js';
 import { editorColors, themeName } from '../theme';
 import type { EditorProps } from './props';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
-for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell })) {
+for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell, hcl, sql })) {
   monaco.languages.register({ id });
   monaco.languages.setMonarchTokensProvider(id, language);
 }
-const languageIds = ['powershell', 'javascript', 'typescript', 'python', 'xml', 'yaml', 'shell', 'json', 'plaintext'];
+const languageIds = ['powershell', 'javascript', 'typescript', 'python', 'xml', 'yaml', 'shell', 'hcl', 'sql', 'json', 'dotenv', 'plaintext'];
 monaco.languages.register({ id: 'json' });
 monaco.languages.setMonarchTokensProvider('json', { tokenizer: { root: [[/"(?:[^"\\]|\\.)*"/, 'string'], [/\b(?:true|false|null)\b/, 'keyword'], [/-?\d+(?:\.\d+)?/, 'number']] } });
+// No dotenv definition ships with monaco, and the syntax is small enough to state outright: a
+// comment, a key, and the three shapes a value can take.
+monaco.languages.register({ id: 'dotenv' });
+monaco.languages.setMonarchTokensProvider('dotenv', { tokenizer: { root: [
+  [/^\s*#.*$/, 'comment'],
+  [/^\s*(?:export\s+)?[\w.]+(?==)/, 'key'],
+  [/"(?:[^"\\]|\\.)*"/, 'string'],
+  [/'[^']*'/, 'string'],
+  [/=/, 'operator'],
+] } });
 monaco.editor.defineTheme('vault', { base: 'vs', inherit: true, rules: [], colors: editorColors.light });
 monaco.editor.defineTheme('vault-dark', { base: 'vs-dark', inherit: true, rules: [], colors: editorColors.dark });
 export type { Selection } from './props';

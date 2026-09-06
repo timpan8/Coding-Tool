@@ -602,6 +602,32 @@ test('still reveals a placeholder when its binding is clicked', async ({ page })
   await expect(page.locator('.monaco-editor .selected-text').first()).toBeVisible();
 });
 
+// Report F13. Adding a language means adding its escaping rule, or values fall through to the
+// generic one and are escaped for the wrong syntax. This is the end-to-end half of that.
+test('handles a Terraform file end to end, interpolation and all', async ({ page }) => {
+  await page.getByLabel('Språk', { exact: true }).selectOption('hcl');
+  await type(page, 'resource "aws_db" "main" {\n  password = "s3cret"\n}\n');
+  await bind(page, 's3cret', '${var.injected}', 'secret');
+
+  // The private value is an interpolation. Terraform would evaluate it, so Local must write it
+  // with the sigil doubled rather than live.
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
+  await expect(page.locator('.editor-body')).toContainText('$${var.injected}');
+
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.locator('.editor-body')).not.toContainText('var.injected');
+});
+
+// A .env file is the most likely thing a user brings to this tool, and it is named by its
+// extension alone.
+test('names a dotenv file the way a dotenv file is named', async ({ page }) => {
+  await page.getByLabel('Språk', { exact: true }).selectOption('dotenv');
+  await type(page, 'API_KEY=abc123\n');
+  await expect(page.locator('.file-tabs')).toContainText('.env');
+  await expect(page.locator('.file-tabs')).not.toContainText('script.env');
+});
+
 // Report U13. Mall/Local/AI is the whole idea of the tool and was explained only by three banner
 // lines. Shown once on a fresh vault, and never again after it is closed.
 test('introduces the three views once, and can be brought back', async ({ browser }) => {
