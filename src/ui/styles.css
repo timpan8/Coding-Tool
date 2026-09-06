@@ -1049,3 +1049,13 @@ dialog p {
     padding: 15px 10px;
   }
 }
+.substituted-value {
+  border-radius: 3px;
+  padding: 1px 0;
+  background: var(--accent-surface-strong);
+  box-shadow: 0 0 0 1px var(--accent-border);
+}
+.mode-local .substituted-value {
+  background: var(--danger-surface-strong);
+  box-shadow: 0 0 0 1px var(--danger-border);
+}

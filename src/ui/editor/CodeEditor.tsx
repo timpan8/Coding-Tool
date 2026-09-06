@@ -32,6 +32,9 @@ interface Props {
   onBinding?: (selection: Selection) => void; onPlaceholder?: (name: string) => void;
   describePlaceholder?: (name: string) => { category: string; aiReplacement: string; hasValue: boolean } | undefined;
   focusName?: string; focusLine?: number; onLine?: (line: number) => void; theme?: ResolvedTheme;
+  /** Character ranges to mark as substituted. Empty in the template view, where the placeholders
+   * are visible as themselves. */
+  substitutions?: { start: number; end: number; name: string }[];
 }
 export function CodeEditor(props: Props) {
   const host = useRef<HTMLDivElement>(null), editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -39,6 +42,7 @@ export function CodeEditor(props: Props) {
   const documents = useRef(new Map<string, { model: monaco.editor.ITextModel; view: monaco.editor.ICodeEditorViewState | null }>());
   const activeKey = useRef('');
   const callbacks = useRef(props);
+  const decorateRef = useRef<(() => void) | null>(null);
   callbacks.current = props;
   useEffect(() => {
     const model = monaco.editor.createModel(callbacks.current.value, callbacks.current.language);
@@ -53,7 +57,16 @@ export function CodeEditor(props: Props) {
     editor.current = instance;
     const decorations = instance.createDecorationsCollection();
     const decorate = () => {
-      decorations.set(instance.getModel()!.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } })));
+      const model = instance.getModel()!;
+      const substitutions = callbacks.current.substitutions ?? [];
+      if (substitutions.length) {
+        decorations.set(substitutions.map(range => ({
+          range: monaco.Range.fromPositions(model.getPositionAt(range.start), model.getPositionAt(range.end)),
+          options: { inlineClassName: 'substituted-value', hoverMessage: { value: `Utbytt: **${range.name}**` } },
+        })));
+        return;
+      }
+      decorations.set(model.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } })));
     };
     const binding = () => {
       const model = instance.getModel()!;
@@ -94,6 +107,7 @@ export function CodeEditor(props: Props) {
         },
       },
     );
+    decorateRef.current = decorate;
     decorate();
     if (callbacks.current.autoFocus) instance.focus();
     return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); mouse.dispose(); hover.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
@@ -133,6 +147,7 @@ export function CodeEditor(props: Props) {
     if (model.getLanguageId() !== props.language) monaco.editor.setModelLanguage(model, props.language);
   }, [props.value, props.language, props.readOnly, props.documentKey, props.active]);
   useEffect(() => { monaco.editor.setTheme(themeName(props.theme ?? 'light')); }, [props.theme]);
+  useEffect(() => { decorateRef.current?.(); }, [props.substitutions, props.value]);
   useEffect(() => { if (props.active) { editor.current?.layout(); if (props.autoFocus) editor.current?.focus(); } }, [props.active, props.autoFocus]);
   useEffect(() => {
     if (!props.focusName || !editor.current) return;
