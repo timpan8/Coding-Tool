@@ -8,13 +8,19 @@ import { download } from '../download';
 import { t } from '../text';
 
 const stamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+const daysSince = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 
 export function BackupPanel({
   storage,
+  lastExportAt,
+  onExported,
   notify,
   confirm,
 }: {
   storage: StorageProvider;
+  /** When the vault was last exported, so the page can say how long ago that was. */
+  lastExportAt?: string;
+  onExported: () => void;
   notify: (message: string) => void;
   confirm: (request: ConfirmRequest) => Promise<ConfirmResult>;
 }) {
@@ -45,6 +51,9 @@ export function BackupPanel({
         deviceName: settings.deviceName,
       });
       download(`ai-code-vault-${kind}-${stamp()}.acv.json`, JSON.stringify(snapshot, null, 2));
+      // Written after the file is handed over, so a failed export does not reset the reminder.
+      await storage.saveSettings({ ...settings, lastExportAt: new Date().toISOString() });
+      onExported();
       notify(kind === 'full' ? 'Hela valvet exporterat.' : t.backup.privateExported);
     } catch {
       notify(t.backup.exportFailed);
@@ -168,6 +177,11 @@ export function BackupPanel({
       <p className="notice">
         <b>{t.backup.plaintextWarning}</b> Skillnaden är att den privata utelämnar
         projektkoden, inte att den är ofarlig. Förvara dem som du förvarar lösenorden de innehåller.
+      </p>
+      {/* Nothing nags, and nothing is scheduled: the page says how old the last file is and leaves
+          the judgement to the person who knows what has changed since. */}
+      <p className={lastExportAt && daysSince(lastExportAt) < 30 ? 'muted' : 'inline-warning'} role="status">
+        {lastExportAt ? t.backup.lastExport(daysSince(lastExportAt)) : t.backup.neverExported}
       </p>
 
       <h2>{t.backup.restore}</h2>

@@ -288,6 +288,54 @@ export function App({ storage }: { storage: StorageProvider }) {
     createBinding({ text: value, start: finding.start, end: finding.end, line: finding.line,
       lineBefore: template.slice(template.lastIndexOf('\n', finding.start) + 1, finding.start) }, finding);
   }
+  /** Binding one finding at a time meant a dialog for each, and a file that arrives with a dozen of
+   * them is exactly when that hurts most. Nothing here needs a decision the finding has not already
+   * made: the rule says what the value is and what an AI may see instead. The dialog stays for the
+   * one-at-a-time path, where the point is to look at it.
+   *
+   * Undoing removes the bindings as well as the substitution. They were created without anyone
+   * seeing them, so leaving them behind would leave a mess nobody asked for. */
+  async function bindFindings(chosen: Finding[]) {
+    await run(async () => {
+      await controller.flush();
+      const current = controller.getSnapshot();
+      if (!current.settings) return;
+      const scope = current.session.project
+        ? { scope: 'project' as const, scopeRef: current.session.project.id }
+        : { scope: 'global' as const, scopeRef: null };
+      const before = current.session.text;
+      const created: Binding[] = [];
+      const time = new Date().toISOString();
+      let text = before;
+      // Back to front, so replacing one value does not move the next one's offsets.
+      for (const finding of [...chosen].sort((a, b) => b.start - a.start)) {
+        const value = before.slice(finding.start, finding.end);
+        // The same value twice is one binding, here as everywhere else.
+        const owner = [...bindings, ...created].find(b => Object.values(b.values).includes(value)
+          && (b.scope === 'global' || (b.scope === scope.scope && b.scopeRef === scope.scopeRef)));
+        let name = owner?.name;
+        if (!name) {
+          const lineBefore = before.slice(before.lastIndexOf('\n', finding.start) + 1, finding.start);
+          name = suggestBinding(lineBefore, value, [...bindings, ...created], scope).name;
+          created.push({ id: crypto.randomUUID(), name, category: finding.category, ...scope, description: '',
+            aiReplacement: finding.suggestedAiReplacement || defaults[finding.category],
+            values: { __default__: value }, escapeMode: 'auto',
+            matchHints: { lastVariableNames: [], previousAiValues: [], aliases: [] },
+            createdAt: time, updatedAt: time, deviceId: current.settings.deviceId });
+        }
+        text = text.slice(0, finding.start) + `{{${name}}}` + text.slice(finding.end);
+      }
+      for (const binding of created) await storage.saveBinding(binding);
+      setBindings(await storage.listBindings());
+      controller.changeText(text); changeMode('template'); await controller.flush();
+      setNotice(t.findings.boundMany(created.length));
+      offerUndo({ label: t.findings.boundManyUndo(created.length), restore: async () => {
+        for (const binding of created) await storage.deleteBinding(binding.id);
+        setBindings(await storage.listBindings());
+        controller.changeText(before); await controller.flush();
+      } });
+    });
+  }
   /** Report F-2.7. One click on a 68×21 px button silenced a finding for good — in the panel and
    * in the copy dialog, which filters on the same set. There was no confirmation, no undo and no
    * list of what had been dismissed, while `deleteDismissal` sat implemented in the storage layer
@@ -358,7 +406,20 @@ export function App({ storage }: { storage: StorageProvider }) {
       // The name heuristic reads only the variable name, so `$p = "Hunter2"` came out as identity
       // and a password rendered unmasked. Running the rules over the value itself is the missing
       // half: what a value looks like says more than what it was called.
-      const matched = finding ?? scan(selection.text, rules, { skipRanges: [] })
+      //
+      // Over the whole line, though, and not the selection alone. Several rules are about the
+      // assignment rather than the value — `password = "…"` is what makes `Hunter2!` a secret, and
+      // `Hunter2!` on its own is just a word with a digit in it. Only findings that cover the
+      // selection count, so the variable on the same line cannot categorise it by accident.
+      const source = current.session.text;
+      const lineStart = source.lastIndexOf('\n', selection.start - 1) + 1;
+      const lineEnd = source.indexOf('\n', selection.end);
+      const line = source.slice(lineStart, lineEnd === -1 ? source.length : lineEnd);
+      const onLine = scan(line, rules, { skipRanges: [] })
+        // Only a finding that covers the selection counts, so a value elsewhere on the line cannot
+        // categorise this one. The assignment rule reports its captured value, not the whole line.
+        .filter(f => f.start + lineStart <= selection.start && f.end + lineStart >= selection.end);
+      const matched = finding ?? onLine
         .sort((a, b) => (a.severity === 'critical' ? -1 : b.severity === 'critical' ? 1 : 0))[0];
       const category = matched?.category ?? hint.category;
       const aiValue = matched?.suggestedAiReplacement ?? defaults[category];
@@ -685,7 +746,7 @@ export function App({ storage }: { storage: StorageProvider }) {
             onCreate={() => void newBinding()} />
           <IssuePanel issues={issues} onSelect={showIssue} fix={{ offered: issue => Boolean(leakedValue(issue)), apply: replaceLeak }} />
           <FindingsPanel findings={findings} onShow={f => { changeMode('template'); setFocusLine(f.line); }}
-            onBind={bindFinding} onDismiss={f => void dismissFinding(f)} />
+            onBind={bindFinding} onBindMany={f => void bindFindings(f)} onDismiss={f => void dismissFinding(f)} />
           <VersionPanel versions={versions} baseVersionId={session.baseVersionId} disabled={busy}
             onPreview={v => setViewing({ version: v, compareTo: null })}
             onCompare={v => setViewing({ version: v, compareTo: versions[versions.indexOf(v) + 1] ?? null })}
@@ -704,7 +765,8 @@ export function App({ storage }: { storage: StorageProvider }) {
         onEdit={b => setBindingDialog({ binding: b })} onDelete={b => void removeBinding(b)} onCreate={newBinding} /></div>
       {/* Its own page rather than the last section of a long settings page. It is the only way back
           after a browser clears its storage, and it was three scroll-lengths below the fold. */}
-      <div className="overview-scroll" hidden={route !== '#/backup'}><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></div>
+      <div className="overview-scroll" hidden={route !== '#/backup'}><BackupPanel storage={storage} notify={setNotice} confirm={confirm}
+        lastExportAt={settings?.lastExportAt} onExported={() => void controller.reloadSettings()} /></div>
       <div hidden={route !== '#/security'}><Security /></div>
       <div hidden={route !== '#/settings'}><SettingsPage settings={settings} storage={storage} storageInfo={storageInfo}
         onStorageInfo={setStorageInfo} deviceName={deviceName} onDeviceName={setDeviceName} rules={rules}
@@ -732,6 +794,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       save={storeBinding} close={() => setBindingDialog(null)} />}
     {copyMode && <CopyDialog mode={copyMode} coverage={cover} issues={ai.issues.length} replaced={ai.used.length}
       findings={copyFindings} seriousFindings={seriousFindings} reviewed={reviewed} onReviewed={setReviewed}
+      profile={profiles.find(p => p.id === options.profileId)?.name}
       close={() => setCopyMode(null)} onDownload={() => downloadCopy(copyMode)}
       onCopy={() => {
         // Re-audited on the current text: the dialog must not be able to copy what it last saw.

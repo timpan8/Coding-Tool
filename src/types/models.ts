@@ -60,6 +60,9 @@ export interface Settings {
   activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean; aiPromptText: string;
   clipboardAutoClearSeconds: number; maskSecretsInUi: boolean; theme: 'system' | 'light' | 'dark';
   editorFontSize: number; editorWordWrap: boolean; introSeen: boolean;
+  /** When the vault was last exported. The only way back from cleared browser data is a file the
+   * user made, so the app has to be able to say how old that file is. Absent means never. */
+  lastExportAt?: Iso;
 }
 export interface WorkspaceSnapshot { projects: Project[]; versions: Version[]; drafts: ProjectDraft[]; bindings: Binding[]; profiles: Profile[]; datasets: Dataset[]; rules: ScannerRule[]; blocklist: BlocklistEntry[]; dismissals: ScanDismissal[]; settings: Settings }
 export type ProjectSummary = Project;

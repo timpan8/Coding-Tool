@@ -21,8 +21,21 @@ describe('built-in rules', () => {
     ['\\\\fileserver\\payroll\\2026', 'unc-path'],
     ['contact = "anna.andersson@company.se"', 'email'],
     ['id = "19850505-1234"', 'personnummer'],
+    ['tenantId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"', 'guid'],
   ])('flags %s', (text, expected) => {
     expect(ruleIds(text)).toContain(expected);
+  });
+
+  // The AI value has to keep the shape, or code that parses the value stops working in the copy the
+  // AI is asked to reason about.
+  it('offers an AI value of the same shape as the value it replaces', () => {
+    const shaped = (text: string, id: string) => found(text).find((f) => f.ruleId === id)?.suggestedAiReplacement ?? '';
+    expect(shaped('tenantId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"', 'guid'))
+      .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    // Not the nil GUID: that reads as an unset value rather than as a stand-in.
+    expect(shaped('tenantId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"', 'guid')).not.toBe('00000000-0000-0000-0000-000000000000');
+    expect(shaped('host = "10.4.12.9"', 'private-ip')).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
+    expect(shaped('contact = "anna@company.se"', 'email')).toContain('@');
   });
 
   it('does not flag ordinary prose or an already sanitised example', () => {
@@ -32,6 +45,16 @@ describe('built-in rules', () => {
 
   it('leaves a value alone once a placeholder covers it', () => {
     expect(found('$password = "{{ADMIN_PASSWORD}}"')).toEqual([]);
+  });
+
+  // The entropy rule is the fallback for values nothing can name. A GUID reported as "random string"
+  // gets <SECRET> for an AI value rather than a GUID, and a JWT used to be called one too.
+  it('lets a rule that names the value win over the entropy fallback', () => {
+    expect(ruleIds('tenantId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"')).toEqual(['guid']);
+    // Bare, so the assignment rule stays out of it: between two rules that both name the value,
+    // severity still decides, and "assigned to something called token" is the graver reading.
+    expect(ruleIds('Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk'))
+      .toContain('jwt');
   });
 
   it('reports one finding per span, keeping the most severe rule', () => {

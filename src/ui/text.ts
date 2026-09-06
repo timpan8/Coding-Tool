@@ -319,6 +319,8 @@ export const sv = {
     localTitle: '⚠ Kopiera riktiga värden',
     aiTitle: 'AI-export · granska före kopiering',
     localWarning: 'Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.',
+    localProfile: (name: string) => `Värdena kommer från profilen ${name}. Bindings utan eget värde där använder standardvärdet.`,
+    localDefaultProfile: 'Värdena är standardvärdena. Ingen profil är vald.',
     localClipboardNote: 'Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.',
     acknowledge: (n: number) => `Jag har tittat på de ${n} misstänkta värdena och vill ändå kopiera.`,
     download: 'Ladda ned som fil',
@@ -399,6 +401,11 @@ export const sv = {
     literalNote: 'Matchas ordagrant, oavsett stora eller små bokstäver. Reguljära uttryck stöds inte.',
   },
   findings: {
+    selectAll: 'Markera alla',
+    choose: (rule: string, line: number) => `Välj ${rule} på rad ${line}`,
+    bindChosen: (count: number) => count === 1 ? 'Skapa binding för den valda' : `Skapa ${count} bindings`,
+    boundMany: (count: number) => `${count} bindings skapade. Värdena är utbytta mot platshållare.`,
+    boundManyUndo: (count: number) => `${count} bindings skapade från granskningsfynden.`,
     title: 'Misstänkta värden',
     dismissed: (rule: string) => `${rule} är avfärdad i det här projektet.`,
   },
@@ -440,6 +447,10 @@ export const sv = {
     clearNoUndo: 'Det finns ingen ångra. Exportera en backup först om du kan behöva något av det igen.',
     cleared: 'Valvet är rensat.',
     plaintextWarning: 'Båda filerna innehåller dina riktiga värden i klartext.',
+    neverExported: 'Valvet har aldrig exporterats. En fil är den enda vägen tillbaka om webbläsardata rensas.',
+    lastExport: (days: number) => days === 0 ? 'Senast exporterat i dag.'
+      : days === 1 ? 'Senast exporterat i går.'
+      : `Senast exporterat för ${days} dagar sedan.`,
     restore: 'Återställ',
     fileRejected: 'Filen kunde inte användas',
     replacedElsewhere: 'Valvet har bytts ut under den öppna sessionen. Ladda om innan du arbetar vidare.',

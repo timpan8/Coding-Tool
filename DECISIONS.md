@@ -140,3 +140,23 @@ platshållaren stod matchar ingen nivå, så rapporten löd "0 platshållare på
 helt tysta. `ingest` tar nu emot den gamla mallen och räknar vilka platshållare som inte kom hem.
 Ersättningen tillåts fortfarande: koden är användarens, och en varning som blockerar är en varning som
 kringgås. Knappen säger däremot vad den gör.
+
+**Entropiregeln viker för en regel som kan namnge värdet.** Den är reservregeln för värden ingenting
+kan sätta namn på. Ett GUID rapporterat som "slumpmässig sträng" får `<SECRET>` som AI-värde i stället
+för ett GUID, och en JWT kallades också slumpmässig sträng. Namnet är det användbara: mellan två regler
+som båda namnger värdet avgör allvarlighetsgraden fortfarande, och ingenting här blockerar en
+kopiering ändå.
+
+**Kategorin läses ur raden, inte ur markeringen ensam.** Flera regler handlar om tilldelningen och inte
+om värdet — `password = "…"` är det som gör `Hunter2!` till en hemlighet, medan `Hunter2!` för sig är
+ett ord med en siffra i. Bara fynd som täcker markeringen räknas, så en annan variabel på samma rad
+inte kan kategorisera den av misstag.
+
+**Klumpen från scannern öppnar ingen dialog.** Regeln har redan sagt vad värdet är och vad en AI får se
+i stället; det finns inget beslut kvar som dialogen skulle hämta. Att ångra tar bort bindingarna också,
+eftersom de skapades utan att någon fick se dem. Dialogen finns kvar för en i taget, där poängen är att
+titta på den.
+
+**Backuppåminnelsen tjatar inte.** Sidan säger hur gammal den senaste filen är och överlämnar
+bedömningen till den som vet vad som hänt sedan dess. Tidsstämpeln skrivs efter att filen lämnats över,
+så en misslyckad export inte nollställer den.

@@ -393,6 +393,62 @@ test('says which placeholders the code from the AI no longer has', async ({ page
   await expect(page.locator('.editor-body')).toContainText('{{HOST}}');
 });
 
+// Punkt 1. Ett fynd i taget betydde en dialog per fynd, och en fil som kommer in med ett dussin av
+// dem är precis när det är värst. Punkt 3: kategorin läses ur raden, inte ur markeringen ensam.
+test('binds a whole set of findings in one go', async ({ page }) => {
+  await type(page, '$password = "Hunter2!"\n$host = "sql01.corp.local"\n$mail = "anna@company.se"\n');
+  await expect(page.locator('.finding')).toHaveCount(3);
+
+  await page.getByLabel('Markera alla').check();
+  await page.getByRole('button', { name: 'Skapa 3 bindings' }).click();
+  await expect(page.locator('.findings-panel')).toHaveCount(0);
+  await expect(page.locator('.editor-body')).not.toContainText('Hunter2!');
+  await expect(page.locator('.editor-body')).not.toContainText('sql01.corp.local');
+  await expect(page.locator('.editor-body')).not.toContainText('anna@company.se');
+
+  // The password was categorised from the assignment on its line, not from the word Hunter2 alone,
+  // so its AI value masks rather than reading like a name.
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.locator('.editor-body')).toContainText('<PASSWORD>');
+
+  // Undo takes the bindings with it: they were made without anyone seeing them.
+  await page.locator('.undo-bar').getByRole('button', { name: 'Ångra', exact: true }).click();
+  await page.getByRole('tab', { name: 'Mall' }).click();
+  await expect(page.locator('.editor-body')).toContainText('Hunter2!');
+  await page.evaluate(() => (location.hash = '#/bindings'));
+  await expect(page.locator('.binding-card')).toHaveCount(0);
+});
+
+// Punkt 5 och 6. Copy Local skriver riktiga värden, och vilka beror på en väljare i ett annat hörn
+// av skärmen. Backupsidan sa ingenting om hur gammal den senaste filen är.
+test('names the profile it is about to copy and says how old the last backup is', async ({ page }) => {
+  await go(page, 'Backup', '.backup-panel');
+  await expect(page.locator('.backup-panel')).toContainText('aldrig exporterats');
+
+  await go(page, '＋ Ny kod', '.code-editor');
+  await type(page, '$host = "prod.example.test"\n');
+  await bind(page, 'prod', 'prod.internal', 'infrastructure');
+  await page.locator('.copy-actions').getByRole('button', { name: 'Copy Local' }).click();
+  await expect(page.locator('dialog[open]')).toContainText('Ingen profil är vald');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Avbryt' }).click();
+
+  await page.getByLabel('Aktiv profil').selectOption('__manage__');
+  await page.getByLabel('Ny profil').fill('Test');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Lägg till' }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Stäng', exact: true }).click();
+  await page.getByLabel('Aktiv profil').selectOption({ label: 'Test' });
+  await page.locator('.copy-actions').getByRole('button', { name: 'Copy Local' }).click();
+  await expect(page.locator('dialog[open]')).toContainText('profilen Test');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Avbryt' }).click();
+
+  await go(page, 'Backup', '.backup-panel');
+  await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Exportera hela valvet' }).click(),
+  ]);
+  await expect(page.locator('.backup-panel')).toContainText('Senast exporterat i dag');
+});
+
 // Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did
 // exist were native dialogs, two of which opened on top of an already open <dialog>.
 test('requires a typed confirmation before deleting a project', async ({ page }) => {
