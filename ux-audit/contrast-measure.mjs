@@ -4,7 +4,7 @@ const BASE='http://127.0.0.1:4173/';
 
 const MEASURE = () => {
   const px = s => { const m = /rgba?\(([^)]+)\)/.exec(s); if(!m) return null;
-    const p = m[1].split(/[ ,\/]+/).filter(Boolean).map(Number); return {r:p[0],g:p[1],b:p[2],a:p.length>3?p[3]:1}; };
+    const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return {r:p[0],g:p[1],b:p[2],a:p.length>3?p[3]:1}; };
   const over = (fg,bg) => ({ r: fg.r*fg.a + bg.r*(1-fg.a), g: fg.g*fg.a + bg.g*(1-fg.a), b: fg.b*fg.a + bg.b*(1-fg.a), a:1 });
   const lum = c => { const f = v => { v/=255; return v<=0.03928? v/12.92 : ((v+0.055)/1.055)**2.4; };
     return 0.2126*f(c.r)+0.7152*f(c.g)+0.0722*f(c.b); };

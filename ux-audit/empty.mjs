@@ -16,7 +16,7 @@ const r = await p.evaluate(()=>{
 });
 console.log(JSON.stringify(r,null,1));
 // try clicking it
-const before = await p.evaluate(()=>document.querySelectorAll('.view-line').length);
+const _before = await p.evaluate(()=>document.querySelectorAll('.view-line').length);
 try { await p.locator('.paste-prompt button').click({timeout:2500}); } catch(e){ console.log('CLICK FAILED:', String(e).split('\n')[0]); }
 await p.waitForTimeout(900);
 console.log('editor text after click:', JSON.stringify((await p.evaluate(()=>document.querySelector('.editor-body')?.innerText||'')).slice(0,90)));

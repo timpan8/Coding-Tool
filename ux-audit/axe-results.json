@@ -1,383 +1,383 @@
 [
- {
-  "label": "light / intro modal (first visit)",
-  "violations": [],
-  "incomplete": [],
-  "passes": 13
- },
- {
-  "label": "light / #/ empty workspace",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 9,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".paste-prompt > strong",
-      "summary": "Fix any of the following: Element's background color could not be determined because it's partially obscured by another element"
-     },
-     {
-      "target": ".paste-prompt > span",
-      "summary": "Fix any of the following: Element's background color could not be determined because it's partially obscured by another element"
-     },
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 27
- },
- {
-  "label": "light / #/settings",
-  "violations": [],
-  "incomplete": [],
-  "passes": 26
- },
- {
-  "label": "light / #/security",
-  "violations": [],
-  "incomplete": [],
-  "passes": 25
- },
- {
-  "label": "light / workspace with code + findings",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 7,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "button[aria-label=\"Mindre text\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "span[aria-live=\"polite\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 28
- },
- {
-  "label": "light / workspace view=Local",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 7,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "button[aria-label=\"Mindre text\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "span[aria-live=\"polite\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 27
- },
- {
-  "label": "light / workspace view=AI",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 7,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "button[aria-label=\"Mindre text\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "span[aria-live=\"polite\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 27
- },
- {
-  "label": "light / #/projects",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 1,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".search-wrap > span",
-      "summary": "Fix any of the following: Element content contains only non-text characters"
-     }
-    ]
-   }
-  ],
-  "passes": 24
- },
- {
-  "label": "light / #/bindings",
-  "violations": [],
-  "incomplete": [],
-  "passes": 24
- },
- {
-  "label": "light / #/project/:id",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 7,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "button[aria-label=\"Mindre text\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "span[aria-live=\"polite\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 28
- },
- {
-  "label": "light / shortcuts modal",
-  "violations": [],
-  "incomplete": [],
-  "passes": 15
- },
- {
-  "label": "light / binding dialog",
-  "violations": [],
-  "incomplete": [],
-  "passes": 17
- },
- {
-  "label": "dark / intro modal (first visit)",
-  "violations": [],
-  "incomplete": [],
-  "passes": 13
- },
- {
-  "label": "dark / #/ empty workspace",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 9,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".paste-prompt > strong",
-      "summary": "Fix any of the following: Element's background color could not be determined because it's partially obscured by another element"
-     },
-     {
-      "target": ".paste-prompt > span",
-      "summary": "Fix any of the following: Element's background color could not be determined because it's partially obscured by another element"
-     },
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 27
- },
- {
-  "label": "dark / #/settings",
-  "violations": [
-   {
-    "id": "color-contrast",
-    "impact": "serious",
-    "n": 1,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".danger",
-      "summary": "Fix any of the following: Element has insufficient color contrast of 4.28 (foreground color: #04140f, background color: #c05a3c, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-     }
-    ]
-   }
-  ],
-  "incomplete": [],
-  "passes": 26
- },
- {
-  "label": "dark / #/security",
-  "violations": [],
-  "incomplete": [],
-  "passes": 25
- },
- {
-  "label": "dark / workspace with code + findings",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 7,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "button[aria-label=\"Mindre text\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "span[aria-live=\"polite\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 28
- },
- {
-  "label": "dark / workspace view=Local",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 7,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "button[aria-label=\"Mindre text\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "span[aria-live=\"polite\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 27
- },
- {
-  "label": "dark / workspace view=AI",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 7,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "button[aria-label=\"Mindre text\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "span[aria-live=\"polite\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 27
- },
- {
-  "label": "dark / #/projects",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 1,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".search-wrap > span",
-      "summary": "Fix any of the following: Element content contains only non-text characters"
-     }
-    ]
-   }
-  ],
-  "passes": 24
- },
- {
-  "label": "dark / #/bindings",
-  "violations": [],
-  "incomplete": [],
-  "passes": 24
- },
- {
-  "label": "dark / #/project/:id",
-  "violations": [],
-  "incomplete": [
-   {
-    "id": "color-contrast",
-    "n": 7,
-    "help": "Elements must meet minimum color contrast ratio thresholds",
-    "nodes": [
-     {
-      "target": ".editor-footer > span:nth-child(1)",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "button[aria-label=\"Mindre text\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     },
-     {
-      "target": "span[aria-live=\"polite\"]",
-      "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
-     }
-    ]
-   }
-  ],
-  "passes": 28
- },
- {
-  "label": "dark / shortcuts modal",
-  "violations": [],
-  "incomplete": [],
-  "passes": 15
- },
- {
-  "label": "dark / binding dialog",
-  "violations": [],
-  "incomplete": [],
-  "passes": 17
- }
+  {
+    "label": "light / intro modal (first visit)",
+    "violations": [],
+    "incomplete": [],
+    "passes": 13
+  },
+  {
+    "label": "light / #/ empty workspace",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 9,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".paste-prompt > strong",
+            "summary": "Fix any of the following: Element's background color could not be determined because it's partially obscured by another element"
+          },
+          {
+            "target": ".paste-prompt > span",
+            "summary": "Fix any of the following: Element's background color could not be determined because it's partially obscured by another element"
+          },
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 27
+  },
+  {
+    "label": "light / #/settings",
+    "violations": [],
+    "incomplete": [],
+    "passes": 26
+  },
+  {
+    "label": "light / #/security",
+    "violations": [],
+    "incomplete": [],
+    "passes": 25
+  },
+  {
+    "label": "light / workspace with code + findings",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 7,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "button[aria-label=\"Mindre text\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "span[aria-live=\"polite\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 28
+  },
+  {
+    "label": "light / workspace view=Local",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 7,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "button[aria-label=\"Mindre text\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "span[aria-live=\"polite\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 27
+  },
+  {
+    "label": "light / workspace view=AI",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 7,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "button[aria-label=\"Mindre text\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "span[aria-live=\"polite\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 27
+  },
+  {
+    "label": "light / #/projects",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 1,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".search-wrap > span",
+            "summary": "Fix any of the following: Element content contains only non-text characters"
+          }
+        ]
+      }
+    ],
+    "passes": 24
+  },
+  {
+    "label": "light / #/bindings",
+    "violations": [],
+    "incomplete": [],
+    "passes": 24
+  },
+  {
+    "label": "light / #/project/:id",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 7,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "button[aria-label=\"Mindre text\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "span[aria-live=\"polite\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 28
+  },
+  {
+    "label": "light / shortcuts modal",
+    "violations": [],
+    "incomplete": [],
+    "passes": 15
+  },
+  {
+    "label": "light / binding dialog",
+    "violations": [],
+    "incomplete": [],
+    "passes": 17
+  },
+  {
+    "label": "dark / intro modal (first visit)",
+    "violations": [],
+    "incomplete": [],
+    "passes": 13
+  },
+  {
+    "label": "dark / #/ empty workspace",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 9,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".paste-prompt > strong",
+            "summary": "Fix any of the following: Element's background color could not be determined because it's partially obscured by another element"
+          },
+          {
+            "target": ".paste-prompt > span",
+            "summary": "Fix any of the following: Element's background color could not be determined because it's partially obscured by another element"
+          },
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 27
+  },
+  {
+    "label": "dark / #/settings",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "n": 1,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".danger",
+            "summary": "Fix any of the following: Element has insufficient color contrast of 4.28 (foreground color: #04140f, background color: #c05a3c, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+          }
+        ]
+      }
+    ],
+    "incomplete": [],
+    "passes": 26
+  },
+  {
+    "label": "dark / #/security",
+    "violations": [],
+    "incomplete": [],
+    "passes": 25
+  },
+  {
+    "label": "dark / workspace with code + findings",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 7,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "button[aria-label=\"Mindre text\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "span[aria-live=\"polite\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 28
+  },
+  {
+    "label": "dark / workspace view=Local",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 7,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "button[aria-label=\"Mindre text\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "span[aria-live=\"polite\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 27
+  },
+  {
+    "label": "dark / workspace view=AI",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 7,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "button[aria-label=\"Mindre text\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "span[aria-live=\"polite\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 27
+  },
+  {
+    "label": "dark / #/projects",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 1,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".search-wrap > span",
+            "summary": "Fix any of the following: Element content contains only non-text characters"
+          }
+        ]
+      }
+    ],
+    "passes": 24
+  },
+  {
+    "label": "dark / #/bindings",
+    "violations": [],
+    "incomplete": [],
+    "passes": 24
+  },
+  {
+    "label": "dark / #/project/:id",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "n": 7,
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          {
+            "target": ".editor-footer > span:nth-child(1)",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "button[aria-label=\"Mindre text\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          },
+          {
+            "target": "span[aria-live=\"polite\"]",
+            "summary": "Fix any of the following: Element's background color could not be determined because it is overlapped by another element"
+          }
+        ]
+      }
+    ],
+    "passes": 28
+  },
+  {
+    "label": "dark / shortcuts modal",
+    "violations": [],
+    "incomplete": [],
+    "passes": 15
+  },
+  {
+    "label": "dark / binding dialog",
+    "violations": [],
+    "incomplete": [],
+    "passes": 17
+  }
 ]

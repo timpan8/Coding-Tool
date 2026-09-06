@@ -6,7 +6,7 @@ const ctx=await b.newContext({viewport:{width:1440,height:900},permissions:['cli
 const page=await ctx.newPage();
 await page.goto(BASE,{waitUntil:'networkidle'});await page.waitForTimeout(1500);
 await page.locator('dialog[open] .dialog-head button').first().click();await page.waitForTimeout(400);
-for(const n of ['Deploy','Backup','Migrering']){
+for(const _n of ['Deploy','Backup','Migrering']){
  await page.goto(BASE+'#/');await page.waitForTimeout(700);
  await page.locator('.editor-body').click();await page.keyboard.insertText(S);await page.waitForTimeout(1500);
 }

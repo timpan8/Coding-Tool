@@ -6,7 +6,7 @@ $dbHost = "sql-prod-01.internal.example.com"
 $apiKey = "sk-live-4eC39HqLyjWDarjtT1zdp7dc"
 `;
 const M=()=>{
- const px=s=>{const m=/rgba?\(([^)]+)\)/.exec(s);if(!m)return null;const p=m[1].split(/[ ,\/]+/).filter(Boolean).map(Number);return{r:p[0],g:p[1],b:p[2],a:p.length>3?p[3]:1};};
+ const px=s=>{const m=/rgba?\(([^)]+)\)/.exec(s);if(!m)return null;const p=m[1].split(/[ ,/]+/).filter(Boolean).map(Number);return{r:p[0],g:p[1],b:p[2],a:p.length>3?p[3]:1};};
  const over=(f,b)=>({r:f.r*f.a+b.r*(1-f.a),g:f.g*f.a+b.g*(1-f.a),b:f.b*f.a+b.b*(1-f.a),a:1});
  const lum=c=>{const f=v=>{v/=255;return v<=0.03928?v/12.92:((v+0.055)/1.055)**2.4;};return .2126*f(c.r)+.7152*f(c.g)+.0722*f(c.b);};
  const ratio=(a,b)=>{const[x,y]=[lum(a),lum(b)].sort((p,q)=>q-p);return (x+.05)/(y+.05);};
@@ -61,7 +61,7 @@ for(const theme of ['light','dark']){
  console.log('  -- named classes --');
  const want=/binding-example|binding-value|eyebrow|muted|count|severity|tag|chip|pill|copy-blocked|finding-excerpt|save-state|view-banner|intro-step|kbd/;
  const shown=new Set();
- for(const [s,rows] of Object.entries(states))for(const r of rows){ if(!want.test(r.sel))continue; const k=r.sel+r.fg+r.bg; if(shown.has(k))continue; shown.add(k);
+ for(const [,rows] of Object.entries(states))for(const r of rows){ if(!want.test(r.sel))continue; const k=r.sel+r.fg+r.bg; if(shown.has(k))continue; shown.add(k);
    console.log(`   ${r.pass?'ok  ':'FAIL'} ${String(r.ratio).padStart(5)}:1 (need ${r.need}) ${r.size}px ${r.fg} on ${r.bg}  ${r.sel} "${r.text}"`); }
  await ctx.close();
 }

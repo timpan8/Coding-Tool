@@ -10,7 +10,7 @@ Granskad commit: `28e5eed` · körd mot produktionsförhandsvisningen på `http:
 ## Sammanfattning
 
 Appen är genomtänkt på de ställen där någon har suttit och tänkt: raderingsdialogen,
-ångra-mekanismen, tokeniseringen av färg, `useConfirm()`, kommentarerna som förklarar *varför*.
+ångra-mekanismen, tokeniseringen av färg, `useConfirm()`, kommentarerna som förklarar _varför_.
 Det som brister är sällan idéerna — det är att flera av dem inte når ända fram i det renderade
 gränssnittet.
 
@@ -78,6 +78,7 @@ Insats: **S** ≈ under en halvdag · **M** ≈ en till tre dagar · **L** ≈ m
 ### 0. Tvärs över appen — topbar, navigation, responsivitet
 
 #### F-0.1 · P0 · Hela dokumentet scrollar i sidled vid 768 px · **S**
+
 `src/ui/styles.css:328` (`.topbar` saknar `flex-wrap`), brytpunkter på `src/ui/code-first.css:262`
 och `:817` (750 px) samt `src/ui/styles.css:1124` (650 px).
 
@@ -97,6 +98,7 @@ bryts till tre rader).
 > i stället för vid en gissad pixelgräns.
 
 #### F-0.2 · P1 · Varumärkestexten skjuts 64 px åt höger mellan 751 och 900 px · **S**
+
 `src/ui/styles.css:1082-1087`.
 
 ```css
@@ -121,6 +123,7 @@ Skärm: `07-workspace-with-code--768.png` — glappet mellan `</>` och ordmärke
 > `.brand > span:last-child`, `.rail-label` och `.project-links` ur selektorlistan.
 
 #### F-0.3 · P1 · Vid 390 px är "Säkerhet" och "Inställningar" utanför skärmen utan att något visar det · **S**
+
 `src/ui/code-first.css:823-826` (`.top-navigation { overflow-x: auto }`).
 
 Uppmätt: nav-elementets `scrollWidth` 487 px mot `clientWidth` 358 px. "Säkerhet" (`right: 408`)
@@ -136,6 +139,7 @@ Skärm: `07-workspace-with-code--390.png` (raden slutar mitt i "Säke…").
 > så det ryms.
 
 #### F-0.4 · P1 · Ingen markering av aktuell sida — inte i navet, inte i fliktiteln · **S**
+
 `src/ui/App.tsx:532` (nav-knapparna), `index.html:16` (titeln).
 
 `grep -rn "aria-current" src/` ger en enda träff, och den sitter på filflikarna
@@ -152,6 +156,7 @@ no-op-sonderingen (`NO-CHANGE` för "Bindings" på `#/bindings` och "Inställnin
 > `<projektnamn> · AI Code Vault`.
 
 #### F-0.5 · P1 · "Alla projekt" finns inte i navigationen — enda vägen dit går genom en modal · **S**
+
 `src/ui/App.tsx:613` (enda `navigate('#/projects')` i hela UI:t), `src/ui/App.tsx:532` (navet).
 
 `#/projects` är den enda platsen med sortering, språkfilter, statusfilter och versions-/
@@ -164,6 +169,7 @@ mot lådan i stället för sidan (`src/ui/text.ts:51`).
 > snabbväxlaren till lådan.
 
 #### F-0.6 · P2 · Navet blandar fyra sorters saker och prioriterar fusklappen framför riktiga sidor · **S**
+
 `src/ui/App.tsx:532`.
 
 De sex knapparna är: en **åtgärd** som skapar nytt projekt (`#/`), en **överläggsöppnare**
@@ -176,18 +182,20 @@ använda på pekskärm (`29-shortcuts-modal--390.png`).
 > ?-hjälp som ikonknappar). Dölj hjälpknappen under 700 px.
 
 #### F-0.7 · P2 · Kortkommandofunktionen har fyra olika namn · **S**
+
 `src/ui/text.ts:24` ("Genvägar"), `:25` (aria-label "Visa kortkommandon"), `:166` (modaltitel
 "Kortkommandon"), `src/ui/shortcuts.ts:19` ("Visa genvägar").
 
 Användaren klickar "Genvägar" och möts av rubriken "Kortkommandon"
 (`29-shortcuts-modal--390.png`). Eftersom `aria-label` ersätter knapptexten helt ingår det synliga
 namnet inte i det tillgängliga namnet — röststyrning på "Genvägar" fungerar inte (WCAG 2.5.3
-*Label in Name*).
+_Label in Name_).
 
 > **Förslag:** ett ord på alla fyra ställen — "Kortkommandon" — och ta bort `aria-label` så den
 > synliga texten blir det tillgängliga namnet.
 
 #### F-0.8 · P2 · Svenska och engelska blandas inom samma kontrollgrupp · **S**
+
 `src/ui/text.ts:251-257`, `:203`, `:288`, `:219`/`:230` mot `:299`.
 
 Vyväxlaren heter "Mall" / "Local" / "AI"; åtgärderna bredvid heter "Klistra in från AI ↙",
@@ -199,6 +207,7 @@ bindingsidan (`text.ts:219`) och **Scope** i bindingdialogen (`text.ts:299`) —
 > till "Räckvidd". Se även FRÅGA Q-1 om ordet "bindings".
 
 #### F-0.9 · P2 · Notisremsan renderas överst i dokumentet och hamnar utanför bild · **S**
+
 `src/ui/App.tsx:535` (`.persistence-error`), `:536` (`.clipboard-countdown`), `:537`
 (`.inline-notice`).
 
@@ -215,6 +224,7 @@ urklippsrensningen — och den kan ligga helt utanför skärmen.
 > självstänga efter ~6 s; behåll `warn` tills den stängs.
 
 #### F-0.10 · P1 · Kallstart på en okänd route ger en helt tom sida · **M**
+
 `src/ui/App.tsx:108` (route sätts direkt från `location.hash`), `:169` (validering som bara körs i
 `navigate()`), `:181`.
 
@@ -230,6 +240,7 @@ Kallstart på ett raderat projekt-id är värre: felmodalen "Projektet finns int
 > `setLocation('#/', true)` **innan** felet visas, och visa inte felmodalen medan `intro` är öppen.
 
 #### F-0.11 · P1 · Det finns ingen väg tillbaka till pågående projekt från Bindings, Säkerhet eller Inställningar · **M**
+
 `src/ui/App.tsx:547` och `:599` (de enda två ställen som renderar "Tillbaka till pågående projekt").
 
 Från `#/settings` finns **noll** vägar tillbaka till det öppna projektet i `<main>` — verifierat
@@ -244,6 +255,7 @@ Ingen data går förlorad (`newCode()` gör `flush()` först), men kontexten gö
 > första knapp bära projektets namn, med "＋ Ny kod" som en separat, mindre framträdande knapp.
 
 #### F-0.12 · P2 · Två snabba tryck på bakåtknappen sväljs · **M**
+
 `src/ui/App.tsx:158-162`.
 
 `navigate()` avbryter tidigt när en skrivning pågår, återställer URL:en och varnar. Eftersom
@@ -256,6 +268,7 @@ tillstånd, inte användarens nästa handling.
 > ögonblick."
 
 #### F-0.13 · P1 · `busy` är helt osynligt — arbetsytan blir `inert` utan att något förändras · **S**
+
 `src/ui/App.tsx:144-150` (`run()`), `:543-544` (`aria-busy={busy}` / `inert={busy}`).
 
 Det finns ingen CSS-regel någonstans som reagerar på `[inert]` eller `aria-busy`. Verifierat genom
@@ -273,16 +286,18 @@ profil) slutar editorn och panelerna reagera medan de ser helt normala ut.
 ### 1. `#/` — Arbetsytan, tomt läge
 
 #### F-1.1 · P0 · Startskärmens enda hjälpande knapp går inte att klicka · **S**
+
 `src/ui/code-first.css:127-136` (`.paste-prompt { position: absolute; pointer-events: none }`),
 knappen renderas inuti den på `src/ui/App.tsx:570`.
 
 Mekaniskt verifierat, tre oberoende sätt:
+
 - knappens beräknade `pointer-events` är `none` (ärvd),
 - `document.elementFromPoint()` mitt på knappen returnerar Monacos `.view-lines`,
 - ett Playwright-klick timeoutar, och även ett **framtvingat** klick lämnar editorn tom
   (`textlängd = 0` före och efter).
 
-README:ns steg 1 lyder *"Klistra in kod, dra in en fil, eller välj den ofarliga exempelkoden."* —
+README:ns steg 1 lyder _"Klistra in kod, dra in en fil, eller välj den ofarliga exempelkoden."_ —
 det tredje alternativet är inte implementerat i praktiken. Knappen ärver dessutom `text-align:
 center` i ett 260 px brett grid-spår och hamnar ~55 px till höger om raderna ovanför, så den läses
 som en bildtext snarare än en knapp.
@@ -290,21 +305,28 @@ som en bildtext snarare än en knapp.
 Skärm: `02-workspace-empty--1440.png`, `30-sample-button-blocked--1440.png`.
 
 > **Förslag:**
+>
 > ```css
 > .paste-prompt button {
->   pointer-events: auto; justify-self: start; text-align: left;
->   margin-top: 10px; padding: 8px 13px;
->   border: 1px solid var(--accent-border); border-radius: 6px;
->   color: var(--accent-text); background: var(--accent-surface);
+>   pointer-events: auto;
+>   justify-self: start;
+>   text-align: left;
+>   margin-top: 10px;
+>   padding: 8px 13px;
+>   border: 1px solid var(--accent-border);
+>   border-radius: 6px;
+>   color: var(--accent-text);
+>   background: var(--accent-surface);
 > }
 > ```
 
 #### F-1.2 · P1 · Fem av fjorton knappar är inaktiverade på den allra första skärmen · **M**
+
 `src/ui/App.tsx:547` (Spara version), `components/EditorToolbar.tsx:41` (Klistra in från AI),
 `:45` (Copy Local), `:47` (Copy for AI), `components/BindingPanel.tsx:32` (＋ Ny).
 
-Uppmätt i tomt läge: 14 knappar i `<main>`, varav **5 inaktiverade** — *Spara version, Klistra in
-från AI ↙, Copy Local, Copy for AI ↗, ＋ Ny*. Av de 9 aktiva är tre vyflikar som visar tomhet, två
+Uppmätt i tomt läge: 14 knappar i `<main>`, varav **5 inaktiverade** — _Spara version, Klistra in
+från AI ↙, Copy Local, Copy for AI ↗, ＋ Ny_. Av de 9 aktiva är tre vyflikar som visar tomhet, två
 textstorleksknappar, en radbrytningsknapp, en filflik och en "lägg till fil". Den enda som faktiskt
 hjälper någon i gång är den som inte går att klicka (F-1.1).
 
@@ -318,6 +340,7 @@ Skärm: `02-workspace-empty--1440.png`, `02b-workspace-empty-full--390.png`.
 > Behåll språkväljaren.
 
 #### F-1.3 · P2 · Inget laddningstillstånd — inklistringsprompten visas ovanpå en Monaco som inte är redo · **M**
+
 `src/ui/App.tsx:228` (`saveStatus`), `:534` (`.save-state`), `:570` (`.paste-prompt`).
 
 Uppmätt tidslinje efter sidladdning: vid **t=213 ms** finns `.editor-body` och texten "Klistra in
@@ -334,6 +357,7 @@ skelett-, spinner- eller `role="progressbar"`-element vid varje mätpunkt: **0**
 ### 2. `#/project/:id` — Arbetsytan med öppet projekt
 
 #### F-2.1 · P0 · "AI — SANERAD" i solid accentgrön ovanför osanerad kod · **S**
+
 `src/ui/text.ts:72` (`bannerAi: '◇ AI — SANERAD'`), `src/ui/styles.css:608-611`
 (`.mode-ai .view-banner { background: var(--accent); color: var(--accent-fg) }`).
 
@@ -354,16 +378,17 @@ kontrolleras visuellt har redan gett godkänt.
 > `◇ AI — INGET ERSATT ÄNNU`.
 
 #### F-2.2 · P0 · Vyn har ingen primär handling, och den enda fyllda knappen är fel handling · **M**
+
 `src/ui/App.tsx:547` (`.heading-actions`), `src/ui/components/EditorToolbar.tsx:47`,
 `src/ui/styles.css:579-582` (`.copy-actions button`).
 
 Uppmätta värden i den körande appen vid 1440 px:
 
-| Kontroll | Storlek | Vikt | Yta |
-|---|---|---|---|
-| `Spara version` (`.primary`, fylld grön) | 14 px | 600 | 121×39 |
-| `Copy for AI ↗` (tonad konturknapp) | **11,2 px** | 600 | **90×31** |
-| Nav-etiketterna i topbaren | 12,8 px | 600 | 81×35 |
+| Kontroll                                 | Storlek     | Vikt | Yta       |
+| ---------------------------------------- | ----------- | ---- | --------- |
+| `Spara version` (`.primary`, fylld grön) | 14 px       | 600  | 121×39    |
+| `Copy for AI ↗` (tonad konturknapp)      | **11,2 px** | 600  | **90×31** |
+| Nav-etiketterna i topbaren               | 12,8 px     | 600  | 81×35     |
 
 Produktens hela existensberättigande — att få ut kod som är trygg att ge till en AI — är alltså den
 **minsta** kontrollen i sin egen vy, mindre än navigationsetiketterna. Bredvid den ligger
@@ -376,6 +401,7 @@ Skärm: `07-workspace-with-code--1440.png`.
 > "Om projektet" och "Radera projekt" in i projektdialogen.
 
 #### F-2.3 · P1 · Högerpanelens rubriknivåer är inverterade, och friskrivningen är sidans största brödtext · **S**
+
 `src/ui/styles.css:789-792` (`.panel-title h2` — bara `h2`), `src/ui/components/FindingsPanel.tsx:51`
 (renderar `<h3>`), `:54-56`, `src/ui/styles.css:799` (`.binding-panel > .muted`).
 
@@ -383,7 +409,7 @@ Skärm: `07-workspace-with-code--1440.png`.
 `h3 { font-size: 1rem }` (`styles.css:263`). Uppmätt: "Bindings" **13,6 px**, "Misstänkta värden"
 **16 px** — panel två har 18 % större rubrik än panel ett. Samma genomfall på brödtexten: `.muted`
 i `.findings-panel` träffas inte av `.binding-panel > .muted` och renderas på **16 px/400**, vilket
-gör friskrivningen *"Förslag, inte fynd. Ingen av dem blockerar kopiering…"* till den största
+gör friskrivningen _"Förslag, inte fynd. Ingen av dem blockerar kopiering…"_ till den största
 brödtexten på hela skärmen. Fyndrubrikerna beräknas dessutom till **vikt 900** (`<b>` = `bolder`
 inuti `button { font-weight: 600 }`), alltså tyngre än `h1`.
 
@@ -394,6 +420,7 @@ Skärm: `08-findings-panel--1440.png`.
 > `.finding-head b { font-weight: 600 }`.
 
 #### F-2.4 · P1 · Fem staplade paneler utan rangordning; hälften hamnar under viewporten · **M**
+
 `src/ui/App.tsx:588-595`, `src/ui/code-first.css:110-114` och `:144-147`.
 
 BindingPanel → IssuePanel → FindingsPanel → VersionPanel → `.m1-note` staplas i en 270 px-kolumn med
@@ -408,6 +435,7 @@ att något antyder det. Vid 390 px börjar "Misstänkta värden" först runt y�
 > standard, övriga hopfällda. Ge alla paneler samma rubriknivå.
 
 #### F-2.5 · P1 · "Ersätt mallen" skriver över hela utkastet utan bekräftelse och utan ångra · **S**
+
 `src/ui/App.tsx:651-654`, `src/ui/components/IngestDialog.tsx:74-76`.
 
 Verifierat: editorn gick från deploy-skriptet till helt annan kod på ett klick; ingen `UndoBar`
@@ -423,10 +451,11 @@ matchade.
 > "Ersätt ändå (0 värden återställda)".
 
 #### F-2.6 · P1 · Radera fil kastar osparad text utan ångra, och bekräftelsen lovar en väg tillbaka som ofta inte finns · **M**
+
 `src/ui/App.tsx:556-563`, texten i `src/ui/text.ts:137`.
 
 Verifierat: ny fil, text skriven, autospar inväntat, flik stängd → ingen UndoBar, ingen notis.
-Bekräftelsen påstår *"Sparade versioner behåller sin kopia, så den går att få tillbaka därifrån."*
+Bekräftelsen påstår _"Sparade versioner behåller sin kopia, så den går att få tillbaka därifrån."_
 — men det fanns aldrig någon sparad version. Påståendet är falskt i precis det fall där det spelar
 roll. Filradering är den enda destruktiva handlingen i arbetsytan utan `offerUndo`.
 
@@ -434,10 +463,11 @@ roll. Filradering är den enda destruktiva handlingen i arbetsytan utan `offerUn
 > till `offerUndo`. Visa raden om sparade versioner bara när filen faktiskt finns i en version.
 
 #### F-2.7 · P1 · "Ofarligt här" är permanent, obekräftat och utan väg tillbaka i UI:t · **M**
+
 `src/ui/App.tsx:288-295`, `src/ui/components/FindingsPanel.tsx:71-73`.
 
 Ett klick på en **68×21 px** knapp skriver en `ScanDismissal` till IndexedDB. Fyndet försvinner ur
-panelen *och ur kopieringsdialogen* (`App.tsx:220` filtrerar på `dismissed`) för alltid i det
+panelen _och ur kopieringsdialogen_ (`App.tsx:220` filtrerar på `dismissed`) för alltid i det
 projektet. Ingen bekräftelse, ingen ångra, och notisen som bekräftar det kan ligga utanför bild
 (F-0.9).
 
@@ -446,10 +476,11 @@ projektet. Ingen bekräftelse, ingen ångra, och notisen som bekräftar det kan 
 
 > **Förslag:** koppla in den befintliga ångra-mekanismen:
 > `offerUndo({ label: \`${finding.ruleName} avfärdad.\`, restore: () => storage.deleteDismissal(...) })`.
-> Lägg dessutom `<details>Avfärdade i det här projektet (N)</details>` längst ner i FindingsPanel
+Lägg dessutom `<details>Avfärdade i det här projektet (N)</details>` längst ner i FindingsPanel
 > med "Ta tillbaka" per rad.
 
 #### F-2.8 · P2 · På smal skärm försvinner både substitutionsmarkeringar och bindingnavigering · **M**
+
 `src/ui/editor/Editor.tsx:12` och `:29` (under 750 px används `PlainEditor`),
 `src/ui/editor/PlainEditor.tsx:11`.
 
@@ -459,9 +490,9 @@ projektet. Ingen bekräftelse, ingen ångra, och notisen som bekräftar det kan 
 
 Uppmätt konsekvens, samma projekt och samma binding:
 
-| | 390 px (textarea) | 1440 px (Monaco) |
-|---|---|---|
-| Markeringar i AI-vyn | **0** | 1 |
+|                                | 390 px (textarea)                              | 1440 px (Monaco)    |
+| ------------------------------ | ---------------------------------------------- | ------------------- |
+| Markeringar i AI-vyn           | **0**                                          | 1                   |
 | Klick på bindingnamn i panelen | markering oförändrad `[138,138]`, inget händer | hoppar till platsen |
 
 Alltså: på telefon kan man inte se vilka värden som ersatts — själva kvittot på att verktyget gjort
@@ -475,6 +506,7 @@ Textarea-valet i sig är väl motiverat i koden (`Editor.tsx:27-28`) och bör be
 > `focusLine` så att klick på ett bindingnamn åtminstone scrollar till rätt rad.
 
 #### F-2.9 · P2 · `.m1-note` — texten är produktionstext, inramningen är utvecklaranteckning · **S**
+
 `src/ui/App.tsx:595`, `src/ui/text.ts:168-169`, `src/ui/styles.css:877-887`.
 
 Innehållet är riktig produktionstext (den ligger i `text.ts` bland de andra svenska strängarna och
@@ -494,6 +526,7 @@ Skärm: `02-workspace-empty--1440.png`.
 ### 3. `#/projects` — Alla projekt
 
 #### F-3.1 · P1 · En tredjedel av korthöjden bär noll information · **M**
+
 `src/ui/components/ProjectsPage.tsx:140-141`, `:156`, `:160`, `src/ui/styles.css:442-448`,
 `:466-469`.
 
@@ -512,6 +545,7 @@ inte det som drar blicken.
 > "Inga versioner än" när båda är noll; rendera statustaggen bara när statusen inte är standard.
 
 #### F-3.2 · P2 · Filterraden visas innan det finns något att filtrera, och tomt resultat saknar väg vidare · **S**
+
 `src/ui/App.tsx:600` (`<ProjectFilters>` renderas villkorslöst), `:602`,
 `src/ui/code-first.css:208-212`.
 
@@ -524,6 +558,7 @@ tillbaka — ingen "Rensa sökning" bredvid "Inga projekt matchar sökningen"
 > rubrik, en mening och **en** knapp: "＋ Ny kod" när valvet är tomt, "Rensa sökning" vid no-match.
 
 #### F-3.3 · P2 · Sökningen i projektlådan kastas bort på vägen till "Alla projekt" · **S**
+
 `src/ui/App.tsx:110` (två oberoende söktillstånd), `:600` och `:613`.
 
 Verifierat: sökte "MITT" i lådan (1 träff), klickade "Visa alla projekt →", och sidans sökfält var
@@ -536,6 +571,7 @@ tomt. Användaren har just sagt vad hon letar efter och får börja om.
 ### 4. `#/bindings`
 
 #### F-4.1 · P2 · Redigera och radera har samma visuella vikt i tabellen · **S**
+
 `src/ui/components/BindingsPage.tsx` (åtgärdskolumnen), `src/ui/styles.css:853` (`.text-button`).
 
 "Redigera DB_HOST" och "Radera DB_HOST" renderas som två likadana textknappar bredvid varandra,
@@ -546,27 +582,29 @@ oskyldig och en destruktiv handling.
 > **Förslag:** flytta radera till slutet av raden med ett tydligt avstånd, eller bakom en
 > `<details>`-meny per rad. Behåll bekräftelsen.
 
-*(För övrigt är den här vyn den mest välfungerande i appen: riktig tabell med `<th>`, förklarande
-ledtext, och kolumnen "Används i" som svarar på den fråga sidan finns för.)*
+_(För övrigt är den här vyn den mest välfungerande i appen: riktig tabell med `<th>`, förklarande
+ledtext, och kolumnen "Används i" som svarar på den fråga sidan finns för.)_
 
 ---
 
 ### 5. `#/settings`
 
 #### F-5.1 · P1 · "Spara inställningar" sparar bara ett av sju fält · **S**
+
 `src/ui/components/SettingsPage.tsx:87`, etiketten i `src/ui/text.ts:209`.
 
 Knappen heter **"Spara inställningar"** men anropar `save({ deviceName })` — enbart enhetsnamnet.
 Allt annat på sidan sparar direkt när det ändras: kryssrutan (`SettingsPage.tsx:63-64`),
 textrutan (`:69-70`, på `onBlur`) och urklippsväljaren (`:75-76`).
 
-Följden är omvänd mot vad etiketten lovar: den som ändrar urklippstiden och *inte* trycker Spara är
+Följden är omvänd mot vad etiketten lovar: den som ändrar urklippstiden och _inte_ trycker Spara är
 räddad, medan den som skriver ett enhetsnamn och navigerar bort tappar det.
 
 > **Förslag:** byt etiketten till "Spara enhetsnamn" och flytta knappen intill fältet — eller låt
 > fältet spara på `onBlur` som textrutan bredvid och ta bort knappen helt.
 
 #### F-5.2 · P2 · Tre fyllda knappar och tre gula varningsrutor på samma sida · **M**
+
 `src/ui/components/SettingsPage.tsx:87`, `src/ui/components/BackupPanel.tsx:121` och `:169`.
 
 Uppmätt: två `.primary` ("Spara inställningar", "Exportera hela valvet") och en `.danger`
@@ -579,14 +617,15 @@ gör att varje hjälptext inuti en `<label>` renderas **fetare** än fältetiket
 Skärm: `04b-settings-full--1440.png`.
 
 > **Förslag:** `label small { display: block; margin-top: 4px; font-weight: 400; color:
-> var(--text-muted) }`. Högst en `.primary` per sektion — gör båda exportknapparna till
+var(--text-muted) }`. Högst en `.primary` per sektion — gör båda exportknapparna till
 > konturknappar och behåll `.danger` på Rensa.
 
 #### F-5.3 · P1 · Import kan skriva över poster utan bekräftelse, bakom en knapp som säger "Slå ihop" · **M**
+
 `src/ui/components/BackupPanel.tsx:194-198` (valet), `:71-74` (tillämpningen), `:203-205` (knappen).
 
 Verifierat: en exportfil redigerades så att samma projekt-id fick nytt namn och nyare tidsstämpel.
-Planen visade "0 nya, 2 krockar, 0 redan identiska" med alternativen *duplicate / keep / replace*.
+Planen visade "0 nya, 2 krockar, 0 redan identiska" med alternativen _duplicate / keep / replace_.
 Med **replace** valt och knappen **"Slå ihop med valvet"** tryckt: ingen extra bekräftelse, resultat
 "0 tillagda · **2 ersatta** · 0 som kopior · 0 orörda", ingen UndoBar. Två poster överskrivna
 oåterkalleligt med ett klick, under en knapp som lovar sammanslagning.
@@ -603,14 +642,15 @@ Jämför "Rensa hela valvet" på samma sida, som kräver att man skriver `RENSA`
 ### 6. `#/security`
 
 #### F-6.1 · P1 · Dokumentet har toppnivåplats, kontrollerna är begravda · **M**
+
 `src/ui/pages/Security.tsx` (12 rader ren brödtext, noll kontroller och noll länkar),
 `src/ui/App.tsx:607-610`.
 
 `#/security` har samma nav-vikt som "Inställningar" men innehåller inget att göra. Samtidigt ligger
 alla faktiska säkerhetsåtgärder på `#/settings`: granskningsreglerna
 (`components/RulesPanel.tsx:53`), backup/export (`components/BackupPanel.tsx:120`), återställ
-(`:133`) och "Rensa hela valvet" (`:164`). Säkerhetssidan säger till och med *"Exportera valvet från
-inställningarna"* (`Security.tsx:10`) utan att länka dit.
+(`:133`) och "Rensa hela valvet" (`:164`). Säkerhetssidan säger till och med _"Exportera valvet från
+inställningarna"_ (`Security.tsx:10`) utan att länka dit.
 
 > **Förslag:** flytta "Granskningsregler" och "Backup / Återställ / Rensa" till `#/security` under
 > egna rubriker, så sidan blir "Säkerhet och data" med både förklaring och reglage. Låt
@@ -621,6 +661,7 @@ inställningarna"* (`Security.tsx:10`) utan att länka dit.
 ### 7. Dialoger och överlägg
 
 #### F-7.1 · P1 · Granskningsdialogen öppnas redan nedscrollad förbi sin egen varning · **S**
+
 `src/ui/components/Modal.tsx:10-12`, `src/ui/components/CopyDialog.tsx:79-82`,
 `src/ui/styles.css:967-968`.
 
@@ -637,12 +678,13 @@ kryssrutan "Jag har tittat på de N misstänkta värdena" — inte värdena.
 > efter `showModal()`. Gör bekräftelserutan och `.dialog-actions` `position: sticky; bottom: 0`.
 
 #### F-7.2 · P1 · Enter i kopieringsdialogen stänger den tyst — omöjligt att skilja från lyckad kopiering · **S**
+
 `src/ui/components/Modal.tsx:10` och `:15`.
 
 När AI-dialogen saknar bekräftelseruta (inga critical/high-fynd, `CopyDialog.tsx:70`) finns inget
 `input` alls, så fokus hamnar på `×` i dialoghuvudet och Enter stänger dialogen. Verifierat: efter
 Enter är `dialogStillOpen: 0`, `notice: null`, `clipboard: ""` — ingenting kopierades och ingenting
-sades. Eftersom en *lyckad* kopiering bara ger notisremsan (som kan ligga utanför bild, F-0.9) ser
+sades. Eftersom en _lyckad_ kopiering bara ger notisremsan (som kan ligga utanför bild, F-0.9) ser
 utfallen likadana ut. Med critical-fynd gör Enter i stället ingenting alls — beteendet är alltså
 också inkonsekvent.
 
@@ -650,6 +692,7 @@ också inkonsekvent.
 > alltid en notis när dialogen stängs utan kopiering.
 
 #### F-7.3 · P1 · Rubriken räknar två, listan visar fem · **S**
+
 `src/ui/components/CopyDialog.tsx:9-17` (rubriken använder `serious.length`), `:27-36` (listan
 renderar alla `findings`), `:81` (kryssrutan använder `seriousFindings`).
 
@@ -662,6 +705,7 @@ dela motsäger dialogen sig själv.
 > separat: "5 misstänkta värden hittades, varav 2 allvarliga".
 
 #### F-7.4 · P2 · Två orubricerade punktlistor — den ena maskad, den andra i klartext · **S**
+
 `src/ui/components/CopyDialog.tsx:27-36` och `:37-44`.
 
 Första listan visar `sq••••••••••••om` och `sk••••••••••••dc`. Andra listan visar samma sorts värden
@@ -678,6 +722,7 @@ Skärm: `10-copy-dialog-ai--1440.png`.
 > "Visa"-knapp.
 
 #### F-7.5 · P2 · BindingDialog validerar först vid submit, och felet står kvar när det är åtgärdat · **M**
+
 `src/ui/components/BindingDialog.tsx:19-25` (`submit`), `:28` (namnfältet), `:44` (felraden), `:45`
 (knappen, `disabled={busy}` — aldrig på grund av valideringsfel).
 
@@ -694,6 +739,7 @@ Se `35-long-strings--1440.png`: felraden "Namn måste vara 2–64 tecken…" st�
 > första ogiltiga fält vid submit.
 
 #### F-7.6 · P2 · Radera profil saknar ångra och utlöses av ett omärkt `×` · **S**
+
 `src/ui/App.tsx:662-668`, `src/ui/components/ProfilePicker.tsx:80`.
 
 Raderingen bekräftas ("N bindings har ett eget värde för den här profilen. De värdena raderas") men
@@ -705,6 +751,7 @@ tecken som betyder "stäng" i dialoghuvudet och i notisremsan.
 > till `offerUndo`. Byt `×` mot en textknapp "Ta bort" med `danger-text`.
 
 #### F-7.7 · P2 · Profilhanteraren göms som ett alternativ inuti en `<select>` · **S**
+
 `src/ui/components/ProfilePicker.tsx:23`.
 
 ```js
@@ -718,12 +765,13 @@ alternativ bland profilerna.
 > **Förslag:** flytta "Hantera profiler…" till en egen liten knapp bredvid väljaren.
 
 #### F-7.8 · P2 · Kortkommandon utlöses medan markören står i ett textfält, och Ctrl+S är en tyst nullhandling · **S**
+
 `src/ui/App.tsx:518-526` — `typing` beräknas på rad 520 men används bara på rad 521 (`help`).
 
 `projects`, `copyAi`, `copyLocal` och `save` kör `e.preventDefault()` villkorslöst. Verifierat: med
 markören i enhetsnamnfältet på Inställningar gav `Ctrl+Enter` notisen "Öppna en fil först…" och
 `Ctrl+P` öppnade projektlådan medan webbläsarens utskriftsdialog blockerades. `Ctrl+S` på tom
-arbetsyta utan projekt ger **ingenting alls** — `preventDefault()` körs på rad 525 *före*
+arbetsyta utan projekt ger **ingenting alls** — `preventDefault()` körs på rad 525 _före_
 `if (project && template.trim())`, så webbläsarens spara-dialog blockeras och ingen ersättning ges.
 
 Besläktat: i `ConfirmDialog` gör Enter i RADERA-fältet ingenting (`ConfirmDialog.tsx:51-58`), trots
@@ -735,6 +783,7 @@ att versionsetikett, profilnamn och projektnamn alla submittar på Enter.
 > `ready`.
 
 #### F-7.9 · P2 · Projektlådan klistrar sig mot vänsterkanten · **S**
+
 `src/ui/code-first.css:214-224` (`right: 24px`).
 
 Lådan renderas uppmätt på `x=0` — webbläsarens `dialog { left: 0 }` vinner när bredd och `margin: 0`
@@ -756,8 +805,8 @@ inställningarna med alla `<details>` öppna — i **både ljust och mörkt tema
 
 **Överträdelser: 1 regel, 1 nod.**
 
-| Regel | Impact | Var | Detalj |
-|---|---|---|---|
+| Regel            | Impact  | Var                          | Detalj                                                                                                     |
+| ---------------- | ------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `color-contrast` | serious | **mörkt tema**, `#/settings` | `button.danger` ("Rensa hela valvet"): `#04140f` på `#c05a3c` = **4,28:1**, 14 px normal vikt. Krav 4,5:1. |
 
 Noll överträdelser av `aria-*`, `button-name`, `label`, `link-name`, `landmark-*`, `heading-order`,
@@ -774,6 +823,7 @@ utanför vad axe mäter.** Det starkaste enskilda tillskottet vore att köra den
 i mörkt tema och vid 390 px.
 
 ### A.1 · P0 · `?` öppnar genvägsmodalen mitt i koden, och tecknet försvinner · **S**
+
 `src/ui/App.tsx:520` (`typing` testar bara `/^(INPUT|TEXTAREA)$/`), `:521`,
 `src/ui/shortcuts.ts:19` och `:48`.
 
@@ -797,15 +847,21 @@ För skärmläsaranvändare är det värre: NVDA/JAWS i fokusläge skickar vidar
 till en modal.
 
 > **Förslag:** utöka vakten till redigerbara ytor, inte bara taggnamn:
+>
 > ```ts
 > const el = e.target instanceof HTMLElement ? e.target : null;
-> const typing = !!el && (/^(INPUT|TEXTAREA)$/.test(el.tagName) || el.isContentEditable
->   || !!el.closest('.monaco-editor, [role="textbox"], .plain-editor'));
+> const typing =
+>   !!el &&
+>   (/^(INPUT|TEXTAREA)$/.test(el.tagName) ||
+>     el.isContentEditable ||
+>     !!el.closest('.monaco-editor, [role="textbox"], .plain-editor'));
 > ```
+>
 > Ta helst bort `'?'` ur `shortcuts.ts:19` helt och behåll `Ctrl+/`. Enteckensgenvägen ger inget som
 > `Ctrl+/` inte redan ger, och SC 2.1.4 kräver annars en av/på-inställning.
 
 ### A.2 · P0 · Monaco är en tangentbordsfälla — Tab tar sig aldrig ut och skriver in indrag · **S**
+
 `src/ui/editor/CodeEditor.tsx:80-85` (`monaco.editor.create(...)`, ingen `tabFocusMode`).
 
 Verifierat av mig: klick i koden, sedan tre Tab i rad.
@@ -829,17 +885,18 @@ Suspense-fallback) har ingen fälla — Tab går vidare korrekt.
 > ingen av dem, så utvägen är osynlig.
 
 ### A.3 · P1 · Fokus återförs aldrig när en dialog stängs · **S**
+
 `src/ui/components/Modal.tsx:5-13`, samma mönster i `src/ui/components/ProjectBrowser.tsx:13`.
 
 `Modal` öppnar med `showModal()` men anropar aldrig `close()` — React avmonterar `<dialog>` i
 stället. Webbläsarens automatiska fokusåterställning hänger på `close()`, så fokus hamnar på
 `<body>`.
 
-| Dialog | Fokus före | Fokus efter Escape |
-|---|---|---|
-| Kortkommandon | `button "Visa kortkommandon"` | `body` |
-| Projektlådan | `button "Mina projekt"` | `body` |
-| Copy for AI | `button.ai-copy` | `body` |
+| Dialog        | Fokus före                    | Fokus efter Escape |
+| ------------- | ----------------------------- | ------------------ |
+| Kortkommandon | `button "Visa kortkommandon"` | `body`             |
+| Projektlådan  | `button "Mina projekt"`       | `body`             |
+| Copy for AI   | `button.ai-copy`              | `body`             |
 
 Den som stänger kopieringsdialogen måste tabba genom 32 stopp för att komma tillbaka till knappen
 hen tryckte på. **WCAG 2.4.3 Focus Order.**
@@ -849,12 +906,18 @@ fungerar i Chrome tack vare "sequential focus navigation starting point", men i 
 flyttas fokus inte alls.
 
 > **Förslag:** spara `document.activeElement` före `showModal()` och återställ i effektens cleanup:
+>
 > ```ts
-> return () => { dialog?.close(); opener?.focus?.(); };
+> return () => {
+>   dialog?.close();
+>   opener?.focus?.();
+> };
 > ```
+>
 > Samma tillägg i `ProjectBrowser`. Lägg `tabIndex={-1}` på `<main>`.
 
 ### A.4 · P1 · `inert` under busy kastar bort fokus och lämnar det på `<body>` · **S**
+
 `src/ui/App.tsx:544` (`inert={busy}`), `busy` sätts i `run()` på `:145-149`. Se även F-0.13.
 
 Uppmätt: fokusera `＋` (Lägg till fil) och tryck Enter.
@@ -875,6 +938,7 @@ gäller varje `run()`-inpackad åtgärd i arbetsytan. **WCAG 2.4.3.**
 > `finally`, via `requestAnimationFrame` så att `inert` hunnit tas bort.
 
 ### A.5 · P1 · Fokusmarkeringen saknas helt i editorn på mobil, och når inte 3:1 i ljust tema · **S**
+
 `src/ui/code-first.css:813-815` (`.plain-editor:focus { outline: 0 }`), `src/ui/styles.css:208-213`,
 `--focus-ring` på `:20` (ljust) och `:85`/`:138` (mörkt).
 
@@ -885,14 +949,14 @@ laddas. **WCAG 2.4.7 Focus Visible.**
 
 **Del B — för låg kontrast på ringen.**
 
-| Tema | Ring mot | Uppmätt | Krav |
-|---|---|---|---|
-| Ljust | `--bg #f3f6f9` | **2,08:1** | 3:1 |
-| Ljust | `--surface #ffffff` (topbar, kort, dialoger) | **2,26:1** | 3:1 |
-| Ljust | `--surface-sunken #f0f4f7` (flikremsan) | **2,04:1** | 3:1 |
-| Mörkt | `--bg #0e1a24` | 9,17:1 | ok |
-| Mörkt | `--accent #1c9078` (primärknapp) | **2,06:1** | 3:1 |
-| Mörkt | `--danger #c05a3c` | **2,29:1** | 3:1 |
+| Tema  | Ring mot                                     | Uppmätt    | Krav |
+| ----- | -------------------------------------------- | ---------- | ---- |
+| Ljust | `--bg #f3f6f9`                               | **2,08:1** | 3:1  |
+| Ljust | `--surface #ffffff` (topbar, kort, dialoger) | **2,26:1** | 3:1  |
+| Ljust | `--surface-sunken #f0f4f7` (flikremsan)      | **2,04:1** | 3:1  |
+| Mörkt | `--bg #0e1a24`                               | 9,17:1     | ok   |
+| Mörkt | `--accent #1c9078` (primärknapp)             | **2,06:1** | 3:1  |
+| Mörkt | `--danger #c05a3c`                           | **2,29:1** | 3:1  |
 
 `outline-offset: 2px` gör att ringen till största delen ligger på den omgivande ytan, så ljust tema
 faller på i stort sett varje kontroll. **WCAG 1.4.11 Non-text Contrast.**
@@ -900,22 +964,28 @@ faller på i stort sett varje kontroll. **WCAG 1.4.11 Non-text Contrast.**
 > **Förslag:** ge `--focus-ring` ett mörkare värde i ljust tema, t.ex. `#0b6f92` (5,15:1 mot `--bg`,
 > 5,61:1 mot `--surface`, 3,1:1 mot `--accent`). Lägg till en mellanrand så ringen får kontrast åt
 > båda håll även på fyllda knappar:
+>
 > ```css
-> button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+> button:focus-visible,
+> a:focus-visible,
+> input:focus-visible,
+> select:focus-visible {
 >   outline: 3px solid var(--focus-ring);
 >   outline-offset: 2px;
 >   box-shadow: 0 0 0 2px var(--surface);
 > }
 > ```
+>
 > Ta bort `outline: 0` på `code-first.css:813-815`.
 
 ### A.6 · P1 · Vald vy-flik syns knappt: 1,11:1 · **S**
+
 `src/ui/styles.css:556-574`, markup i `src/ui/components/EditorToolbar.tsx:35-38`.
 
-| | Ljust | Mörkt |
-|---|---|---|
+|                             | Ljust                               | Mörkt                               |
+| --------------------------- | ----------------------------------- | ----------------------------------- |
 | Vald flik bakgrund vs ovald | `#ffffff` vs `#f0f4f7` = **1,11:1** | `#16242f` vs `#111d27` = **1,08:1** |
-| Vald text vs ovald text | 1,29:1 | 1,19:1 |
+| Vald text vs ovald text     | 1,29:1                              | 1,19:1                              |
 
 Tillståndet bärs alltså av en ~1,1:1 bakgrundsskillnad och en nästan osynlig skugga. **WCAG 1.4.11**
 kräver 3:1 för det som identifierar en komponents tillstånd.
@@ -930,6 +1000,7 @@ banderollen påstår.
 > `border-bottom: 2px solid var(--accent)` (5,97:1 ljust, 4,16:1 mörkt).
 
 ### A.7 · P1 · `role="alert"` på IssuePanel läser om hela panelen vid varje tangenttryck · **S**
+
 `src/ui/components/IssuePanel.tsx:43`.
 
 Uppmätt med två blockerande problem i koden:
@@ -943,27 +1014,32 @@ avbryter skärmläsaren och läser om hela panelen. Nio gånger på nio tecken. 
 att redigera kod med skärmläsare medan panelen är öppen. **WCAG 4.1.3 Status Messages.**
 
 > **Förslag:** ta bort `role="alert"` och gör panelen till en `<section aria-labelledby>`. Låt bara
-> *antalet* vara det annonserade, artigt och avgränsat:
+> _antalet_ vara det annonserade, artigt och avgränsat:
+>
 > ```tsx
-> <h3 id="issue-heading"><span role="status">{issues.length} problem hindrar kopiering</span></h3>
+> <h3 id="issue-heading">
+>   <span role="status">{issues.length} problem hindrar kopiering</span>
+> </h3>
 > ```
+>
 > Samma resonemang gäller `.clipboard-countdown` (`App.tsx:536`), som med `role="status"` skulle
 > annonsera en gång per sekund om urklippsrensningen slås på — ge nedräkningen `aria-live="off"` och
 > behåll bara Avbryt-knappen tillgänglig.
 
 ### A.8 · P1 · Fältens och knapparnas gränser når inte 3:1 i något tema · **M**
+
 `src/ui/styles.css:190-194`, `:228-236`, tokens på `:17-19` / `:82-84` / `:135-137`.
 
-| Gräns | Mot | Ljust | Mörkt |
-|---|---|---|---|
+| Gräns                            | Mot         | Ljust      | Mörkt      |
+| -------------------------------- | ----------- | ---------- | ---------- |
 | `--border-strong` (input/select) | `--surface` | **1,52:1** | **1,94:1** |
-| `--border-strong` | `--bg` | **1,40:1** | **2,16:1** |
-| `--border` (knapp) | `--bg` | **1,20:1** | **1,59:1** |
-| `--border` (knapp) | `--surface` | **1,30:1** | **1,43:1** |
-| `--accent-border` | `--surface` | **1,43:1** | **1,77:1** |
+| `--border-strong`                | `--bg`      | **1,40:1** | **2,16:1** |
+| `--border` (knapp)               | `--bg`      | **1,20:1** | **1,59:1** |
+| `--border` (knapp)               | `--surface` | **1,30:1** | **1,43:1** |
+| `--accent-border`                | `--surface` | **1,43:1** | **1,77:1** |
 
 Knapparna har `background: var(--surface)` på `--bg` = 1,09:1, så ramen är i praktiken det enda som
-säger var knappen slutar. Textfälten ligger på kortens `--surface` — där är ramen det *enda* som
+säger var knappen slutar. Textfälten ligger på kortens `--surface` — där är ramen det _enda_ som
 identifierar fältet. **WCAG 1.4.11.**
 
 > **Förslag:** höj `--border-strong` (används bara till fältgränser) till `#74869a` i ljust
@@ -973,29 +1049,34 @@ identifierar fältet. **WCAG 1.4.11.**
 > `surface`/`bg`, så gränsen inte kan glida tillbaka.
 
 ### A.9 · P1 · Platshållartext är webbläsarens grå: 3,43:1 i mörkt tema · **S**
+
 Ingen `::placeholder`-regel finns någonstans (`grep -n placeholder src/ui/*.css` → tomt). Fälten
 definieras i `src/ui/styles.css:228-236`.
 
 Chrome använder sin standardfärg `#757575` i båda teman eftersom fälten har uttrycklig
 `background`/`color` men ingen `::placeholder`-regel:
 
-| | Ljust | Mörkt |
-|---|---|---|
+|                            | Ljust                           | Mörkt                               |
+| -------------------------- | ------------------------------- | ----------------------------------- |
 | Sökfält, alla placeholders | `#757575` på `#ffffff` = 4,61:1 | `#757575` på `#16242f` = **3,43:1** |
 
 Ljust ligger 0,11 över gränsen — inte fel, men utan marginal. Axe missar detta helt (den läser inte
 pseudoelementets färg). **WCAG 1.4.3.**
 
 > **Förslag:**
+>
 > ```css
-> input::placeholder, textarea::placeholder {
->   color: var(--text-muted);  /* 6,18:1 ljust, 7,49:1 mörkt */
->   opacity: 1;                /* Firefox lägger annars 0.54 ovanpå */
+> input::placeholder,
+> textarea::placeholder {
+>   color: var(--text-muted); /* 6,18:1 ljust, 7,49:1 mörkt */
+>   opacity: 1; /* Firefox lägger annars 0.54 ovanpå */
 > }
 > ```
+>
 > `--text-muted` täcks redan av `contrast.test.ts:22-23`, så det låser sig självt.
 
 ### A.10 · P1 · `button.danger` i mörkt tema: 4,28:1 — den enda axe-överträdelsen · **S**
+
 `src/ui/styles.css:223-227`, tokens `--danger: #c05a3c` (`:106`, `:159`) och `--accent-fg: #04140f`
 (`:95`, `:148`).
 
@@ -1008,18 +1089,21 @@ tillstånd.
 
 > **Förslag:** ljusa upp `--danger` i mörkt tema till `#cd6244` (`#04140f` på den = **4,87:1**) och
 > behåll `--danger-strong #d06a49` som hover. Lägg till paren i testet:
+>
 > ```ts
 > ['accent-fg', 'danger', AA_TEXT],
 > ['accent-fg', 'danger-strong', AA_TEXT],
 > ```
 
 ### A.11 · P1 · Projektkorten: `<h3>` och `<p>` inuti `<button>`, och ett 60+ teckens namn · **M**
+
 `src/ui/components/ProjectsPage.tsx:138` (`<button className="project-card">`) och `:143` (`<h3>`).
 
 Tillgängligt namn på ett kort:
 `"{ }powershellNamnlöst projekt1 fil0 versioner0 bindingsExperiment2026-09-06 11:13Pågående →"`.
 
 Tre problem i samma element:
+
 1. **Rubriknivåhopp h1 → h3** utan mellanliggande h2 (**WCAG 1.3.1**). Axes `heading-order` fångade
    det inte, eftersom rubrikerna sitter inuti knappar och därmed inte alltid exponeras som rubriker.
 2. **`<button>` får bara innehålla frasinnehåll.** `<h3>`, `<p>` och `<div>` inuti är ogiltig HTML,
@@ -1030,21 +1114,28 @@ Tre problem i samma element:
 Se F-3.1 — den visuella och den tillgänglighetsmässiga åtgärden är samma ombyggnad.
 
 > **Förslag:** vänd på strukturen — `<article className="project-card">` med länken i rubriken:
+>
 > ```tsx
-> <h2><button className="project-open" onClick={open}>{project.name}</button></h2>
+> <h2>
+>   <button className="project-open" onClick={open}>
+>     {project.name}
+>   </button>
+> </h2>
 > ```
+>
 > och `.project-open::after { content: ''; position: absolute; inset: 0 }` så att hela kortet
 > fortfarande är klickbart (`.project-card` behöver `position: relative`, `styles.css:422`). Då blir
 > namnet knappens hela tillgängliga namn och rubriknivån blir h1 → h2.
 
 ### A.12 · P1 · Routebyte är osynligt för hjälpmedel, och fokus tappas · **M**
+
 `src/ui/App.tsx:532`, `src/ui/code-first.css:29-37`, `src/ui/App.tsx:543`. Se även F-0.4.
 
-| Klick i huvudnavigationen | Fokus efteråt | `document.title` |
-|---|---|---|
-| "Bindings" (`disabled={busy}`) | **`body`** | `AI Code Vault` |
-| "Inställningar" | `button "Inställningar"` | `AI Code Vault` |
-| "＋ Ny kod" (`disabled={busy}`) | `div.native-edit-context` | `AI Code Vault` |
+| Klick i huvudnavigationen       | Fokus efteråt             | `document.title` |
+| ------------------------------- | ------------------------- | ---------------- |
+| "Bindings" (`disabled={busy}`)  | **`body`**                | `AI Code Vault`  |
+| "Inställningar"                 | `button "Inställningar"`  | `AI Code Vault`  |
+| "＋ Ny kod" (`disabled={busy}`) | `div.native-edit-context` | `AI Code Vault`  |
 
 Tre följder: (a) en skärmläsaranvändare kan inte ta reda på vilken vy hen är i annat än genom att
 leta upp `h1`; (b) `document.title` skiljer inte routerna åt, vilket bryter **WCAG 2.4.2 Page Titled
@@ -1054,12 +1145,13 @@ som A.4.
 
 > **Förslag:** `aria-current="page"` plus en `.active`-klass på den matchande nav-knappen
 > (`.top-navigation button[aria-current="page"] { background: var(--accent-surface); color:
-> var(--accent-text); font-weight: 700 }` — det paret är uppmätt till 5,94:1 ljust / 8,19:1 mörkt).
+var(--accent-text); font-weight: 700 }` — det paret är uppmätt till 5,94:1 ljust / 8,19:1 mörkt).
 > Sätt `document.title` i den effekt som redan lyssnar på routeändringar. Ta bort `disabled={busy}`
 > från nav-knapparna — `navigate()` går ändå genom `run()`-vakten (`App.tsx:145`). Flytta fokus till
 > `<main>` (med `tabIndex={-1}`, se A.3) vid routebyte.
 
 ### A.13 · P2 · Fliklistans ARIA-kontrakt är halvt — piltangenterna är döda · **S**
+
 `src/ui/components/EditorToolbar.tsx:35-38`, panelen på `src/ui/App.tsx:570`.
 
 `role`, `aria-selected`, `aria-controls` och `id` är korrekta, och panelens `aria-labelledby` följer
@@ -1136,19 +1228,21 @@ Jag har filtrerat bort mina egna granskningsskript i `ux-audit/`, som knip korre
 oanvända.
 
 **Oanvända filer (1 av appens egna):**
+
 - `scripts/publish-pages.mjs` — refereras inte från `package.json`, `.github/workflows/ci.yml`,
   `README.md` eller någon annan fil.
 
 **Oanvända exporter (7):**
-| Fil | Export |
-|---|---|
-| `src/domain/bindings/rewrite.ts` | `restoreValueInTemplates`, `countPlaceholder` |
-| `src/domain/scanner/index.ts` | `placeholderRanges` |
-| `src/domain/snapshot/schema.ts` | `projectSchema`, `versionSchema`, `draftSchema`, `bindingSchema`, `profileSchema`, `datasetSchema`, `ruleSchema`, `dismissalSchema`, `settingsSchema` |
-| `src/ui/components/ConfirmDialog.tsx` | `ConfirmDialog` (används bara internt via `useConfirm`) |
-| `src/ui/components/VersionPanel.tsx` | `changedLines` |
-| `src/ui/contrast.ts` | `luminance`, `AA_LARGE` |
-| `src/ui/text.ts` | `sv` |
+
+| Fil                                   | Export                                                                                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/domain/bindings/rewrite.ts`      | `restoreValueInTemplates`, `countPlaceholder`                                                                                                         |
+| `src/domain/scanner/index.ts`         | `placeholderRanges`                                                                                                                                   |
+| `src/domain/snapshot/schema.ts`       | `projectSchema`, `versionSchema`, `draftSchema`, `bindingSchema`, `profileSchema`, `datasetSchema`, `ruleSchema`, `dismissalSchema`, `settingsSchema` |
+| `src/ui/components/ConfirmDialog.tsx` | `ConfirmDialog` (används bara internt via `useConfirm`)                                                                                               |
+| `src/ui/components/VersionPanel.tsx`  | `changedLines`                                                                                                                                        |
+| `src/ui/contrast.ts`                  | `luminance`, `AA_LARGE`                                                                                                                               |
+| `src/ui/text.ts`                      | `sv`                                                                                                                                                  |
 
 **Oanvända exporterade typer (4 grupper):** `EntityKind`, `PlannedEntity`, `SnapshotHead`, `Iso`,
 `ProjectPathConfig`, `BindingUsage`, `DatasetColumn`, `IssueView`.
@@ -1170,24 +1264,27 @@ förlitar sig på knip.
 ### D.2 Egen analys
 
 #### F-D.1 · P0 · Versionshistorikens samtliga handlingar är `display: none` under 1251 px · **S**
+
 `src/ui/styles.css:1059-1061`, inuti `@media (max-width: 1250px)`:
 
 ```css
-.version-item .text-button { display: none; }
+.version-item .text-button {
+  display: none;
+}
 ```
 
 Uppmätt, samma projekt, samma dragspel öppnat:
 
-| Bredd | Knappar i DOM | Synliga |
-|---|---|---|
-| 390 px | 4 | **0** |
-| 768 px | 4 | **0** |
-| 1000 px | 4 | **0** |
-| 1250 px | 4 | **0** |
-| 1251 px | 4 | 4 |
-| 1440 px | 4 | 4 |
+| Bredd   | Knappar i DOM | Synliga |
+| ------- | ------------- | ------- |
+| 390 px  | 4             | **0**   |
+| 768 px  | 4             | **0**   |
+| 1000 px | 4             | **0**   |
+| 1250 px | 4             | **0**   |
+| 1251 px | 4             | 4       |
+| 1440 px | 4             | 4       |
 
-*Visa*, *Jämför med v(n)*, *Återställ*, *Återställ som ny version* och *Radera* är alltså
+_Visa_, _Jämför med v(n)_, _Återställ_, _Återställ som ny version_ och _Radera_ är alltså
 oåtkomliga på varje telefon och varje surfplatta. Dragspelet öppnas och visar ingenting — vilket är
 sämre än om det inte gick att öppna alls. Versionshistorik blir en läslista utan handlingar precis i
 det läge (`code-first.css:262-278` gör layouten enkolumnig) där det finns gott om bredd.
@@ -1199,20 +1296,21 @@ Skärm: `34-version-actions-open--768.png` mot `34-version-actions-open--1440.pn
 > radbrytas.
 
 #### F-D.2 · P1 · Fem responsiva `.work-grid`-regler är döda av specificitetsskäl · **M**
+
 `src/ui/styles.css:493`, `:1036-1038`, `:1050-1052`, `:1091-1093`, `:1133` — alla överskuggade av
 `src/ui/code-first.css:110-114` (`.code-first .work-grid`, specificitet 0,2,0 mot 0,1,0).
 `.code-first` sitter alltid på rotelementet (`App.tsx:530`).
 
 Uppmätt `grid-template-columns` i den körande appen:
 
-| Bredd | Beräknat värde |
-|---|---|
-| 390 px | `366px` (en kolumn — 750 px-regeln i `code-first.css` biter) |
-| 768 px | `410px 270px` |
-| 900 px | `542px 270px` |
-| 1250 px | `892px 270px` |
-| 1440 px | `1082px 270px` |
-| 1700 px | `1162px 270px` |
+| Bredd   | Beräknat värde                                               |
+| ------- | ------------------------------------------------------------ |
+| 390 px  | `366px` (en kolumn — 750 px-regeln i `code-first.css` biter) |
+| 768 px  | `410px 270px`                                                |
+| 900 px  | `542px 270px`                                                |
+| 1250 px | `892px 270px`                                                |
+| 1440 px | `1082px 270px`                                               |
+| 1700 px | `1162px 270px`                                               |
 
 Sidopanelen är alltså **exakt 270 px från 768 px hela vägen upp till 1700 px**. Vid 768 px betyder
 det att panelen tar 40 % av innehållsbredden och editorn får 410 px. Trekolumnslayouten som
@@ -1222,10 +1320,12 @@ det att panelen tar 40 % av innehållsbredden och editorn får 410 px. Trekolumn
 > `.code-first`). Se även DESIGN.md §6 och §7 — det här är samma fälla som F-0.2.
 
 #### F-D.3 · P1 · "eller prova med exempelkod" — se F-1.1
+
 Knappen finns i DOM:en, har en handler, och kan aldrig aktiveras. Den mest bokstavliga döda ytan i
 appen.
 
 #### F-D.4 · P1 · `PlainEditor` tar emot 10 av 20 props — resten faller tyst · **M**
+
 `src/ui/editor/props.ts:14-39` mot `src/ui/editor/PlainEditor.tsx:11`.
 
 Ignorerade: `documentKey`, `active`, `language`, `onPlaceholder`, `describePlaceholder`,
@@ -1241,27 +1341,28 @@ konsekvenserna.
 > F-2.8 föreslår.
 
 #### F-D.5 · P1 · `deleteDismissal` är implementerad men har noll anropare · **S**
+
 `src/storage/StorageProvider.ts:47`, `src/storage/IndexedDbProvider.ts:174`.
 
 Av 35 metoder i `StorageProvider` saknar fyra anropare utanför lagringslagret och testerna:
 
-| Metod | Bedömning |
-|---|---|
-| `deleteDismissal` | **Verklig lucka.** Avfärdning är en levererad funktion (F-2.7); bara vägen tillbaka saknas. |
-| `getVersion` | Oanvänd läshjälpare. Ofarlig. |
-| `listDatasets`, `saveDataset` | Avsiktligt förarbete — README listar "datasets" under *Inte levererat ännu*. |
+| Metod                         | Bedömning                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `deleteDismissal`             | **Verklig lucka.** Avfärdning är en levererad funktion (F-2.7); bara vägen tillbaka saknas. |
+| `getVersion`                  | Oanvänd läshjälpare. Ofarlig.                                                               |
+| `listDatasets`, `saveDataset` | Avsiktligt förarbete — README listar "datasets" under _Inte levererat ännu_.                |
 
 > **Förslag:** koppla `deleteDismissal` till ångra-mekanismen enligt F-2.7. Ta bort `getVersion`
 > eller använd den.
 
 #### F-D.6 · P2 · Fyra CSS-klasser är definierade men finns inte i någon JSX · **S**
 
-| Klass | Definierad | Regler |
-|---|---|---|
-| `.profile-badge` | `src/ui/styles.css:338` | 3 |
-| `.project-links` | `src/ui/styles.css:317` | 2 |
-| `.rail-label` | `src/ui/styles.css:1083` | 1 |
-| `.section-title` | `src/ui/styles.css:404` | 5 |
+| Klass            | Definierad               | Regler |
+| ---------------- | ------------------------ | ------ |
+| `.profile-badge` | `src/ui/styles.css:338`  | 3      |
+| `.project-links` | `src/ui/styles.css:317`  | 2      |
+| `.rail-label`    | `src/ui/styles.css:1083` | 1      |
+| `.section-title` | `src/ui/styles.css:404`  | 5      |
 
 `.rail-label` och `.project-links` är rester från den borttagna sidoraden och är samtidigt orsaken
 till att regeln i F-0.2 ser ut som den gör.
@@ -1275,17 +1376,18 @@ alla med template-literaler (`` `mode-${mode}` ``, `` `severity-${finding.severi
 
 Enumererat ur `src/ui/App.tsx`:
 
-| Mål | Antal ingångar | Rader |
-|---|---|---|
-| `#/` (som **stänger** öppet projekt) | 3 | `:531` logotypen, `:532` navet, `:599` projektsidan |
-| `#/project/${currentId}` ("tillbaka") | 2 | `:547`, `:599` — men saknas på tre routes, se F-0.11 |
-| `#/projects` | **1** | `:613`, inne i en modal — se F-0.5 |
-| `newBinding()` | 2 | `:586`, `:605` — legitimt, olika kontexter |
+| Mål                                   | Antal ingångar | Rader                                                |
+| ------------------------------------- | -------------- | ---------------------------------------------------- |
+| `#/` (som **stänger** öppet projekt)  | 3              | `:531` logotypen, `:532` navet, `:599` projektsidan  |
+| `#/project/${currentId}` ("tillbaka") | 2              | `:547`, `:599` — men saknas på tre routes, se F-0.11 |
+| `#/projects`                          | **1**          | `:613`, inne i en modal — se F-0.5                   |
+| `newBinding()`                        | 2              | `:586`, `:605` — legitimt, olika kontexter           |
 
 Att klicka nav-knappen för den sida man redan står på är en tyst nullhandling (verifierat:
 `NO-CHANGE` på `#/bindings` och `#/settings`) — se F-0.4.
 
 #### Ej fynd — kontrollerat och friat
+
 - **`.skip-link`** flaggades av min automatiska sondering som "NOT-CLICKABLE". Det är ett falskt
   utslag: länken ligger utanför skärmen tills den fokuseras, vilket är avsikten och redan täcks av
   ett e2e-test (`e2e/accessibility.spec.ts:63-82`). Fungerar.
@@ -1333,7 +1435,7 @@ Sådant jag inte kan avgöra om det är ett problem eller ett medvetet val:
 Det här bör inte "fixas" bort i städningen:
 
 - **Raderingsdialogen för projekt** (`24-confirm-delete-project--1440.png`) namnger projektet,
-  räknar upp exakt vad som försvinner, säger vad som *inte* påverkas, kräver att man skriver
+  räknar upp exakt vad som försvinner, säger vad som _inte_ påverkas, kräver att man skriver
   `RADERA` och håller knappen inaktiverad tills dess. Så här bör alla destruktiva handlingar i
   appen se ut.
 - **`useConfirm()`** (`ConfirmDialog.tsx:96`) med stöd för `danger`, `typeToConfirm` och ett extra

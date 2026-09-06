@@ -19,7 +19,6 @@ await page.keyboard.insertText(SAMPLE);
 await page.waitForTimeout(1800);
 
 const dump = await page.evaluate(() => {
-  const seen = new Map();
   const els = document.querySelectorAll('main *, header *, footer *');
   const out = [];
   for (const el of els) {

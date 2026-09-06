@@ -10,7 +10,7 @@ await page.locator('dialog[open] .dialog-head button').first().click();await pag
 await page.locator('.editor-body').click();await page.keyboard.insertText('$a = "x"\n');await page.waitForTimeout(2000);
 console.log('\n#### '+theme.toUpperCase());
 console.log('tabs:',JSON.stringify(await page.evaluate(()=>{
- const px=s=>{const m=/rgba?\(([^)]+)\)/.exec(s);const p=m[1].split(/[ ,\/]+/).filter(Boolean).map(Number);return{r:p[0],g:p[1],b:p[2],a:p.length>3?p[3]:1};};
+ const px=s=>{const m=/rgba?\(([^)]+)\)/.exec(s);const p=m[1].split(/[ ,/]+/).filter(Boolean).map(Number);return{r:p[0],g:p[1],b:p[2],a:p.length>3?p[3]:1};};
  const over=(f,g)=>({r:f.r*f.a+g.r*(1-f.a),g:f.g*f.a+g.g*(1-f.a),b:f.b*f.a+g.b*(1-f.a),a:1});
  const lum=c=>{const f=v=>{v/=255;return v<=0.03928?v/12.92:((v+0.055)/1.055)**2.4};return .2126*f(c.r)+.7152*f(c.g)+.0722*f(c.b)};
  const cr=(a,g)=>{const[x,y]=[lum(a),lum(g)].sort((p,q)=>q-p);return +((x+.05)/(y+.05)).toFixed(2)};

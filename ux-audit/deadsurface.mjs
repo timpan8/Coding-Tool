@@ -52,7 +52,7 @@ async function probeRoute(route, label) {
     results.push({ route: label, ...meta, verdict: before === after ? 'NO-CHANGE' : 'ok' });
     // return to a clean state
     if (await page.locator('dialog[open]').count()) { await page.keyboard.press('Escape'); await page.waitForTimeout(400); }
-    if (location => true) { await page.goto(BASE + route); await page.waitForTimeout(800); }
+    await page.goto(BASE + route); await page.waitForTimeout(800);
   }
 }
 

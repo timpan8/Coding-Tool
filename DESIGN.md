@@ -2,7 +2,7 @@
 
 Detta dokument är **härlett ur koden**, inte påhittat. Varje skala nedan är uppmätt i
 `src/ui/styles.css` (1193 rader) och `src/ui/code-first.css` (942 rader). Där jag föreslår en
-normalisering står den under rubriken *Förslag* och är alltid räknad så att den flyttar så få
+normalisering står den under rubriken _Förslag_ och är alltid räknad så att den flyttar så få
 befintliga värden som möjligt.
 
 Stacken har inget UI-bibliotek och ingen CSS-in-JS: allt är handskriven CSS med custom properties.
@@ -19,10 +19,10 @@ Färg är helt tokeniserad. Alla 44 tokens definieras tre gånger — en gång l
 explicit mörkt val (`styles.css:126-176`). Kommentaren på `styles.css:67-70` beskriver regeln som
 gäller:
 
-> *"Tokens only: no component rule is redefined here, so the two themes cannot drift."*
+> _"Tokens only: no component rule is redefined here, so the two themes cannot drift."_
 
 Regeln hålls. Ingen komponentregel definierar om sig per tema, och byggsteget kontrollerar det —
-`scripts/check-network.mjs` rapporterar *"colours confined to token definitions"*. **Det här är
+`scripts/check-network.mjs` rapporterar _"colours confined to token definitions"_. **Det här är
 systemets starkaste del och bör inte luckras upp.**
 
 ### 1.2 Tokens
@@ -31,32 +31,32 @@ Ljust värde först, mörkt inom parentes.
 
 **Ytor**
 
-| Token | Ljus | Mörk | Används till |
-|---|---|---|---|
-| `--bg` | `#f3f6f9` | `#0e1a24` | Sidbakgrund, `main` |
-| `--surface` | `#ffffff` | `#16242f` | Kort, paneler, topbar, knappar |
-| `--surface-raised` | `#f8fafb` | `#1c2c38` | Upphöjda ytor |
+| Token              | Ljus      | Mörk      | Används till                   |
+| ------------------ | --------- | --------- | ------------------------------ |
+| `--bg`             | `#f3f6f9` | `#0e1a24` | Sidbakgrund, `main`            |
+| `--surface`        | `#ffffff` | `#16242f` | Kort, paneler, topbar, knappar |
+| `--surface-raised` | `#f8fafb` | `#1c2c38` | Upphöjda ytor                  |
 | `--surface-sunken` | `#f0f4f7` | `#111d27` | Nedsänkta ytor, `.status-pill` |
-| `--surface-hover` | `#eef4f7` | `#223341` | Hover på knapp och nav |
+| `--surface-hover`  | `#eef4f7` | `#223341` | Hover på knapp och nav         |
 
 **Linjer**
 
-| Token | Ljus | Mörk | Används till |
-|---|---|---|---|
-| `--border-subtle` | `#e8edf1` | `#1e2f3b` | Svaga avdelare, `.count`-bakgrund |
-| `--border` | `#dbe3ea` | `#2a3e4d` | Standardram på knapp, kort, dialog |
-| `--border-strong` | `#c8d3de` | `#3a5265` | `input`, `select` |
-| `--focus-ring` | `#4cb9df` | `#5cc8ec` | Fokusmarkering |
+| Token             | Ljus      | Mörk      | Används till                       |
+| ----------------- | --------- | --------- | ---------------------------------- |
+| `--border-subtle` | `#e8edf1` | `#1e2f3b` | Svaga avdelare, `.count`-bakgrund  |
+| `--border`        | `#dbe3ea` | `#2a3e4d` | Standardram på knapp, kort, dialog |
+| `--border-strong` | `#c8d3de` | `#3a5265` | `input`, `select`                  |
+| `--focus-ring`    | `#4cb9df` | `#5cc8ec` | Fokusmarkering                     |
 
 **Text** — fem nivåer, varav tre ligger mycket nära varandra.
 
-| Token | Ljus | Mörk | Används till |
-|---|---|---|---|
-| `--text-strong` | `#102333` | `#eaf2f7` | Rubriker, projektnamn, varumärke |
-| `--text` | `#21364a` | `#d3e0e9` | Brödtext, knapptext |
-| `--text-muted` | `#526375` | `#a3b5c2` | `p`, `.muted`, `.eyebrow`, `.text-button` |
-| `--text-subtle` | `#59697c` | `#9aadbb` | `small`, sidfot, `.paste-prompt` |
-| `--text-faint` | `#5f7185` | `#91a4b3` | `.bindings-empty` |
+| Token           | Ljus      | Mörk      | Används till                              |
+| --------------- | --------- | --------- | ----------------------------------------- |
+| `--text-strong` | `#102333` | `#eaf2f7` | Rubriker, projektnamn, varumärke          |
+| `--text`        | `#21364a` | `#d3e0e9` | Brödtext, knapptext                       |
+| `--text-muted`  | `#526375` | `#a3b5c2` | `p`, `.muted`, `.eyebrow`, `.text-button` |
+| `--text-subtle` | `#59697c` | `#9aadbb` | `small`, sidfot, `.paste-prompt`          |
+| `--text-faint`  | `#5f7185` | `#91a4b3` | `.bindings-empty`                         |
 
 > **Observation:** `--text-muted` (`#526375`), `--text-subtle` (`#59697c`) och `--text-faint`
 > (`#5f7185`) skiljer sig med under 5 % i luminans. Tre tokens gör i praktiken ett jobb. Det är
@@ -124,19 +124,26 @@ Tyngdpunkten ligger på **10, 8, 12, 4, 14, 6, 5, 15, 7, 18** — tillsammans 21
 ### 2.2 Förslag: skala härledd ur tyngdpunkten
 
 ```css
---space-1:  2px;   --space-2:  4px;   --space-3:  6px;   --space-4:  8px;
---space-5: 10px;   --space-6: 12px;   --space-7: 16px;   --space-8: 20px;
---space-9: 24px;   --space-10: 30px;
+--space-1: 2px;
+--space-2: 4px;
+--space-3: 6px;
+--space-4: 8px;
+--space-5: 10px;
+--space-6: 12px;
+--space-7: 16px;
+--space-8: 20px;
+--space-9: 24px;
+--space-10: 30px;
 ```
 
 Den skalan är vald för att flytta så lite som möjligt, inte för att vara vacker:
 
-| | Andel av 334 förekomster |
-|---|---|
-| Träffar exakt, ingen ändring | **178 (53 %)** |
-| Flyttas ≤ 1 px | 97 (29 %) |
-| Flyttas ≤ 2 px | 50 (15 %) |
-| Flyttas > 2 px | **9 (3 %)** |
+|                              | Andel av 334 förekomster |
+| ---------------------------- | ------------------------ |
+| Träffar exakt, ingen ändring | **178 (53 %)**           |
+| Flyttas ≤ 1 px               | 97 (29 %)                |
+| Flyttas ≤ 2 px               | 50 (15 %)                |
+| Flyttas > 2 px               | **9 (3 %)**              |
 
 82 % av all spacing i appen ändras alltså med högst en pixel. En klassisk 4-punktsskala
 (4/8/12/16/20/24/32) hade träffat exakt på bara 28 % och flyttat 18 förekomster mer än 2 px —
@@ -152,8 +159,8 @@ så att en visuell diff faktiskt går att granska.
 ### 3.1 Familj
 
 ```css
-font-family: Inter, "Segoe UI", Arial, sans-serif;   /* styles.css:3 */
-font-synthesis: none;                                 /* styles.css:4 */
+font-family: Inter, "Segoe UI", Arial, sans-serif; /* styles.css:3 */
+font-synthesis: none; /* styles.css:4 */
 ```
 
 Inter laddas **inte** — appen får inte hämta externa fonter (`font-src 'self'` i CSP:n,
@@ -168,26 +175,26 @@ andra får Segoe UI eller Arial. Kodytor använder `Consolas, monospace` (t.ex. 
 
 **25 olika font-size-värden.** Rubriknivåerna:
 
-| Element | Storlek | Vikt | Fil:rad |
-|---|---|---|---|
-| `h1` | `1.9rem` (30,4 px), `letter-spacing: -0.8px` | 650 | `styles.css:254` |
-| `h2` | `1.05rem` (16,8 px) | ärvd | `styles.css:260` |
-| `h3` | `1rem` (16 px) | ärvd | `styles.css:263` |
-| `.panel-title h2` | `0.85rem` (13,6 px) | ärvd | `styles.css:789` |
+| Element           | Storlek                                      | Vikt | Fil:rad          |
+| ----------------- | -------------------------------------------- | ---- | ---------------- |
+| `h1`              | `1.9rem` (30,4 px), `letter-spacing: -0.8px` | 650  | `styles.css:254` |
+| `h2`              | `1.05rem` (16,8 px)                          | ärvd | `styles.css:260` |
+| `h3`              | `1rem` (16 px)                               | ärvd | `styles.css:263` |
+| `.panel-title h2` | `0.85rem` (13,6 px)                          | ärvd | `styles.css:789` |
 
 > **Observation:** Steget `h1 → h2` är 1,81× medan `h2 → h3` är 1,05×. Visuellt finns alltså två
 > rubriknivåer, inte tre — `h2` och `h3` går inte att skilja åt på storlek. Se UX-AUDIT.md.
 
 De sex vanligaste storlekarna bär nästan hela gränssnittet, och alla är under 16 px:
 
-| rem | px | Antal | Används av |
-|---|---|---|---|
-| `0.75` | 12,0 | 26 | Metadata, kortdetaljer, `small` |
-| `0.7` | 11,2 | 15 | `.text-button`, `.count`, `.issue-panel p` |
-| `0.8125` | 13,0 | 12 | Paneltext |
-| `0.875` | 14,0 | 11 | **`button`**, `.notice` |
-| `0.8` | 12,8 | 10 | `.topbar`, `.check`, `.inline-notice` |
-| `0.65` | 10,4 | 9 | `.eyebrow`-syskon, `.editor-tools` |
+| rem      | px   | Antal | Används av                                 |
+| -------- | ---- | ----- | ------------------------------------------ |
+| `0.75`   | 12,0 | 26    | Metadata, kortdetaljer, `small`            |
+| `0.7`    | 11,2 | 15    | `.text-button`, `.count`, `.issue-panel p` |
+| `0.8125` | 13,0 | 12    | Paneltext                                  |
+| `0.875`  | 14,0 | 11    | **`button`**, `.notice`                    |
+| `0.8`    | 12,8 | 10    | `.topbar`, `.check`, `.inline-notice`      |
+| `0.65`   | 10,4 | 9     | `.eyebrow`-syskon, `.editor-tools`         |
 
 Basen är 16 px (`styles.css:5`) men används nästan aldrig för text — bara `h3` och fem andra ställen
 landar på `1rem`.
@@ -195,13 +202,13 @@ landar på `1rem`.
 ### 3.3 Förslag: sju steg i stället för 25
 
 ```css
---text-2xs: 0.6875rem;  /* 11px — badge, kbd, tertiär metadata     (ersätter 0.65–0.72) */
---text-xs:  0.75rem;    /* 12px — metadata, small                  (behålls)            */
---text-sm:  0.8125rem;  /* 13px — paneltext                        (ersätter 0.78–0.8)  */
---text-base:0.875rem;   /* 14px — knappar, brödtext i UI           (ersätter 0.85–0.9)  */
---text-md:  1rem;       /* 16px — h3, längre brödtext              (ersätter 0.925–1.05)*/
---text-lg:  1.4rem;     /* 22px — h2 i dokumentvyer                (ersätter 1.2–1.5)   */
---text-xl:  1.9rem;     /* 30px — h1                               (behålls)            */
+--text-2xs: 0.6875rem; /* 11px — badge, kbd, tertiär metadata     (ersätter 0.65–0.72) */
+--text-xs: 0.75rem; /* 12px — metadata, small                  (behålls)            */
+--text-sm: 0.8125rem; /* 13px — paneltext                        (ersätter 0.78–0.8)  */
+--text-base: 0.875rem; /* 14px — knappar, brödtext i UI           (ersätter 0.85–0.9)  */
+--text-md: 1rem; /* 16px — h3, längre brödtext              (ersätter 0.925–1.05)*/
+--text-lg: 1.4rem; /* 22px — h2 i dokumentvyer                (ersätter 1.2–1.5)   */
+--text-xl: 1.9rem; /* 30px — h1                               (behålls)            */
 ```
 
 Sammanslagningarna ovan flyttar ingen storlek mer än 1,6 px. Insats: M.
@@ -225,14 +232,14 @@ Tio värden i dag: 2, 3, 4, 5, 6, 7 (10×), 8 (13×), 12, 15, 20.
 
 Mönstret bakom dem är tydligt när man sorterar efter användning:
 
-| Roll | Värde | Exempel |
-|---|---|---|
-| Liten kontroll | `4px` | Chips, taggar, små markeringar |
-| Standardkontroll | `6px` | `input`, `select` (`styles.css:857`) |
-| Knapp | `7px` | `button` (`styles.css:194`) |
-| Kort och panel | `8px` | Projektkort, bindingkort, findings |
-| Dialog | `12px` | `dialog` (`styles.css:962`) |
-| Pill | `15px` / `20px` | `.count` (`:796`), `.status-pill` (`code-first.css:741`) |
+| Roll             | Värde           | Exempel                                                  |
+| ---------------- | --------------- | -------------------------------------------------------- |
+| Liten kontroll   | `4px`           | Chips, taggar, små markeringar                           |
+| Standardkontroll | `6px`           | `input`, `select` (`styles.css:857`)                     |
+| Knapp            | `7px`           | `button` (`styles.css:194`)                              |
+| Kort och panel   | `8px`           | Projektkort, bindingkort, findings                       |
+| Dialog           | `12px`          | `dialog` (`styles.css:962`)                              |
+| Pill             | `15px` / `20px` | `.count` (`:796`), `.status-pill` (`code-first.css:741`) |
 
 **Förslag:** `--radius-sm: 4px`, `--radius-md: 6px`, `--radius-lg: 8px`, `--radius-xl: 12px`,
 `--radius-pill: 999px`. Det slår ihop 6/7 till ett värde och 15/20 till en äkta pill. Insats: S.
@@ -256,7 +263,8 @@ Mönstren nedan finns redan och används på flera ställen. De är systemets fa
 ### 5.1 Knapp
 
 ```css
-button {                    /* styles.css:190 */
+button {
+  /* styles.css:190 */
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -270,27 +278,32 @@ button {                    /* styles.css:190 */
 
 Fyra varianter, i fallande vikt:
 
-| Variant | Klass | Definition | Regel |
-|---|---|---|---|
-| Primär | `.primary` | accentfylld, `--accent-fg` text | `styles.css:215` |
-| Destruktiv | `.danger` | `--danger`-fylld | `styles.css:223` |
-| Sekundär | *(ingen klass)* | ram + `--surface` | `styles.css:190` |
-| Tertiär | `.text-button` | ingen ram, `2px 4px`, `0.7rem`, `--text-muted` | `styles.css:853` |
+| Variant    | Klass           | Definition                                     | Regel            |
+| ---------- | --------------- | ---------------------------------------------- | ---------------- |
+| Primär     | `.primary`      | accentfylld, `--accent-fg` text                | `styles.css:215` |
+| Destruktiv | `.danger`       | `--danger`-fylld                               | `styles.css:223` |
+| Sekundär   | _(ingen klass)_ | ram + `--surface`                              | `styles.css:190` |
+| Tertiär    | `.text-button`  | ingen ram, `2px 4px`, `0.7rem`, `--text-muted` | `styles.css:853` |
 
 **Regel:** högst en `.primary` per vy. Det bryts i dag på arbetsytan — se UX-AUDIT.md.
 
 **Varning om `.text-button`:** den är appens minsta och svagaste kontroll (11,2 px text, 2×4 px
-padding → uppmätt 28×21 px) och används samtidigt för destruktiva handlingar som *Radera projekt*
+padding → uppmätt 28×21 px) och används samtidigt för destruktiva handlingar som _Radera projekt_
 och `×` på en binding. Den kombinationen — svagast i systemet, farligast i konsekvens — bör inte
 spridas vidare. Se UX-AUDIT.md.
 
 **Fokus** (`styles.css:208-213`) är konsekvent och bra:
+
 ```css
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
 ```
+
 `:focus-visible` betyder att markeringen bara syns vid tangentbordsnavigation. Behåll det.
 
 **Disabled** (`styles.css:204`) är `opacity: 0.45` på hela knappen. Det är enkelt men sänker
@@ -315,6 +328,7 @@ Används av `.project-heading` (App.tsx:539), `.dashboard-heading` (App.tsx:599)
 ```
 .panel-title  =  h2/h3  +  .count (pill-badge)  +  valfri .text-button
 ```
+
 `styles.css:784-798`. Används av BindingPanel, FindingsPanel, BindingsPage.
 
 ### 5.4 Dialog
@@ -324,7 +338,8 @@ Alla dialoger går genom `Modal` (`components/Modal.tsx`), som ger native `<dial
 `.dialog-actions` (knapprad, primär sist till höger).
 
 ```css
-dialog {                              /* styles.css:960 */
+dialog {
+  /* styles.css:960 */
   border-radius: 12px;
   padding: 25px;
   width: min(590px, calc(100vw - 40px));
@@ -347,12 +362,12 @@ Bekräftelser går genom `useConfirm()` (`ConfirmDialog.tsx:96`) som ger ett `aw
 
 Fyra olika ytor med olika livslängd, alla redan definierade:
 
-| Mönster | Klass | Livslängd | Fil |
-|---|---|---|---|
-| Beständig varning i flödet | `.notice` | tills innehållet ändras | `styles.css:949` |
-| Tillfälligt besked | `.inline-notice` (+ `.warn`) | tills användaren stänger | `code-first.css:172` |
-| Ångra efter radering | `.undo-bar` | 10 sekunder | `UndoBar.tsx:121` |
-| Blockerande fel | `Modal` + `role="alert"` | tills stängd | `App.tsx:673` |
+| Mönster                    | Klass                        | Livslängd                | Fil                  |
+| -------------------------- | ---------------------------- | ------------------------ | -------------------- |
+| Beständig varning i flödet | `.notice`                    | tills innehållet ändras  | `styles.css:949`     |
+| Tillfälligt besked         | `.inline-notice` (+ `.warn`) | tills användaren stänger | `code-first.css:172` |
+| Ångra efter radering       | `.undo-bar`                  | 10 sekunder              | `UndoBar.tsx:121`    |
+| Blockerande fel            | `Modal` + `role="alert"`     | tills stängd             | `App.tsx:673`        |
 
 Valet mellan dem är dokumenterat på `App.tsx:113-116`: modal för något som kräver ett beslut, strip
 för en vägran eller ett misslyckat bekvämlighetsgrepp.
@@ -396,13 +411,13 @@ något som `code-first.css` äger måste också stå i `code-first.css`, eller p
 
 Nuvarande brytpunkter, i den ordning de finns i koden:
 
-| Brytpunkt | Fil | Vad den gör |
-|---|---|---|
-| `min-width: 1600px` | `styles.css:1035` | 3-kolumners `.work-grid` — **verkningslös**, se §6 |
-| `max-width: 1250px` | `styles.css:1046` | Smalare panel — **verkningslös** för `.work-grid` |
-| `max-width: 900px` | `styles.css:1078` | Kompaktare topbar och kort |
-| `max-width: 750px` | `code-first.css:262`, `:817` | Topbaren wrappar, `.work-grid` blir en kolumn |
-| `max-width: 650px` | `styles.css:1124` | Ytterligare topbar-wrap — **verkningslös** |
+| Brytpunkt           | Fil                          | Vad den gör                                        |
+| ------------------- | ---------------------------- | -------------------------------------------------- |
+| `min-width: 1600px` | `styles.css:1035`            | 3-kolumners `.work-grid` — **verkningslös**, se §6 |
+| `max-width: 1250px` | `styles.css:1046`            | Smalare panel — **verkningslös** för `.work-grid`  |
+| `max-width: 900px`  | `styles.css:1078`            | Kompaktare topbar och kort                         |
+| `max-width: 750px`  | `code-first.css:262`, `:817` | Topbaren wrappar, `.work-grid` blir en kolumn      |
+| `max-width: 650px`  | `styles.css:1124`            | Ytterligare topbar-wrap — **verkningslös**         |
 
 Dessutom finns brytpunkten `750px` i JavaScript: `Editor.tsx:12` väljer `PlainEditor` (en `textarea`)
 i stället för Monaco under den bredden.
