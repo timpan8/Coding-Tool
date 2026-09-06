@@ -1,0 +1,125 @@
+/* ---------------------------------------------------------------------------
+   Fixar för återmappningsdialogens diff-rutor.
+   Bara CSS, inga tokens — fungerar i den publicerade designlinjen och går att
+   flytta med om koden porteras. Klassnamnen är dina befintliga.
+   --------------------------------------------------------------------------- */
+
+/* D-5. <pre> radbryter inte, så varje ruta rullade i sidled. Hängande indrag
+   håller +/- kvar i vänsterkanten på brutna rader. */
+.version-diff {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: hidden;
+}
+.version-diff > span {
+  display: block;
+  padding-left: 3.4ch;
+  text-indent: -3.4ch;
+}
+
+/* D-7. Markören låg i textnoden, så den följde med vid kopiering och lästes
+   upp som "plus" på varje rad. Flyttad till CSS; ta bort strängarna i JSX. */
+.version-diff.markers-in-css > span::before {
+  content: "  ";
+  white-space: pre;
+  color: color-mix(in srgb, currentColor 55%, transparent);
+}
+.version-diff.markers-in-css > .diff-add::before {
+  content: "+ ";
+}
+.version-diff.markers-in-css > .diff-remove::before {
+  content: "- ";
+}
+
+/* D-6. Tabellen hänvisar till "rad 1, kolumn 23" men diffen saknade radnummer.
+   Kräver att raden får style="--n: <radnummer>" i JSX. */
+.version-diff.numbered > span::after {
+  content: counter(diff-line);
+  position: absolute;
+  left: 0;
+  width: 3ch;
+  text-align: right;
+  opacity: 0.45;
+  font-variant-numeric: tabular-nums;
+}
+.version-diff.numbered {
+  counter-reset: diff-line;
+  position: relative;
+  padding-left: 4.5ch;
+}
+.version-diff.numbered > span {
+  counter-increment: diff-line;
+  position: relative;
+  padding-left: 3.4ch;
+}
+.version-diff.numbered > span::after {
+  left: -4ch;
+}
+
+/* Bakgrundstonen bar bara 1.5–1.8:1 mot rutans egen bakgrund, så på en ljus
+   skärm är +/- i praktiken ensam signal. En kantmarkör kostar inget och syns. */
+.diff-add {
+  box-shadow: inset 3px 0 0 #35c08a;
+}
+.diff-remove {
+  box-shadow: inset 3px 0 0 #e2685f;
+}
+
+/* D-1. Två av tre rutor var till 10 av 11 rader identiska. Fäll ihop dem. */
+.paste-diff-sections > details > summary {
+  cursor: pointer;
+  margin: 5px 0;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.paste-diff-sections > details[open] > summary {
+  margin-bottom: 8px;
+}
+
+/* Båda rutnäten var 1fr 1fr på varje bredd — vid 390px blev varje kolumn
+   ~150px. Enda mediefrågan i hela bygget rör .version-paste. */
+@media (max-width: 900px) {
+  .reconciliation-layout,
+  .paste-diff-sections {
+    grid-template-columns: 1fr;
+  }
+
+  /* Fyra kolumner på ~200px bröt varje cell mitt i ordet: "ADMIN_USE R",
+     "C:\Temp \Exampl e", "ai- value · hög". Staplade celler med kryssrutan
+     kvar till höger. Kolumnrubrikerna tas bort med kolumnerna — cellerna
+     bär sin egen betydelse: namn i fetstil, värde med pil, metod i småtext. */
+  .reconciliation-head {
+    display: none;
+  }
+  /* display:grid måste sättas här. .reconciliation-row är definierad två gånger
+     i stilmallen — den första ger den grid och kolumnerna 1fr 1.4fr 1fr 35px,
+     den andra gör den till flex. Den senare vinner på källordning, så
+     kolumnproportionerna är död CSS och grid-column på barnen är verkningslöst
+     tills raden faktiskt är ett rutnät igen. */
+  .reconciliation-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    row-gap: 3px;
+  }
+  .reconciliation-row > span:nth-child(-n + 3) {
+    grid-column: 1;
+  }
+  .reconciliation-row > span:nth-child(4) {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: start;
+  }
+
+  /* Med 26 rader kod rullade alla tre rutorna lodrätt inuti en dialog som
+     själv rullar vid 90vh: fyra rullningsytor i varandra. Låt dialogen vara
+     den enda. Kortare blir det först när de två nedre fälls ihop. */
+  .paste-diff-preview {
+    max-height: none;
+  }
+}
+/* Textarean är min-height 270px, vilket trycker ner primärhandlingen.
+   Efter en analys behöver den inte vara lika stor. */
+.reconciliation-results ~ * .version-paste,
+.has-result .version-paste {
+  min-height: 120px;
+}

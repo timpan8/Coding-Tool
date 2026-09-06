@@ -11,11 +11,15 @@ export function DiffEditor({
   modified,
   language,
   theme,
+  sideBySide = true,
 }: {
   original: string;
   modified: string;
   language: LanguageId;
   theme: ResolvedTheme;
+  /** Two panes need roughly 60 characters each to be worth having. Below that the inline view
+   * shows the same information in the width that is actually available. */
+  sideBySide?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneDiffEditor | null>(null);
@@ -33,6 +37,9 @@ export function DiffEditor({
       scrollBeyondLastLine: false,
       renderOverviewRuler: false,
       ignoreTrimWhitespace: false,
+      // A changed line is usually a long one, and a clipped line hides the very characters the
+      // comparison exists to show. Horizontal scrolling in two panes independently is worse.
+      wordWrap: 'on',
     });
     editor.current = instance;
     models.current = {
@@ -62,6 +69,12 @@ export function DiffEditor({
   useEffect(() => {
     monaco.editor.setTheme(themeName(theme));
   }, [theme]);
+
+  // Updated rather than passed at creation: the viewer switches to the inline view when the dialog
+  // is too narrow for two panes, and that can happen while the diff is open.
+  useEffect(() => {
+    editor.current?.updateOptions({ renderSideBySide: sideBySide });
+  }, [sideBySide]);
 
   return <div className="diff-editor" ref={host} />;
 }

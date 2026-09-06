@@ -1,0 +1,91 @@
+<dialog aria-label="Ny version · baserad på v4" open="">
+  <header class="dialog-head">
+    <h2>Ny version · baserad på v4</h2>
+    <button aria-label="Stäng dialog">×</button>
+  </header>
+  <p class="quick-intro">Klistra in AI-sanerad kod. Granska varje mapping innan koden används som lokalt utkast.</p>
+  <textarea
+    data-version-paste="true"
+    aria-label="AI-kod för ny version"
+    class="version-paste"
+    placeholder="Klistra in den nya koden här…"
+    spellcheck="false"
+  >
+$Users = Get-Content "C:\Temp\Example"
+
+$Result = foreach ($User in $Users) {
+
+
+        }
+    }
+}
+
+$Result | Export-Csv "C:\aaa" -NoTypeInformation -Encoding UTF8</textarea>
+  <div class="dialog-actions"><button>Avbryt</button><button class="primary">Analysera</button></div>
+  <section class="reconciliation-results">
+    <h3>Granska återmappning</h3>
+    <p class="reconciliation-summary">1 mappings valda · 0 omappade · 0 konflikter</p>
+    <div class="reconciliation-layout">
+      <div class="reconciliation-table">
+        <div class="reconciliation-head">
+          <span>Binding</span><span>Ny text → platshållare</span><span>Metod · säkerhet</span><span>Val</span>
+        </div>
+        <button class="reconciliation-row selected">
+          <span><strong>USERS</strong><small>rad 1, kolumn 23 · 1 förekomst</small></span
+          ><span><code>C:\Temp\Example</code><small>→ {{USERS}}</small></span
+          ><span><small>ai-value · hög</small></span
+          ><span><input aria-label="Acceptera USERS" disabled="" type="checkbox" checked="" /></span>
+        </button>
+      </div>
+      <div class="reconciliation-code">
+        <h4>Ny kod · mappingförhandsvisning</h4>
+        <pre
+          class="version-diff paste-diff-preview"
+        ><span class="diff-remove diff-selected">- $Users = Get-Content "C:\Temp\Example"
+</span><span class="diff-add diff-selected">+ $Users = Get-Content "{{USERS}}"
+</span><span class="diff-same ">  
+</span><span class="diff-same ">  $Result = foreach ($User in $Users) {
+</span><span class="diff-same ">  
+</span><span class="diff-same ">  
+</span><span class="diff-same ">          }
+</span><span class="diff-same ">      }
+</span><span class="diff-same ">  }
+</span><span class="diff-same ">  
+</span><span class="diff-same ">  $Result | Export-Csv "C:\aaa" -NoTypeInformation -Encoding UTF8
+</span></pre>
+      </div>
+    </div>
+    <div class="paste-diff-sections">
+      <div>
+        <h4>Rå kod mot basversion</h4>
+        <pre class="version-diff paste-diff-preview"><span class="diff-remove ">- $Users = Get-Content "{{USERS}}"
+</span><span class="diff-add ">+ $Users = Get-Content "C:\Temp\Example"
+</span><span class="diff-same ">  
+</span><span class="diff-same ">  $Result = foreach ($User in $Users) {
+</span><span class="diff-same ">  
+</span><span class="diff-add ">+ 
+</span><span class="diff-add ">+         }
+</span><span class="diff-add ">+     }
+</span><span class="diff-add ">+ }
+</span><span class="diff-add ">+ 
+</span><span class="diff-add ">+ $Result | Export-Csv "C:\aaa" -NoTypeInformation -Encoding UTF8
+</span></pre>
+      </div>
+      <div>
+        <h4>Mall mot basversion</h4>
+        <pre class="version-diff paste-diff-preview"><span class="diff-same ">  $Users = Get-Content "{{USERS}}"
+</span><span class="diff-same ">  
+</span><span class="diff-same ">  $Result = foreach ($User in $Users) {
+</span><span class="diff-same ">  
+</span><span class="diff-add ">+ 
+</span><span class="diff-add ">+         }
+</span><span class="diff-add ">+     }
+</span><span class="diff-add ">+ }
+</span><span class="diff-add ">+ 
+</span><span class="diff-add ">+ $Result | Export-Csv "C:\aaa" -NoTypeInformation -Encoding UTF8
+</span></pre>
+      </div>
+    </div>
+    <div class="dialog-actions"><button class="primary">Använd kod som utkast</button></div>
+  </section>
+</dialog>

@@ -325,9 +325,14 @@ kbd {
   display: flex;
   flex-direction: column;
 }
+/* Report F-0.1. Wrapping only started at 750px, so between there and roughly 1000px the bar could
+   not break and ran off the side: scrollWidth was 1122 in a 768px viewport on every route, taking
+   the profile picker, the theme picker and the save status off screen. Wrapping by default lets it
+   break when it needs to rather than at a guessed width. */
 .topbar {
   min-height: 68px;
   display: flex;
+  flex-wrap: wrap;
   gap: 20px;
   align-items: center;
   border-bottom: 1px solid var(--border);
@@ -608,6 +613,13 @@ main {
 .mode-ai .view-banner {
   background: var(--accent);
   color: var(--accent-fg);
+}
+/* Nothing was substituted, so the projection is the template. Green here would be a clean bill of
+   health the app has no basis for. */
+.mode-ai .view-banner.nothing-replaced {
+  background: var(--warn-surface);
+  color: var(--warn-text);
+  border-bottom: 1px solid var(--warn-border);
 }
 .local-tools {
   display: flex;
@@ -1056,8 +1068,11 @@ dialog p {
   .version-item > button:first-child {
     white-space: nowrap;
   }
+  /* This used to be display:none, which hid Visa, Jämför, Återställ and Radera on every width
+     below 1251px — the accordion opened onto nothing on every phone and tablet. .version-actions
+     already wraps, so dropping the indent is enough to fit them. */
   .version-item .text-button {
-    display: none;
+    margin-left: 0;
   }
   .editor-panel {
     height: calc(100vh - 290px);
