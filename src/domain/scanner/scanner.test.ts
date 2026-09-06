@@ -9,7 +9,26 @@ describe('built-in rules', () => {
   it('catches the report reproduction that the app used to call clean', () => {
     const ids = ruleIds('$username = "example.user"\n$password = "Hunter2!"\n$conn = "Server=sql01.corp.local;Pwd=Hunter2!"\n');
     expect(ids).toContain('secret-assignment');
-    expect(ids).toContain('internal-host');
+    // The whole server name from the connection string; the internal-host rule's narrower
+    // `sql01.corp` inside it is the same value and is not reported twice.
+    expect(ids).toContain('connection-server');
+    expect(ids).not.toContain('internal-host');
+    expect(ruleIds('$host = "sql01.corp.local"')).toEqual(['internal-host']);
+  });
+
+  it('reports a value once when a narrower rule matches inside a wider one', () => {
+    const findings = found('Get-ADUser -Identity tlindqvist -Server dc01.corp.local');
+    expect(findings.map((f) => f.ruleId)).toEqual(['username-parameter', 'server-parameter']);
+    // A random-looking run inside an assigned password is the password, not a second finding.
+    expect(ruleIds('$password = "Xk9mQ2vB7nR4tZ8w-and-more"')).toEqual(['secret-assignment']);
+    // The whole host chain, so binding it never leaves `.local` behind in the template.
+    const [host] = found('$host = "sql01.corp.local"');
+    expect('$host = "sql01.corp.local"'.slice(host.start, host.end)).toBe('sql01.corp.local');
+  });
+
+  it('keeps a term the user added even inside a built-in finding', () => {
+    const own: ScannerRule = { id: 'own', name: 'mittforetag.se', pattern: 'mittforetag.se', flags: 'g', severity: 'low', category: 'configuration', explanation: '', enabled: true, builtIn: false };
+    expect(scan('$c = "https://intranet.mittforetag.se/api"', [...builtInRules, own]).map((f) => f.ruleId)).toEqual(['fqdn', 'own']);
   });
 
   it.each([
@@ -20,20 +39,60 @@ describe('built-in rules', () => {
     ['host = "10.4.12.9"', 'private-ip'],
     ['\\\\fileserver\\payroll\\2026', 'unc-path'],
     ['contact = "anna.andersson@company.se"', 'email'],
-    ['id = "19850505-1234"', 'personnummer'],
-    ['tenantId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"', 'guid'],
+    ['id = "19811218-9876"', 'personnummer'],
+    ['resourceId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"', 'guid'],
+    ['$UserName = "svc_adsync"', 'username-assignment'],
+    ['Get-ADUser -Identity tlindqvist -Server dc01', 'username-parameter'],
+    ['Get-ADUser -Identity tlindqvist -Server dc01', 'server-parameter'],
+    ['Invoke-Sqlcmd -ServerInstance "sql01\\PROD"', 'server-parameter'],
+    ['$conn = "Data Source=sql01.corp.local;Initial Catalog=hr"', 'connection-server'],
+    ['Add-Computer -DomainName corp.contoso.com', 'domain-parameter'],
+    ['Connect-MgGraph -TenantId 9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730', 'tenant-id'],
+    ['$path = "/home/tim/scripts/export.csv"', 'unix-path'],
+    ['$url = "https://intranet.mittforetag.se/api"', 'fqdn'],
   ])('flags %s', (text, expected) => {
     expect(ruleIds(text)).toContain(expected);
+  });
+
+  it('reads the value off the assignment or parameter, not the whole line', () => {
+    const [user] = found('Get-ADUser -Identity tlindqvist -Server dc01').filter((f) => f.ruleId === 'username-parameter');
+    expect(user.start).toBe('Get-ADUser -Identity '.length);
+    expect(user.end).toBe('Get-ADUser -Identity tlindqvist'.length);
+    expect(user.assigned).toBe(true);
+    expect(found('AKIAIOSFODNN7EXAMPLE')[0].assigned).toBe(false);
+  });
+
+  it('leaves variables, the example namespace and a bare domain alone', () => {
+    expect(ruleIds('Get-ADUser -Identity $user -Server $dc')).toEqual([]);
+    expect(found('$host = "server.example.test"\n$ip = "192.0.2.10"\n$mail = "anna.exempel@example.com"\n$path = "/opt/example/project01"')
+      .filter((f) => f.ruleId !== 'unix-path' && f.ruleId !== 'email')).toEqual([]);
+    expect(ruleIds('# see company.se for details')).toEqual([]);
+    // The date-plus-digits shape without a valid check digit is an order number, not a person.
+    expect(ruleIds('id = "19850505-1234"')).toEqual([]);
+  });
+
+  it('lets a rule that names the value win over the generic GUID rule on the same span', () => {
+    expect(ruleIds('Connect-MgGraph -TenantId 9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730')).toEqual(['tenant-id']);
+  });
+
+  it('warns about a secret in an output statement and a path in a destructive command', () => {
+    const output = scan('Write-Host "Token=ghp_1234567890abcdefghijklmnopqrstuvwxyz"\n$password = "Hunter2!"', builtInRules, { language: 'powershell' });
+    expect(output.find((f) => f.line === 1)?.warnings).toEqual(['Hemligheten står i en utskrifts- eller loggsats.']);
+    expect(output.find((f) => f.line === 2)?.warnings).toEqual([]);
+    const removal = scan('Remove-Item -Recurse "C:\\Users\\tim\\old"', builtInRules, { language: 'powershell' });
+    expect(removal[0].warnings).toEqual(['Sökvägen används i ett kommando som tar bort eller flyttar.']);
+    // Only PowerShell has the vocabulary; a Python file gets no guesses.
+    expect(scan('print("password = Hunter2!")\npassword = "Hunter2!"', builtInRules, { language: 'python' }).every((f) => f.warnings.length === 0)).toBe(true);
   });
 
   // The AI value has to keep the shape, or code that parses the value stops working in the copy the
   // AI is asked to reason about.
   it('offers an AI value of the same shape as the value it replaces', () => {
     const shaped = (text: string, id: string) => found(text).find((f) => f.ruleId === id)?.suggestedAiReplacement ?? '';
-    expect(shaped('tenantId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"', 'guid'))
+    expect(shaped('resourceId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"', 'guid'))
       .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     // Not the nil GUID: that reads as an unset value rather than as a stand-in.
-    expect(shaped('tenantId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"', 'guid')).not.toBe('00000000-0000-0000-0000-000000000000');
+    expect(shaped('resourceId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"', 'guid')).not.toBe('00000000-0000-0000-0000-000000000000');
     expect(shaped('host = "10.4.12.9"', 'private-ip')).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
     expect(shaped('contact = "anna@company.se"', 'email')).toContain('@');
   });
@@ -50,7 +109,7 @@ describe('built-in rules', () => {
   // The entropy rule is the fallback for values nothing can name. A GUID reported as "random string"
   // gets <SECRET> for an AI value rather than a GUID, and a JWT used to be called one too.
   it('lets a rule that names the value win over the entropy fallback', () => {
-    expect(ruleIds('tenantId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"')).toEqual(['guid']);
+    expect(ruleIds('resourceId = "9f2b1c04-7a3e-4d18-b6f5-2c8e91a4d730"')).toEqual(['guid']);
     // Bare, so the assignment rule stays out of it: between two rules that both name the value,
     // severity still decides, and "assigned to something called token" is the graver reading.
     expect(ruleIds('Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk'))
@@ -84,6 +143,10 @@ describe('findings never carry the value', () => {
   it('keeps the raw value out of every field', () => {
     const secret = 'Hunter2SuperSecret';
     for (const finding of found(`$password = "${secret}"`)) {
+      expect(JSON.stringify(finding)).not.toContain(secret);
+    }
+    // The warning describes the line; it must not quote it.
+    for (const finding of scan(`Write-Host "Token=ghp_${secret}${secret}"`, builtInRules, { language: 'powershell' })) {
       expect(JSON.stringify(finding)).not.toContain(secret);
     }
   });

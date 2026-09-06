@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { Binding, Category, Profile } from '../../types/models';
 import { t } from '../text';
 import { categories } from '../../types/models';
-import { BindingRefusal, defaults, validateBinding } from '../../domain/bindings';
+import { BindingRefusal, validateBinding } from '../../domain/bindings';
+import { sharedAiValue, takenAiValues, uniqueExample } from '../../domain/bindings/examples';
 import { Modal } from './Modal';
 export function BindingDialog({ initial, bindings, count, preview, profiles, reuse, save, close }: {
   initial: Binding; bindings: Binding[]; count: number; profiles?: Profile[];
@@ -30,6 +31,11 @@ export function BindingDialog({ initial, bindings, count, preview, profiles, reu
   // knows the whole time. Held back until something has been typed, so a dialog opened on an empty
   // form does not greet the user with its own emptiness.
   const problems = edited ? validateBinding(value, bindings) : [];
+  // Two bindings with one AI value are one value in the AI copy, and the round trip cannot tell
+  // them apart when the code comes back. Said here as a warning; the user may know better.
+  const shared = sharedAiValue(value, bindings);
+  /** A stand-in for the category that nothing else in the vault uses, shaped like the value. */
+  const freshAiValue = (category: Category) => uniqueExample(undefined, category, value.values.__default__ ?? '', takenAiValues(bindings.filter(b => b.id !== initial.id)));
   async function submit() {
     const errors = validateBinding(value, bindings);
     if (errors.length) { setEdited(true); setError(errors.join(' ')); return; }
@@ -46,7 +52,7 @@ export function BindingDialog({ initial, bindings, count, preview, profiles, reu
         empty on purpose. Naming the value is the only decision the common case has left. */}
     <div className="form-grid">
       <label>{t.bindingDialog.name}<input aria-label={t.bindingDialog.nameLabel} value={value.name} onChange={e => edit({ name: e.target.value.toUpperCase() })} autoFocus />{existing && value.name !== initial.name && <small>{t.bindingDialog.renameNote}</small>}</label>
-      <label>{t.bindingDialog.category}<select value={value.category} onChange={e => { const category = e.target.value as Category; edit({ category, aiReplacement: existing ? value.aiReplacement : defaults[category] }); }}>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
+      <label>{t.bindingDialog.category}<select value={value.category} onChange={e => { const category = e.target.value as Category; edit({ category, aiReplacement: existing ? value.aiReplacement : freshAiValue(category) }); }}>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
       <label className="wide">{t.bindingDialog.defaultValue}<input type={show ? 'text' : 'password'} value={value.values.__default__ ?? ''} onChange={e => edit({ values: { ...value.values, __default__: e.target.value } })} autoComplete="off" spellCheck={false} /></label>
       <label className="check"><input type="checkbox" checked={show} onChange={e => setShow(e.target.checked)} />{t.bindingDialog.showValue}</label>
     </div>
@@ -65,6 +71,7 @@ export function BindingDialog({ initial, bindings, count, preview, profiles, reu
       <label className="wide">{t.bindingDialog.description}<input value={value.description} onChange={e => edit({ description: e.target.value })} /></label>
     </div>
     {value.escapeMode === 'raw' && <p className="inline-warning" role="status">{t.bindingDialog.rawNote}</p>}
+    {shared && <p className="inline-warning" role="status">{t.bindingDialog.sharedAi(shared)}</p>}
     {vagueSecret && <label className="check inline-warning"><input type="checkbox" checked={acknowledged} onChange={e => { setAcknowledged(e.target.checked); setError(''); }} />{t.bindingDialog.vagueBefore}<code>&lt;PASSWORD&gt;</code>{t.bindingDialog.vagueAfter}</label>}
     {/* Off by default. Rewriting every occurrence of a value across the file is a choice, and one
         the preview above only shows one line of. */}

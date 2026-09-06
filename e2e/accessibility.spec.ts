@@ -47,6 +47,14 @@ test('the armed real copy, its checklist and a toast stay clean', async ({ page 
   expect(await audit(page)).toEqual([]);
 });
 
+test('the sanitise page has no accessibility violations', async ({ page }) => {
+  await open(page, '#/sanitize');
+  await expect(page.locator('.sanitize-page')).toBeVisible();
+  await page.getByLabel('Text att sanera').fill('Password = "Hunter2-Very-Secret!"');
+  await expect(page.locator('.sanitize-findings')).toBeVisible();
+  expect(await audit(page)).toEqual([]);
+});
+
 test('the settings page has no accessibility violations', async ({ page }) => {
   await open(page, '#/settings');
   await expect(page.locator('.rules-panel')).toBeVisible();

@@ -25,9 +25,15 @@ export interface EditorProps {
   placeholderNames?: string[];
   focusName?: string;
   focusLine?: number;
+  /** Select and reveal a span. A command like `focusName`: the nonce makes the same span
+   * requestable twice, which `focusLine` never could. */
+  focusRange?: { start: number; end: number; nonce: number };
   onLine?: (line: number) => void;
   theme?: ResolvedTheme;
   substitutions?: { start: number; end: number; name: string }[];
+  /** Spans the review panel is pointing at: every candidate faintly, the one under the pointer
+   * strongly. Drawn in the template view only; the projections have substitutions instead. */
+  highlights?: { start: number; end: number; tone: 'candidate' | 'active' }[];
   fontSize?: number;
   wordWrap?: boolean;
   /** Fires whenever the selection changes, with null when it is empty. Lets the workspace offer to
