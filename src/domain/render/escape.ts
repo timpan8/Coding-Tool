@@ -7,13 +7,54 @@ export interface Context { quote: string; blocked?: string }
  * Contexts we cannot reliably escape are blocked rather than guessed.
  */
 export function contextAt(source: string, position: number, language: LanguageId): Context {
-  if (language === 'plaintext' || language === 'xml') return { quote: '' };
-  let quote = '', lineComment = false, blockComment = false, here = '', raw = false, triple = false;
+  if (language === 'plaintext') return { quote: '' };
+  // XML has no strings to be inside, but it does have two regions where escaping would be wrong:
+  // a comment, and CDATA where entities are not interpreted at all.
+  if (language === 'xml') {
+    for (const [open, close, message] of [
+      ['<!--', '-->', 'Platshållaren finns i en XML-kommentar. Använd raw-läge endast efter granskning.'],
+      ['<![CDATA[', ']]>', 'CDATA tolkar inga entiteter, så escaping skulle skriva in dem ordagrant.'],
+    ] as const) {
+      const start = source.lastIndexOf(open, position);
+      if (start !== -1 && source.indexOf(close, start) >= position) return { quote: '', blocked: message };
+    }
+    return { quote: '' };
+  }
+  // A YAML block scalar takes its value from indentation, not from quotes.
+  if (language === 'yaml') {
+    const before = source.slice(0, position);
+    const lines = before.split('\n');
+    for (let i = lines.length - 2; i >= 0; i--) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      if (/:\s*[|>][+-]?\d*\s*$/.test(line)) {
+        const indent = line.length - line.trimStart().length;
+        const current = lines[lines.length - 1];
+        // Still inside while the placeholder's line is indented past the key that opened it.
+        if (current.length - current.trimStart().length > indent) {
+          return { quote: '', blocked: 'YAML-blockskalär: värdet styrs av indrag, inte av citattecken. Flytta det till en citerad sträng.' };
+        }
+      }
+      break;
+    }
+  }
+  let here = '';
+  let quote = '', lineComment = false, blockComment = false, raw = false, triple = false, regex = false;
   for (let i = 0; i < position; i++) {
     const c = source[i], next = source[i + 1];
     const lineStart = i === 0 || source[i - 1] === '\n';
     if (here) {
-      if (lineStart && source.startsWith(here + '@', i)) { here = ''; i++; }
+      // PowerShell closes with "@ or '@; a shell here-document closes with the word alone on a line.
+      if (lineStart && language === 'powershell' && source.startsWith(here + '@', i)) { here = ''; i++; }
+      else if (lineStart && language === 'shell') {
+        const line = source.slice(i, source.indexOf('\n', i) === -1 ? undefined : source.indexOf('\n', i));
+        if (line.trim() === here) here = '';
+      }
+      continue;
+    }
+    if (regex) {
+      if (c === '\\') { i++; continue; }
+      if (c === '/' || c === '\n') regex = false;
       continue;
     }
     if (lineComment) { if (c === '\n') lineComment = false; continue; }
@@ -32,6 +73,16 @@ export function contextAt(source: string, position: number, language: LanguageId
       continue;
     }
     if (language === 'powershell' && c === '@' && (next === '"' || next === "'") && /^(?:\r?\n)/.test(source.slice(i + 2))) { here = next; i++; continue; }
+    if (language === 'shell' && c === '<' && next === '<') {
+      const opener = /^<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/.exec(source.slice(i));
+      if (opener) { here = opener[1]; i += opener[0].length - 1; continue; }
+    }
+    // A slash after an operator or the start of an expression opens a regular expression; after a
+    // value it is division. Looking back at the last meaningful character separates the two.
+    if (['javascript', 'typescript'].includes(language) && c === '/' && next !== '/' && next !== '*') {
+      const preceding = source.slice(0, i).replace(/\s+$/, '').slice(-1);
+      if (!preceding || /[=(,:[!&|?{};+\-*%<>~^]/.test(preceding)) { regex = true; continue; }
+    }
     if (language === 'powershell' && c === '<' && next === '#') { blockComment = true; i++; continue; }
     if (['javascript', 'typescript'].includes(language) && c === '/' && next === '*') { blockComment = true; i++; continue; }
     if (['javascript', 'typescript'].includes(language) && c === '/' && next === '/') { lineComment = true; i++; continue; }
@@ -46,7 +97,10 @@ export function contextAt(source: string, position: number, language: LanguageId
       }
     }
   }
-  if (here) return { quote: '', blocked: 'PowerShell here-string: flytta värdet till en vanlig citerad sträng.' };
+  if (here) return { quote: '', blocked: language === 'shell'
+    ? 'Shell here-document: inget är citerat där, så escaping skulle förvanska värdet. Flytta det till en citerad sträng.'
+    : 'PowerShell here-string: flytta värdet till en vanlig citerad sträng.' };
+  if (regex) return { quote: '', blocked: 'Platshållare i ett reguljärt uttryck stöds inte. Bygg uttrycket av en citerad sträng i stället.' };
   if (raw || triple) return { quote, blocked: 'Python raw-, f-, byte- eller trippelsträng: använd en vanlig sträng.' };
   if (blockComment || lineComment) return { quote: '', blocked: 'Platshållaren finns i en kommentar. Använd raw-läge endast efter granskning.' };
   // Do not attempt to parse nested template expressions or Bash command substitutions.

@@ -69,3 +69,36 @@ describe('contextAt · plaintext and xml short-circuit', () => {
     }
   });
 });
+
+/** Report K-f. Contexts the lexer did not know about, where it fell through to a guess rather than
+ * blocking. Each one can change what the surrounding code means. */
+describe('contextAt · contexts that must be blocked rather than guessed', () => {
+  it('blocks a shell here-document', () => {
+    // Inside <<EOF nothing is quoted, so escaping for a quote would corrupt the value.
+    expect(at('cat <<EOF\n{{V}}\nEOF\n', 'shell').blocked).toBeTruthy();
+    expect(at("cat <<'EOF'\n{{V}}\nEOF\n", 'shell').blocked).toBeTruthy();
+    expect(at('cat <<-EOF\n{{V}}\nEOF\n', 'shell').blocked).toBeTruthy();
+  });
+  it('reads normally again after the here-document ends', () => {
+    expect(at('cat <<EOF\nplain\nEOF\nX="{{V}}"\n', 'shell').quote).toBe('"');
+  });
+  it('blocks a JavaScript regular expression literal', () => {
+    // A slash is not a quote, and backslash escaping differs.
+    expect(at('const r = /{{V}}/g;', 'javascript').blocked).toBeTruthy();
+  });
+  it('does not mistake division for a regular expression', () => {
+    expect(at('const a = b / c;\nconst d = "{{V}}";', 'javascript').quote).toBe('"');
+  });
+  it('blocks a YAML block scalar', () => {
+    expect(at('script: |\n  {{V}}\n', 'yaml').blocked).toBeTruthy();
+    expect(at('script: >\n  {{V}}\n', 'yaml').blocked).toBeTruthy();
+    expect(at('script: |-\n  {{V}}\n', 'yaml').blocked).toBeTruthy();
+  });
+  it('blocks an XML comment and a CDATA section', () => {
+    expect(at('<!-- {{V}} -->', 'xml').blocked).toBeTruthy();
+    expect(at('<![CDATA[{{V}}]]>', 'xml').blocked).toBeTruthy();
+  });
+  it('still escapes ordinary XML text', () => {
+    expect(at('<user>{{V}}</user>', 'xml')).toEqual({ quote: '' });
+  });
+});
