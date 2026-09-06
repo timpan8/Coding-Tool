@@ -19,12 +19,18 @@ export function useUndo(report: (message: string) => void): [(offer: UndoOffer) 
   const [left, setLeft] = useState(WINDOW);
   const running = useRef(false);
 
+  // One timer decides when the offer lapses; the other only counts down on screen. Deriving the
+  // expiry from the displayed number instead meant clearing state from inside the effect that
+  // rendered it, one cascading render per second.
   useEffect(() => {
     if (!offer) return;
-    if (left <= 0) { setOffer(null); return; }
-    const id = setTimeout(() => setLeft(left - 1), 1000);
-    return () => clearTimeout(id);
-  }, [offer, left]);
+    const lapse = setTimeout(() => setOffer(null), WINDOW * 1000);
+    const tick = setInterval(() => setLeft((n) => Math.max(0, n - 1)), 1000);
+    return () => {
+      clearTimeout(lapse);
+      clearInterval(tick);
+    };
+  }, [offer]);
 
   function open(next: UndoOffer) {
     running.current = false;

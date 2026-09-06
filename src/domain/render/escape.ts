@@ -7,126 +7,194 @@ export interface Context { quote: string; blocked?: string }
  * Contexts we cannot reliably escape are blocked rather than guessed.
  */
 export function contextAt(source: string, position: number, language: LanguageId): Context {
-  if (language === 'plaintext') return { quote: '' };
+  return contextsAt(source, [position], language)[0];
+}
+
+/** Report P3. The lexer used to be re-run from position 0 for every placeholder, which is O(n·m):
+ * measured at 11 ms for a 500-line file with 50 placeholders and 184 ms at 2000 lines with 200 —
+ * and render() runs twice per keystroke, once per projection.
+ *
+ * This is the same scan, paused at each requested position instead of restarted. The loop body is
+ * unchanged on purpose; contextsAt with a single position does exactly what contextAt did, which is
+ * what the differential property test in context.test.ts pins down.
+ *
+ * Results come back in the order the positions were given. */
+export function contextsAt(source: string, positions: number[], language: LanguageId): Context[] {
+  const results = Array.from<Context>({ length: positions.length });
+  if (language === 'plaintext') return results.fill({ quote: '' });
+  if (language === 'xml') return positions.map((position) => xmlContext(source, position));
+
+  // Ascending, but the answers go back in the caller's order.
+  const order = positions.map((position, index) => ({ position, index })).sort((a, b) => a.position - b.position);
+  let pending = 0;
+  const record = (state: State, upTo: number) => {
+    while (pending < order.length && order[pending].position <= upTo) {
+      const { position, index } = order[pending++];
+      results[index] = resolve(state, source, position, language);
+    }
+  };
+  const state: State = { here: '', quote: '', lineComment: false, blockComment: false, raw: false, triple: false, regex: false, dollarUntil: -1 };
+  scan(source, language, Math.min(Math.max(0, ...positions), source.length), state, record);
+  record(state, Infinity);
+  return results;
+}
+
+interface State { here: string; quote: string; lineComment: boolean; blockComment: boolean; raw: boolean; triple: boolean; regex: boolean; dollarUntil: number }
+
+function xmlContext(source: string, position: number): Context {
   // XML has no strings to be inside, but it does have two regions where escaping would be wrong:
   // a comment, and CDATA where entities are not interpreted at all.
-  if (language === 'xml') {
-    for (const [open, close, message] of [
-      ['<!--', '-->', 'Platshållaren finns i en XML-kommentar. Använd raw-läge endast efter granskning.'],
-      ['<![CDATA[', ']]>', 'CDATA tolkar inga entiteter, så escaping skulle skriva in dem ordagrant.'],
-    ] as const) {
-      const start = source.lastIndexOf(open, position);
-      if (start !== -1 && source.indexOf(close, start) >= position) return { quote: '', blocked: message };
-    }
-    return { quote: '' };
+  for (const [open, close, message] of [
+    ['<!--', '-->', 'Platshållaren finns i en XML-kommentar. Använd raw-läge endast efter granskning.'],
+    ['<![CDATA[', ']]>', 'CDATA tolkar inga entiteter, så escaping skulle skriva in dem ordagrant.'],
+  ] as const) {
+    const start = source.lastIndexOf(open, position);
+    if (start !== -1 && source.indexOf(close, start) >= position) return { quote: '', blocked: message };
   }
-  // A YAML block scalar takes its value from indentation, not from quotes.
+  return { quote: '' };
+}
+
+/** The scan itself, shared by every position. `record` is called at the top of each character with
+ * the state as it stands before that character, which is exactly the state the old per-position
+ * loop ended with for any position at or before it. */
+function scan(source: string, language: LanguageId, until: number, s: State, record: (state: State, upTo: number) => void) {
+  // Which characters actually open a string differs, and getting it wrong is not cosmetic: an
+  // apostrophe in an HCL comment would otherwise open a string that never closes, and a SQL double
+  // quote encloses an identifier rather than a value.
+  const quotes = language === 'hcl' ? '"' : language === 'sql' ? "'" : language === 'dotenv' ? '"\'' : null;
+  for (let i = 0; i < until; i++) {
+    record(s, i);
+      const c = source[i], next = source[i + 1];
+      const lineStart = i === 0 || source[i - 1] === '\n';
+      if (s.here) {
+        // PowerShell closes with "@ or '@; a shell s.here-document closes with the word alone on a line.
+        if (lineStart && language === 'powershell' && source.startsWith(s.here + '@', i)) { s.here = ''; i++; }
+        else if (lineStart && language === 'shell') {
+          const line = source.slice(i, source.indexOf('\n', i) === -1 ? undefined : source.indexOf('\n', i));
+          if (line.trim() === s.here) s.here = '';
+        }
+        continue;
+      }
+      if (s.regex) {
+        if (c === '\\') { i++; continue; }
+        if (c === '/' || c === '\n') s.regex = false;
+        continue;
+      }
+      if (s.lineComment) { if (c === '\n') s.lineComment = false; continue; }
+      if (s.blockComment) {
+        if ((language === 'powershell' && c === '#' && next === '>') || (c === '*' && next === '/')) { s.blockComment = false; i++; }
+        continue;
+      }
+      if (s.quote) {
+        // Where a backslash escapes the next character. Not in a POSIX single-quoted string, not in
+        // a dotenv single-quoted string, and not in SQL, where the standard escape is a doubled
+        // apostrophe and a backslash stands for itself.
+        const literal = (language === 'shell' || language === 'dotenv') && s.quote === "'";
+        if ((language === 'powershell' && s.quote === '"' && c === '`')
+          || (language !== 'powershell' && language !== 'sql' && !literal && c === '\\')) { i++; continue; }
+        if ((language === 'powershell' || language === 'yaml' || language === 'sql') && s.quote === "'" && c === "'" && next === "'") { i++; continue; }
+        if (c === s.quote) {
+          if (s.triple) { if (source.slice(i, i + 3) === s.quote.repeat(3)) { i += 2; s.quote = ''; s.triple = false; s.raw = false; } }
+          else { s.quote = ''; s.raw = false; }
+        }
+        continue;
+      }
+      if (language === 'powershell' && c === '@' && (next === '"' || next === "'") && /^(?:\r?\n)/.test(source.slice(i + 2))) { s.here = next; i++; continue; }
+      if ((language === 'shell' || language === 'hcl') && c === '<' && next === '<') {
+        const opener = /^<<[-~]?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/.exec(source.slice(i));
+        if (opener) { s.here = opener[1]; i += opener[0].length - 1; continue; }
+      }
+      // Postgres dollar quoting: $tag$ ... $tag$ interprets nothing at all inside. Recorded as the
+      // furthest index a closer sits at, so any position up to there resolves as blocked; an
+      // unterminated one blocks nothing.
+      //
+      // The furthest, not the latest: the old code returned as soon as it found an opener whose
+      // closer lay at or beyond the position, so a position is blocked if ANY earlier opener
+      // reaches it. Overwriting instead let `$t$$t$"` unblock itself — the second opener's closer
+      // is -1, and position 3 stopped being inside the first region. The property test found it.
+      if (language === 'sql' && c === '$') {
+        const opener = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(source.slice(i));
+        if (opener) s.dollarUntil = Math.max(s.dollarUntil, source.indexOf(opener[0], i + opener[0].length));
+      }
+      // A slash after an operator or the start of an expression opens a regular expression; after a
+      // value it is division. Looking back at the last meaningful character separates the two.
+      if (['javascript', 'typescript'].includes(language) && c === '/' && next !== '/' && next !== '*') {
+        const preceding = source.slice(0, i).replace(/\s+$/, '').slice(-1);
+        if (!preceding || /[=(,:[!&|?{};+\-*%<>~^]/.test(preceding)) { s.regex = true; continue; }
+      }
+      if (language === 'powershell' && c === '<' && next === '#') { s.blockComment = true; i++; continue; }
+      if (['javascript', 'typescript'].includes(language) && c === '/' && next === '*') { s.blockComment = true; i++; continue; }
+      if (['javascript', 'typescript'].includes(language) && c === '/' && next === '/') { s.lineComment = true; i++; continue; }
+      if (['powershell', 'python', 'shell', 'yaml', 'dotenv', 'hcl'].includes(language) && c === '#') { s.lineComment = true; continue; }
+      if (language === 'hcl' && c === '/' && next === '*') { s.blockComment = true; i++; continue; }
+      if (language === 'hcl' && c === '/' && next === '/') { s.lineComment = true; i++; continue; }
+      if (language === 'sql' && c === '/' && next === '*') { s.blockComment = true; i++; continue; }
+      if (language === 'sql' && c === '-' && next === '-') { s.lineComment = true; i++; continue; }
+      if (quotes ? quotes.includes(c) : c === '"' || c === "'" || (['javascript', 'typescript'].includes(language) && c === '`')) {
+        s.quote = c;
+        if (language === 'python') {
+          const prefix = /([rRuUfFbB]{1,2})$/.exec(source.slice(0, i))?.[1] || '';
+          s.raw = /[rfb]/i.test(prefix);
+          s.triple = source.slice(i, i + 3) === c.repeat(3);
+          if (s.triple) i += 2;
+        }
+      }
+  }
+}
+
+/** The old function's tail: turn the state at a position into an answer. */
+function resolve(s: State, source: string, position: number, language: LanguageId): Context {
   if (language === 'yaml') {
-    const before = source.slice(0, position);
-    const lines = before.split('\n');
-    for (let i = lines.length - 2; i >= 0; i--) {
-      const line = lines[i];
-      if (!line.trim()) continue;
+    const block = yamlBlockScalar(source, position);
+    if (block) return block;
+  }
+  if (position <= s.dollarUntil) return { quote: '', blocked: 'Dollarciterad SQL-sträng tolkar ingenting alls. Flytta värdet till en vanlig sträng med apostrofer.' };
+  if (s.here) return { quote: '', blocked: language === 'shell' || language === 'hcl'
+    ? 'Here-document: inget är citerat där, så escaping skulle förvanska värdet. Flytta det till en citerad sträng.'
+    : 'PowerShell here-string: flytta värdet till en vanlig citerad sträng.' };
+  if (s.regex) return { quote: '', blocked: 'Platshållare i ett reguljärt uttryck stöds inte. Bygg uttrycket av en citerad sträng i stället.' };
+  if (s.raw || s.triple) return { quote: s.quote, blocked: 'Python raw-, f-, byte- eller trippelsträng: använd en vanlig sträng.' };
+  if (s.blockComment || s.lineComment) return { quote: '', blocked: 'Platshållaren finns i en kommentar. Använd raw-läge endast efter granskning.' };
+  // Do not attempt to parse nested template expressions or Bash command substitutions. Both look
+  // backwards only as far as the nearest closer, rather than slicing the whole prefix, which was
+  // the other half of the quadratic cost.
+  if (s.quote === '`' && unclosed(source, position, '${', '}')) return { quote: s.quote, blocked: 'Platshållare inuti JavaScript-uttryck stöds inte automatiskt.' };
+  if (language === 'shell' && s.quote === '"' && unclosed(source, position, '$(', ')')) return { quote: s.quote, blocked: 'Platshållare i kommandosubstitution stöds inte.' };
+  return { quote: s.quote };
+}
+
+/** True when `open` appears before `position` with no `close` between: the equivalent of the
+ * /\$\{[^}]*$/ test the tail used to run over a slice of the whole source. */
+function unclosed(source: string, position: number, open: string, close: string): boolean {
+  for (let i = position - 1; i >= 0; i--) {
+    if (source[i] === close) return false;
+    if (source[i] === open[1] && source[i - 1] === open[0]) return true;
+  }
+  return false;
+}
+
+/** A YAML block scalar takes its value from indentation, not from quotes. Reads back to the
+ * previous non-empty line rather than splitting the whole prefix into lines. */
+function yamlBlockScalar(source: string, position: number): Context | null {
+  const lineStart = source.lastIndexOf('\n', position - 1) + 1;
+  const current = source.slice(lineStart, position);
+  let end = lineStart - 1;
+  while (end > 0) {
+    const start = source.lastIndexOf('\n', end - 1) + 1;
+    const line = source.slice(start, end);
+    if (line.trim()) {
       if (/:\s*[|>][+-]?\d*\s*$/.test(line)) {
         const indent = line.length - line.trimStart().length;
-        const current = lines[lines.length - 1];
         // Still inside while the placeholder's line is indented past the key that opened it.
         if (current.length - current.trimStart().length > indent) {
           return { quote: '', blocked: 'YAML-blockskalär: värdet styrs av indrag, inte av citattecken. Flytta det till en citerad sträng.' };
         }
       }
-      break;
+      return null;
     }
+    end = start - 1;
   }
-  // Which characters actually open a string differs, and getting it wrong is not cosmetic: an
-  // apostrophe in an HCL comment would otherwise open a string that never closes, and a SQL double
-  // quote encloses an identifier rather than a value.
-  const quotes = language === 'hcl' ? '"' : language === 'sql' ? "'" : language === 'dotenv' ? '"\'' : null;
-  let here = '';
-  let quote = '', lineComment = false, blockComment = false, raw = false, triple = false, regex = false;
-  for (let i = 0; i < position; i++) {
-    const c = source[i], next = source[i + 1];
-    const lineStart = i === 0 || source[i - 1] === '\n';
-    if (here) {
-      // PowerShell closes with "@ or '@; a shell here-document closes with the word alone on a line.
-      if (lineStart && language === 'powershell' && source.startsWith(here + '@', i)) { here = ''; i++; }
-      else if (lineStart && language === 'shell') {
-        const line = source.slice(i, source.indexOf('\n', i) === -1 ? undefined : source.indexOf('\n', i));
-        if (line.trim() === here) here = '';
-      }
-      continue;
-    }
-    if (regex) {
-      if (c === '\\') { i++; continue; }
-      if (c === '/' || c === '\n') regex = false;
-      continue;
-    }
-    if (lineComment) { if (c === '\n') lineComment = false; continue; }
-    if (blockComment) {
-      if ((language === 'powershell' && c === '#' && next === '>') || (c === '*' && next === '/')) { blockComment = false; i++; }
-      continue;
-    }
-    if (quote) {
-      // Where a backslash escapes the next character. Not in a POSIX single-quoted string, not in
-      // a dotenv single-quoted string, and not in SQL, where the standard escape is a doubled
-      // apostrophe and a backslash stands for itself.
-      const literal = (language === 'shell' || language === 'dotenv') && quote === "'";
-      if ((language === 'powershell' && quote === '"' && c === '`')
-        || (language !== 'powershell' && language !== 'sql' && !literal && c === '\\')) { i++; continue; }
-      if ((language === 'powershell' || language === 'yaml' || language === 'sql') && quote === "'" && c === "'" && next === "'") { i++; continue; }
-      if (c === quote) {
-        if (triple) { if (source.slice(i, i + 3) === quote.repeat(3)) { i += 2; quote = ''; triple = false; raw = false; } }
-        else { quote = ''; raw = false; }
-      }
-      continue;
-    }
-    if (language === 'powershell' && c === '@' && (next === '"' || next === "'") && /^(?:\r?\n)/.test(source.slice(i + 2))) { here = next; i++; continue; }
-    if ((language === 'shell' || language === 'hcl') && c === '<' && next === '<') {
-      const opener = /^<<[-~]?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/.exec(source.slice(i));
-      if (opener) { here = opener[1]; i += opener[0].length - 1; continue; }
-    }
-    // Postgres dollar quoting: $tag$ ... $tag$ interprets nothing at all inside.
-    if (language === 'sql' && c === '$') {
-      const opener = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(source.slice(i));
-      if (opener && source.indexOf(opener[0], i + opener[0].length) >= position) {
-        return { quote: '', blocked: 'Dollarciterad SQL-sträng tolkar ingenting alls. Flytta värdet till en vanlig sträng med apostrofer.' };
-      }
-    }
-    // A slash after an operator or the start of an expression opens a regular expression; after a
-    // value it is division. Looking back at the last meaningful character separates the two.
-    if (['javascript', 'typescript'].includes(language) && c === '/' && next !== '/' && next !== '*') {
-      const preceding = source.slice(0, i).replace(/\s+$/, '').slice(-1);
-      if (!preceding || /[=(,:[!&|?{};+\-*%<>~^]/.test(preceding)) { regex = true; continue; }
-    }
-    if (language === 'powershell' && c === '<' && next === '#') { blockComment = true; i++; continue; }
-    if (['javascript', 'typescript'].includes(language) && c === '/' && next === '*') { blockComment = true; i++; continue; }
-    if (['javascript', 'typescript'].includes(language) && c === '/' && next === '/') { lineComment = true; i++; continue; }
-    if (['powershell', 'python', 'shell', 'yaml', 'dotenv', 'hcl'].includes(language) && c === '#') { lineComment = true; continue; }
-    if (language === 'hcl' && c === '/' && next === '*') { blockComment = true; i++; continue; }
-    if (language === 'hcl' && c === '/' && next === '/') { lineComment = true; i++; continue; }
-    if (language === 'sql' && c === '/' && next === '*') { blockComment = true; i++; continue; }
-    if (language === 'sql' && c === '-' && next === '-') { lineComment = true; i++; continue; }
-    if (quotes ? quotes.includes(c) : c === '"' || c === "'" || (['javascript', 'typescript'].includes(language) && c === '`')) {
-      quote = c;
-      if (language === 'python') {
-        const prefix = /([rRuUfFbB]{1,2})$/.exec(source.slice(0, i))?.[1] || '';
-        raw = /[rfb]/i.test(prefix);
-        triple = source.slice(i, i + 3) === c.repeat(3);
-        if (triple) i += 2;
-      }
-    }
-  }
-  if (here) return { quote: '', blocked: language === 'shell' || language === 'hcl'
-    ? 'Here-document: inget är citerat där, så escaping skulle förvanska värdet. Flytta det till en citerad sträng.'
-    : 'PowerShell here-string: flytta värdet till en vanlig citerad sträng.' };
-  if (regex) return { quote: '', blocked: 'Platshållare i ett reguljärt uttryck stöds inte. Bygg uttrycket av en citerad sträng i stället.' };
-  if (raw || triple) return { quote, blocked: 'Python raw-, f-, byte- eller trippelsträng: använd en vanlig sträng.' };
-  if (blockComment || lineComment) return { quote: '', blocked: 'Platshållaren finns i en kommentar. Använd raw-läge endast efter granskning.' };
-  // Do not attempt to parse nested template expressions or Bash command substitutions.
-  const prefix = source.slice(0, position);
-  if (quote === '`' && /\$\{[^}]*$/.test(prefix)) return { quote, blocked: 'Platshållare inuti JavaScript-uttryck stöds inte automatiskt.' };
-  if (language === 'shell' && quote === '"' && /\$\([^)]*$/.test(prefix)) return { quote, blocked: 'Platshållare i kommandosubstitution stöds inte.' };
-  return { quote };
+  return null;
 }
 
 function backslash(value: string, quote: string): string {

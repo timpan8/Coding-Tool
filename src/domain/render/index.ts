@@ -1,6 +1,6 @@
 import type { Binding, LanguageId } from '../../types/models';
 import { resolveBinding, resolveValue } from '../bindings';
-import { contextAt, escapeValue } from './escape';
+import { contextsAt, escapeValue } from './escape';
 
 export interface RenderIssue { name: string; start: number; message: string; kind: 'missing' | 'context' | 'leak' }
 export interface RenderResult {
@@ -23,7 +23,12 @@ export function render(template: string, bindings: Binding[], options: RenderOpt
   const issues: RenderIssue[] = [], used: string[] = [], secretRanges: { start: number; end: number }[] = [];
   const substitutions: RenderResult['substitutions'] = [];
   let output = '', cursor = 0;
-  for (const match of template.matchAll(placeholderRegex())) {
+  // Every placeholder position up front, so the lexer walks the template once rather than once per
+  // placeholder. Report P3: the old shape was O(n·m) — 184 ms for 2000 lines with 200 placeholders,
+  // twice per keystroke.
+  const matches = [...template.matchAll(placeholderRegex())];
+  const contexts = contextsAt(template, matches.map((m) => m.index), options.language);
+  for (const [index, match] of matches.entries()) {
     const start = match.index, name = match[1];
     output += template.slice(cursor, start);
     const binding = resolveBinding(name, bindings, options.projectId, options.versionId);
@@ -32,7 +37,7 @@ export function render(template: string, bindings: Binding[], options: RenderOpt
     if (!binding || value === undefined || value === '') issues.push({ name, start, kind: 'missing', message: 'Binding eller värde saknas.' });
     else {
       used.push(name);
-      const escaped = binding.escapeMode === 'raw' ? { text: value } : escapeValue(value, options.language, contextAt(template, start, options.language));
+      const escaped = binding.escapeMode === 'raw' ? { text: value } : escapeValue(value, options.language, contexts[index]);
       if (escaped.error) issues.push({ name, start, kind: 'context', message: escaped.error });
       else replacement = escaped.text;
       // Every substituted private value counts, not only the ones categorised 'secret'. The

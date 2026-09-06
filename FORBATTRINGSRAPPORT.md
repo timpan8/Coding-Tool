@@ -164,10 +164,10 @@ Lägg till dra-och-släpp av en `.ps1`/`.py`/`.tf`-fil in i editorn samt "Ladda 
 Ett projekt som skapas som PowerShell och byts till Python heter fortfarande `script.ps1`. Byt ändelse när namnet fortfarande är
 det autogenererade, låt det vara om användaren döpt om filen.
 
-**F13 · För få språk för målgruppen.** *(Delvis åtgärdat: `dotenv`, `hcl` och `sql` tillagda med egna
+**F13 · För få språk för målgruppen.** _(Delvis åtgärdat: `dotenv`, `hcl` och `sql` tillagda med egna
 escaping-regler och tester. `dockerfile`, `ini`/`toml`, `csharp`, `go` och `java` återstår — var och en
 kräver samma arbete, och C#-verbatimsträngar och Go:s råsträngar med backticks måste blockeras, inte
-gissas.)* `LanguageId` har nio värden. För ett verktyg om hemligheter i kod saknas
+gissas.)_ `LanguageId` har nio värden. För ett verktyg om hemligheter i kod saknas
 `.env`/dotenv, SQL, Dockerfile, Terraform/HCL, INI/TOML, C#, Go och Java. `.env` och Terraform är de mest uppenbara —
 det är där hemligheter faktiskt bor. Varje nytt språk kräver dock en egen escaping-regel i `escape.ts`; lägg inte till ett språk
 utan att också lägga till dess escaping och test, annars faller det tillbaka på den odefinierade sista raden i
@@ -175,9 +175,9 @@ utan att också lägga till dess escaping och test, annars faller det tillbaka p
 
 ### 3.3 Bindings
 
-**F14 · Bindings kan bara skapas genom att markera text i editorn.** *(Åtgärdat: "Ny binding"-knapp
+**F14 · Bindings kan bara skapas genom att markera text i editorn.** _(Åtgärdat: "Ny binding"-knapp
 utan markering, och `#/bindings` som egen route med sökning, filter på räckvidd och användning över
-hela valvet.)* Det finns ingen "Ny binding"-knapp. Vill man förbereda ett
+hela valvet.)_ Det finns ingen "Ny binding"-knapp. Vill man förbereda ett
 globalt värde innan koden finns går det inte. Lägg till en knapp i bindingpanelen och en global bindinghanterare
 (egen route) där alla bindings kan sökas, redigeras och rensas — inklusive globala som inte hör till något öppet projekt.
 
@@ -278,23 +278,23 @@ till första fokuserbara elementet — `×`. Enter stänger då dialogen i stäl
 `confirm()` går inte att formge, kan blockeras av webbläsaren och saknar möjlighet till "fråga inte igen".
 Åtgärd: använd den befintliga `Modal`-komponenten för alla bekräftelser.
 
-**U6 · Alla fel blir en modal.** *(Åtgärdat.)* `App.tsx:205` visar varje fel som en heltäckande dialog med rubriken "Åtgärden behöver
+**U6 · Alla fel blir en modal.** _(Åtgärdat.)_ `App.tsx:205` visar varje fel som en heltäckande dialog med rubriken "Åtgärden behöver
 uppmärksamhet". För återvinnbara fel (urklipp nekat, projektlistan kunde inte läsas) är det för tungt.
 Åtgärd: skilj på blockerande fel (modal) och information (den befintliga `inline-notice`-remsan).
 
-**U7 · Klick försvinner tyst.** *(Åtgärdat. Den tysta returen för Ctrl+B låg dessutom i editorn, inte i `App.tsx` — Monaco rapporterade aldrig en tom markering, så appen hade ingenting att svara på.)* `run()` (`App.tsx:43-49`) returnerar utan återkoppling om något redan pågår.
+**U7 · Klick försvinner tyst.** _(Åtgärdat. Den tysta returen för Ctrl+B låg dessutom i editorn, inte i `App.tsx` — Monaco rapporterade aldrig en tom markering, så appen hade ingenting att svara på.)_ `run()` (`App.tsx:43-49`) returnerar utan återkoppling om något redan pågår.
 `copy()` (rad 147) och `createBinding()` (rad 101) gör detsamma. I Local-vyn gör Ctrl+B ingenting alls, utan förklaring.
 Åtgärd: ge alltid ett svar — inaktiverat läge med förklaring, eller ett kort meddelande ("Byt till Mall-vyn för att skapa en
 binding").
 
-**U8 · Navigering blockeras tyst under sparning.** *(Åtgärdat.)* `navigate()` (`App.tsx:54-55`) återställer hashen utan att säga något om en
+**U8 · Navigering blockeras tyst under sparning.** _(Åtgärdat.)_ `navigate()` (`App.tsx:54-55`) återställer hashen utan att säga något om en
 skrivning pågår. Användaren klickar på en länk och ingenting händer.
 
-**U9 · Hela gränssnittet fryser vid varje åtgärd.** *(Åtgärdat: `inert` sitter nu på redigeringsytan, och `aria-busy` på `<main>`.)* `<main inert={busy}>` (`App.tsx:171`) stänger av all interaktion i
+**U9 · Hela gränssnittet fryser vid varje åtgärd.** _(Åtgärdat: `inert` sitter nu på redigeringsytan, och `aria-busy` på `<main>`.)_ `<main inert={busy}>` (`App.tsx:171`) stänger av all interaktion i
 huvudytan under varje `run()`-anrop. Det är rätt tänkt men för brett — sätt `inert` på det som faktiskt påverkas, eller visa en
 tydlig upptagen-indikation så att frysningen blir begriplig.
 
-**U10 · Sökfältet delas mellan två vyer.** *(Åtgärdat.)* Samma `query`-tillstånd (`App.tsx:33`) används både i snabbpanelen och på
+**U10 · Sökfältet delas mellan två vyer.** _(Åtgärdat.)_ Samma `query`-tillstånd (`App.tsx:33`) används både i snabbpanelen och på
 "Alla projekt". Skriver man i den ena ändras den andra. Håll dem åtskilda.
 
 **U11 · Inget visar vad som faktiskt byttes ut.** `RenderResult.secretRanges` beräknas i `render()` men används enbart för att
@@ -387,7 +387,9 @@ på några tusen rader blir det kännbart medan man skriver.
 Åtgärd: kör den bara vid AI-kopiering och vid vybyte, inte vid varje tangenttryckning — eller flytta den till en web worker med
 debounce. Överväg Aho–Corasick eller en enkel förfiltrering på minsta värdelängd.
 
-**P3 · Kontextanalysen är kvadratisk.** `contextAt()` (`escape.ts:8`) läser källan från position 0 för varje platshållare.
+**P3 · Kontextanalysen är kvadratisk.** _(Åtgärdat. Uppmätt före: 11 ms för 500 rader med 50
+platshållare, 184 ms vid 2000 rader, 1154 ms vid 5000 — och `render()` kör två gånger per
+tangenttryckning. Efter: 0,6 / 2,5 / 6,2 ms, alltså linjärt.)_ `contextAt()` (`escape.ts:8`) läser källan från position 0 för varje platshållare.
 En fil med många platshållare får O(n·m). En enda genomläsning som bygger ett kontextindex löser det.
 
 **P4 · Alla bindings i valvet laddas alltid.** `App.tsx` anropar `storage.listBindings()` utan filter (rad 64, 72, 120, 135),
