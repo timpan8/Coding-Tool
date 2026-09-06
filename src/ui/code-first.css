@@ -790,6 +790,8 @@ dialog:has(.version-view) {
   display: block;
   margin-bottom: 10px;
   font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .binding-preview {
   display: grid;

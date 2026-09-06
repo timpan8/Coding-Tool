@@ -343,8 +343,8 @@ export const sv = {
     scopeVersion: 'Version',
     aiValue: 'AI-värde',
     aiSees: 'AI:n ser ',
-    more: 'Fler val · AI-värde, räckvidd, profiler',
-    fewer: 'Färre val',
+    more: '▸ Fler val · AI-värde, räckvidd, profiler',
+    fewer: '▾ Färre val',
     defaultValue: 'Privat värde · standard',
     profileValue: (profile: string) => `Privat värde för ${profile}`,
     showValue: 'Visa privat värde',
@@ -406,7 +406,9 @@ export const sv = {
   findings: {
     selectAll: 'Markera alla',
     choose: (rule: string, line: number) => `Välj ${rule} på rad ${line}`,
-    bindChosen: (count: number) => count === 1 ? 'Skapa binding för den valda' : `Skapa ${count} bindings`,
+    bindChosen: (count: number) => count === 0 ? 'Skapa bindings'
+      : count === 1 ? 'Skapa binding för den valda'
+      : `Skapa ${count} bindings`,
     boundMany: (count: number) => `${count} bindings skapade. Värdena är utbytta mot platshållare.`,
     boundManyUndo: (count: number) => `${count} bindings skapade från granskningsfynden.`,
     title: 'Misstänkta värden',
