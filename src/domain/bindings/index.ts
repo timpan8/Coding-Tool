@@ -47,8 +47,11 @@ export function suggestBinding(
 
 /** Counts up until the name is free in the scope the binding will land in — the same comparison
  * validateBinding makes, so a suggestion can never be rejected by it. The suffix is trimmed back
- * into the 64 characters the name rule allows rather than pushing the name past it. */
-function freeName(base: string, bindings: Binding[], scope: Pick<Binding, 'scope' | 'scopeRef'>): string {
+ * into the 64 characters the name rule allows rather than pushing the name past it.
+ *
+ * Takes the names rather than whole bindings so a caller naming several at once can add the ones it
+ * has just decided on to the list, and not propose the same name twice in one pass. */
+export function freeName(base: string, bindings: Pick<Binding, 'name' | 'scope' | 'scopeRef'>[], scope: Pick<Binding, 'scope' | 'scopeRef'>): string {
   const used = new Set(bindings.filter(b => b.scope === scope.scope && b.scopeRef === scope.scopeRef).map(b => b.name));
   if (!used.has(base)) return base;
   for (let n = 2; n < 1000; n++) {

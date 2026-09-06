@@ -16,6 +16,15 @@ async function type(page: Page, code: string) {
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 }
 
+/** The app treats a large jump in one change as a paste — no editor gives it a paste event it can
+ * trust — so the tests that exercise that path have to paste for real rather than type. */
+async function paste(page: Page, code: string) {
+  await page.locator('.code-editor').click();
+  await page.evaluate(text => navigator.clipboard.writeText(text), code);
+  await page.keyboard.press('Control+v');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+}
+
 async function bind(page: Page, word: string, privateValue: string, category?: string) {
   await page.getByText(word, { exact: false }).first().dblclick();
   await page.keyboard.press('Control+b');
@@ -266,6 +275,57 @@ test('clears what it says it clears, and says what it does not', async ({ page }
   await page.evaluate(() => (location.hash = '#/projects'));
   await expect(page.locator('.project-card')).toHaveCount(0);
   await expect(page.locator('.empty-project-list')).toBeVisible();
+});
+
+// Punkt 7. Granskningsreglerna pekar ut och låter dig avgöra, en i taget. Blocklistan är den andra
+// halvan: termer där beslutet redan är fattat byts mot en platshållare i samma stund de landar i
+// arbetsytan, så företagsnamnet inte hinner följa med in i en AI-kopia.
+test('puts a blocklisted term away by itself when code is pasted', async ({ page }) => {
+  await go(page, 'Inställningar', '.blocklist-panel');
+  await page.getByLabel('Term', { exact: true }).fill('mittforetag.se');
+  await page.getByLabel('Vad AI:n ser (valfritt)').fill('example.com');
+  await page.getByRole('button', { name: 'Lägg till term' }).click();
+  await expect(page.locator('.blocklist-panel')).toContainText('{{MITTFORETAG_SE}}');
+
+  await go(page, '＋ Ny kod', '.code-editor');
+  // A real paste, not typing: the blocklist runs on text that arrives whole, and keyboard.type()
+  // delivers one character at a time.
+  await paste(page, '$url = "https://mittforetag.se/api"\n$mail = "post@mittforetag.se"\n');
+  await expect(page.locator('.editor-body')).toContainText('{{MITTFORETAG_SE}}');
+  await expect(page.locator('.editor-body')).not.toContainText('mittforetag.se');
+  await expect(page.locator('.inline-notice')).toContainText('förekomster');
+
+  // The AI view carries the harmless value, the Local view the real one — the term became an
+  // ordinary binding, so nothing else in the app had to learn about the blocklist.
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.locator('.editor-body')).toContainText('example.com');
+  await expect(page.locator('.editor-body')).not.toContainText('mittforetag.se');
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
+  await expect(page.locator('.editor-body')).toContainText('mittforetag.se');
+
+  // And code that comes home from an AI finds its way back onto the placeholder.
+  await page.getByRole('tab', { name: 'Mall' }).click();
+  await page.getByRole('button', { name: 'Klistra in från AI ↙' }).click();
+  await page.locator('textarea[aria-label="Kod från AI"]').fill('$url = "https://example.com/api"\n');
+  await expect(page.locator('.ingest-decisions')).toContainText('Återställd');
+  await page.getByRole('button', { name: 'Ersätt mallen' }).click();
+  await expect(page.locator('.editor-body')).toContainText('{{MITTFORETAG_SE}}');
+});
+
+// The substitution is one act and has to come back in one step, with the pasted text as it stood.
+test('takes back a blocklist substitution in one step', async ({ page }) => {
+  await go(page, 'Inställningar', '.blocklist-panel');
+  await page.getByLabel('Term', { exact: true }).fill('mittforetag.se');
+  await page.getByRole('button', { name: 'Lägg till term' }).click();
+
+  await go(page, '＋ Ny kod', '.code-editor');
+  await paste(page, '$url = "https://mittforetag.se/api"\n');
+  await expect(page.locator('.editor-body')).toContainText('{{MITTFORETAG_SE}}');
+
+  await page.locator('.undo-bar').getByRole('button', { name: 'Ångra', exact: true }).click();
+  await expect(page.locator('.editor-body')).toContainText('mittforetag.se');
+  await expect(page.locator('.editor-body')).not.toContainText('{{MITTFORETAG_SE}}');
 });
 
 // Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did

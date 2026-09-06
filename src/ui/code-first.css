@@ -558,7 +558,8 @@
   gap: 10px;
 }
 
-.rules-panel {
+.rules-panel,
+.blocklist-panel {
   margin-top: 32px;
   padding-top: 24px;
   border-top: 1px solid var(--border);

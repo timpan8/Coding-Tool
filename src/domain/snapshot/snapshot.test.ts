@@ -32,6 +32,7 @@ function workspace(): WorkspaceSnapshot {
     profiles: [],
     datasets: [],
     rules: [],
+    blocklist: [{ id: 'block-1', term: 'mittforetag.se', replacement: 'example.com', enabled: true, createdAt: '2026-09-05T12:00:00.000Z' }],
     dismissals: [{ projectId: p.id, fingerprint: 'abc12345', ruleId: 'email', reason: 'exempelvärde', createdAt: '2026-09-05T12:00:00.000Z', deviceId: 'd' }],
     settings,
   };
@@ -41,7 +42,7 @@ const dataset = (): WorkspaceSnapshot['datasets'][number] => ({
   sensitive: false, columns: [{ name: 'namn', type: 'string' }], rows: [['Anna']],
   createdAt: '2026-09-05T12:00:00.000Z', updatedAt: '2026-09-05T12:00:00.000Z',
 });
-const empty = (): WorkspaceSnapshot => ({ projects: [], versions: [], drafts: [], bindings: [], profiles: [], datasets: [], rules: [], dismissals: [], settings });
+const empty = (): WorkspaceSnapshot => ({ projects: [], versions: [], drafts: [], bindings: [], profiles: [], datasets: [], rules: [], blocklist: [], dismissals: [], settings });
 
 describe('export', () => {
   it('round-trips a full snapshot through parsing', () => {
@@ -67,6 +68,9 @@ describe('export', () => {
     const source = workspace();
     const text = JSON.stringify(toSnapshot(source, 'private', app));
     expect(text).toContain('SuperSecret123!');
+    // A blocklist term is a private value with a decision attached, so it travels with the private
+    // backup too. Without this, restoring one on a new machine leaves the terms behind.
+    expect(text).toContain('mittforetag.se');
   });
 
   it('refuses a payload that smuggles extra keys past the private shape', () => {

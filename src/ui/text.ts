@@ -22,7 +22,7 @@
  * down rather than derived. */
 const plurals: Record<string, string> = {
   projekt: 'projekt', version: 'versioner', utkast: 'utkast', binding: 'bindings',
-  profil: 'profiler', dataset: 'dataset', regel: 'regler',
+  profil: 'profiler', dataset: 'dataset', regel: 'regler', blocklistterm: 'blocklisttermer',
 };
 const plural = (kind: string) => plurals[kind] ?? kind;
 const swedishList = (items: string[]) => items.length < 2 ? items.join('')
@@ -457,6 +457,28 @@ export const sv = {
       `${now} projekt i valvet raderas, ${incoming} kommer från filen`,
     replaceBindings: (now: number, incoming: number) =>
       `${now} ${now === 1 ? 'binding' : 'bindings'} i valvet raderas, ${incoming} kommer från filen`,
+  },
+  blocklist: {
+    heading: 'Blocklista',
+    lead: 'Termer som aldrig får nå en AI. De byts mot en platshållare direkt när text klistras in eller en fil öppnas — till skillnad från granskningsreglerna, som pekar ut och låter dig avgöra. Bindingen blir global, eftersom beslutet gäller hela valvet och inte ett projekt.',
+    termLabel: 'Term',
+    termHint: 'Matchas ordagrant och skiftlägesokänsligt, vid ordgräns. Inga reguljära uttryck.',
+    /** Deliberately not "AI-värde", which is the binding dialog's own field: Playwright's getByLabel
+     * matches substrings, and two controls whose names contain one another are a test that fails
+     * somewhere else entirely. */
+    replacementLabel: 'Vad AI:n ser (valfritt)',
+    replacementHint: 'Vad en AI får se i stället. Lämnas det tomt väljs ett ofarligt standardvärde för kategorin.',
+    defaultReplacement: 'standardvärde',
+    add: 'Lägg till term',
+    added: (term: string) => `${term} läggs nu undan automatiskt.`,
+    duplicate: 'Termen finns redan i listan.',
+    remove: (term: string) => `Ta bort ${term}`,
+    enabledLabel: (term: string) => `${term} aktiv`,
+    fromTerm: (term: string) => `Från blocklistan: ${term}`,
+    replaced: (count: number, terms: number) =>
+      `${count} ${count === 1 ? 'förekomst' : 'förekomster'} av ${terms} ${terms === 1 ? 'term' : 'termer'} i blocklistan byttes mot platshållare.`,
+    undoLabel: (count: number) => `${count} ${count === 1 ? 'förekomst' : 'förekomster'} från blocklistan är utbytta.`,
+    failed: 'Termerna i blocklistan kunde inte bytas ut. Texten står kvar som den klistrades in.',
   },
   versionPanel: {
     draftBasedOnThis: ' · utkastet bygger på den här',

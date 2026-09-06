@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { Binding, LanguageId, Settings, Version } from '../types/models';
+import type { Binding, BlocklistEntry, LanguageId, Settings, Version } from '../types/models';
 import { languages } from '../types/models';
 import type { StorageProvider } from '../storage/StorageProvider';
 import { resolveBinding, resolveValue, suggestBinding, defaults, BindingRefusal } from '../domain/bindings';
 import { expandToLiteral } from '../domain/bindings/literal';
+import { applyBlocklist } from '../domain/blocklist';
 import { render, usage } from '../domain/render';
 import { auditForCopy, auditSelection, promptBlock } from '../domain/render/audit';
 import { buildValueIndex } from '../domain/render/leak';
@@ -127,6 +128,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [confirm, confirmDialog] = useConfirm();
   const [offerUndo, undoBar] = useUndo(setNotice);
   const [rules, setRules] = useState<ScannerRule[]>([]), [profiles, setProfiles] = useState<Profile[]>([]), [managingProfiles, setManagingProfiles] = useState(false);
+  const [blocklist, setBlocklist] = useState<BlocklistEntry[]>([]);
   const [ingesting, setIngesting] = useState(false), [showShortcuts, setShowShortcuts] = useState(false), [dropping, setDropping] = useState(false);
   const [dismissed, refreshDismissals] = useDismissals(() => project ? storage.listDismissals(project.id) : Promise.resolve([]), project?.id ?? '');
   const findings = useScanner(mode === 'template' ? template : '', rules, dismissed);
@@ -189,6 +191,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   useEffect(() => { void storageState().then(setStorageInfo); }, []);
   useEffect(() => { void storage.listScannerRules().then(setRules).catch(() => {}); }, [storage]);
   useEffect(() => { void storage.listProfiles().then(setProfiles).catch(() => {}); }, [storage]);
+  useEffect(() => { void storage.listBlocklist().then(setBlocklist).catch(() => {}); }, [storage]);
   // Asking on an empty first visit would prompt Firefox users before they have anything to lose.
   useEffect(() => {
     if (!project || asked.current) return;
@@ -343,16 +346,60 @@ export function App({ storage }: { storage: StorageProvider }) {
       setBindingDialog({ binding, selection });
     });
   }
-  /** Fires on a paste, not on typing: a guess from the first character is worthless, and after
-   * that the file is no longer empty. A large jump in one change is what a paste looks like from
-   * here, and it works for both editors. Never overrides a language the user picked, and stays
-   * quiet unless the guess is unambiguous — the language decides how values are escaped. */
+  /** Neither editor gives us a paste event we can trust, so a large jump in one change is what a
+   * paste looks like from here. A guess from the first character is worthless, and after that the
+   * file is no longer empty. */
+  const pasted = (next: string) => next.length - template.length >= 20;
+  /** Never overrides a language the user picked, and stays quiet unless the guess is unambiguous —
+   * the language decides how values are escaped. */
   function noteLanguage(text: string) {
-    if (languageChosen.current.has(session.activeFileId) || text.length - template.length < 20) return;
+    if (languageChosen.current.has(session.activeFileId)) return;
     const guess = detectLanguage(text);
     if (guess && guess !== language) {
       controller.changeLanguage(guess);
       setNotice(t.workspace.languageSet(guess));
+    }
+  }
+  /** The blocklist runs on text that arrives whole — a paste or a dropped file — and never while
+   * typing: half a term is not the term, and rewriting the line under the cursor mid-word is help
+   * nobody asked for.
+   *
+   * The bindings it creates are global. A term on the blocklist is a decision about the whole vault,
+   * not about one project, and making them global is also what lets the same term be recognised
+   * again in the next project rather than collecting a binding per project.
+   *
+   * The pasted text is already in the tab before this runs, so a failure here leaves the user's text
+   * where they put it and says so — it never swallows the paste. */
+  async function screenForBlocklist(text: string) {
+    const scope = { scope: 'global' as const, scopeRef: null };
+    const result = applyBlocklist(text, blocklist, bindings, scope);
+    if (!result.replacements) return;
+    try {
+      const current = controller.getSnapshot();
+      if (!current.settings) return;
+      const time = new Date().toISOString();
+      for (const match of result.matches.filter(m => !m.existing)) {
+        // Categorised from the value itself, the same way a binding made by hand is.
+        const found = scan(match.matched, rules, { skipRanges: [] })[0];
+        const category = found?.category ?? 'configuration';
+        await storage.saveBinding({ id: crypto.randomUUID(), name: match.name, category, ...scope,
+          description: t.blocklist.fromTerm(match.entry.term),
+          aiReplacement: match.entry.replacement || found?.suggestedAiReplacement || defaults[category],
+          values: { __default__: match.matched }, escapeMode: 'auto',
+          matchHints: { lastVariableNames: [], previousAiValues: [], aliases: [] },
+          createdAt: time, updatedAt: time, deviceId: current.settings.deviceId });
+      }
+      setBindings(await storage.listBindings());
+      // Typing may have carried on while the bindings were being written. Replacing the text then
+      // would take those keystrokes with it, so the substitution is dropped instead.
+      if (controller.getSnapshot().session.text !== text) return;
+      controller.changeText(result.text);
+      setNotice(t.blocklist.replaced(result.replacements, result.matches.length));
+      offerUndo({ label: t.blocklist.undoLabel(result.replacements), restore: async () => {
+        controller.changeText(text); await controller.flush();
+      } });
+    } catch {
+      warn(t.blocklist.failed);
     }
   }
   async function openFiles(files: FileList | null) {
@@ -370,6 +417,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       // exists too; the first save writes both. The name is what a drop carries that typing does not.
       await controller.renameFile(fileId, file.name);
       setNotice(t.workspace.fileRead(file.name));
+      await screenForBlocklist(text);
     });
   }
   /** No selection, so nothing is replaced in the template: the placeholder is typed by hand or
@@ -587,7 +635,7 @@ export function App({ storage }: { storage: StorageProvider }) {
           <div className={`view-banner ${mode === 'ai' && !ai.used.length ? 'nothing-replaced' : ''}`} key={mode}><strong>{mode === 'template' ? t.workspace.bannerTemplate : mode === 'local' ? t.workspace.bannerLocal : ai.used.length ? t.workspace.bannerAi(ai.used.length) : t.workspace.bannerAiNothing}</strong><span>{mode === 'template' ? t.workspace.editableSource : t.workspace.readOnlyProjection}</span></div>
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>{t.workspace.editAsTemplate}</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? t.workspace.hideValues : t.workspace.showValues}</button></div>}
           <div className="editor-body" id="kodvy" role="tabpanel" aria-labelledby={`vy-${mode}`}>{!template && mode === 'template' && <div className="paste-prompt"><strong>{t.workspace.pasteHere}</strong><span>{t.workspace.pasteHereHint}</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>{t.workspace.trySample}</button>}</div>}
-            <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { noteLanguage(text); controller.changeText(text); }} onBinding={createBinding}
+            <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { if (pasted(text)) { noteLanguage(text); void screenForBlocklist(text); } controller.changeText(text); }} onBinding={createBinding}
               onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }}
               fontSize={fontSize} wordWrap={wrap} onSelectionChange={setSelected} onFocused={() => setFocusName('')} />
           </div><div className="editor-footer"><span>{t.workspace.lines(visible.split('\n').length)} · {t.workspace.bindingCount(used.length)}</span>
@@ -629,6 +677,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <div hidden={route !== '#/settings'}><SettingsPage settings={settings} storage={storage} storageInfo={storageInfo}
         onStorageInfo={setStorageInfo} deviceName={deviceName} onDeviceName={setDeviceName} rules={rules}
         onRules={() => void storage.listScannerRules().then(setRules)} save={patch => changeEditor(patch)} notify={setNotice}
+        blocklist={blocklist} onBlocklist={() => void storage.listBlocklist().then(setBlocklist)}
         showIntro={() => setIntro(true)} /></div>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>{t.app.footerNote}</span></footer>
   </div>

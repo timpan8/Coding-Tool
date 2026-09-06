@@ -78,6 +78,27 @@ export function storageContract(factory: () => { storage: StorageProvider; clean
     expect(await storage.importAll(renamed, 'merge', { [p.id]: 'replace' })).toMatchObject({ replaced: 1 });
     expect((await storage.getProject(p.id))?.name).toBe('Från backup');
   });
+  it('stores blocklist terms and gives them back in a stable order', async () => {
+    const term = (id: string, text: string) => ({ id, term: text, replacement: '', enabled: true, createdAt: time });
+    await storage.saveBlocklistEntry(term('b', 'mittforetag.se'));
+    await storage.saveBlocklistEntry(term('a', 'Anna Andersson'));
+    expect((await storage.listBlocklist()).map(e => e.term)).toEqual(['Anna Andersson', 'mittforetag.se']);
+    await storage.saveBlocklistEntry({ ...term('b', 'mittforetag.se'), enabled: false });
+    expect((await storage.listBlocklist()).find(e => e.id === 'b')?.enabled).toBe(false);
+    await storage.deleteBlocklistEntry('b');
+    expect((await storage.listBlocklist()).map(e => e.id)).toEqual(['a']);
+  });
+  // A term is a private value with a decision attached: it has to survive the round trip that the
+  // backup page promises, or restoring on a new machine silently leaves the list behind.
+  it('carries the blocklist through export and import', async () => {
+    await storage.saveBlocklistEntry({ id: 'b1', term: 'mittforetag.se', replacement: 'example.com', enabled: true, createdAt: time });
+    const snapshot = await storage.exportAll();
+    expect(snapshot.blocklist).toHaveLength(1);
+    await storage.clearAll();
+    expect(await storage.listBlocklist()).toEqual([]);
+    await storage.importAll(snapshot, 'merge');
+    expect((await storage.listBlocklist())[0]).toMatchObject({ term: 'mittforetag.se', replacement: 'example.com' });
+  });
   // The dialog tells the user which kinds "keep both" cannot apply to. That sentence is only true
   // while this matches canDuplicate() in domain/snapshot — snapshot.test.ts pins the other half.
   it('keeps both copies only of the kinds that can carry a fresh id', async () => {
