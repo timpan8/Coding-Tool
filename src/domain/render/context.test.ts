@@ -285,8 +285,8 @@ describe('contextAt · the single pass agrees with the old scan-per-position', (
 /** The half of the rewrite that does apply to every language, old and new: asking for many
  * positions in one pass must give the same answers as asking for each on its own. */
 describe('contextsAt · batching is invisible, in every language', () => {
-  const all: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'dotenv', 'hcl', 'sql', 'csharp', 'go', 'java', 'plaintext'];
-  const pieces = ['"', SQ, '`', BS, '@"', '$"', '"""', '#', '//', '/*', '*/', '--', 'x = ', NL, '  ', '${', '}', 'a', ';'];
+  const all: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'dotenv', 'hcl', 'sql', 'csharp', 'go', 'java', 'dockerfile', 'ini', 'toml', 'plaintext'];
+  const pieces = ['"', SQ, '`', BS, '@"', '$"', '"""', '#', ';', '//', '/*', '*/', '--', 'x = ', NL, '  ', '${', '}', 'a', 'RUN ', 'ENV K=', '[s]'];
 
   it('agrees with one call per position', () => {
     fc.assert(

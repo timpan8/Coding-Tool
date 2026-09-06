@@ -164,10 +164,11 @@ Lägg till dra-och-släpp av en `.ps1`/`.py`/`.tf`-fil in i editorn samt "Ladda 
 Ett projekt som skapas som PowerShell och byts till Python heter fortfarande `script.ps1`. Byt ändelse när namnet fortfarande är
 det autogenererade, låt det vara om användaren döpt om filen.
 
-**F13 · För få språk för målgruppen.** _(Delvis åtgärdat: `dotenv`, `hcl` och `sql` tillagda med egna
-escaping-regler och tester. `dockerfile`, `ini`/`toml`, `csharp`, `go` och `java` återstår — var och en
-kräver samma arbete, och C#-verbatimsträngar och Go:s råsträngar med backticks måste blockeras, inte
-gissas.)_ `LanguageId` har nio värden. För ett verktyg om hemligheter i kod saknas
+**F13 · För få språk för målgruppen.** _(Åtgärdat. Nio språk tillagda, vart och ett med egen
+escaping-regel och egna tester: `dotenv`, `hcl`, `sql`, `csharp`, `go`, `java`, `dockerfile`, `ini`
+och `toml`. C#-verbatimsträngar och Go:s råsträngar blockeras inte utan hanteras — det är där
+Windows-sökvägar bor — medan interpolerade C#-strängar vägras eftersom språket läser `{{` som ett
+escapat `{` och skulle svälja platshållaren.)_ `LanguageId` har nio värden. För ett verktyg om hemligheter i kod saknas
 `.env`/dotenv, SQL, Dockerfile, Terraform/HCL, INI/TOML, C#, Go och Java. `.env` och Terraform är de mest uppenbara —
 det är där hemligheter faktiskt bor. Varje nytt språk kräver dock en egen escaping-regel i `escape.ts`; lägg inte till ett språk
 utan att också lägga till dess escaping och test, annars faller det tillbaka på den odefinierade sista raden i

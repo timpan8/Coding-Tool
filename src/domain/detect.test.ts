@@ -26,6 +26,8 @@ describe('detectLanguage', () => {
     ['using System;\n\nnamespace App { }\n', 'csharp'],
     ['package main\n\nfunc main() {}\n', 'go'],
     ['package com.example;\n\nimport java.util.List;\n', 'java'],
+    ['FROM node:22-alpine\nENV KEY=value\nRUN npm ci\n', 'dockerfile'],
+    ['[database]\nuser = "app"\nport = 5432\n', 'toml'],
   ])('recognises %s', (code, expected) => {
     expect(detectLanguage(code)).toBe(expected);
   });
@@ -44,6 +46,9 @@ describe('detectLanguage', () => {
     expect(languageForFile('Program.cs')).toBe('csharp');
     expect(languageForFile('main.go')).toBe('go');
     expect(languageForFile('App.java')).toBe('java');
+    expect(languageForFile('pyproject.toml')).toBe('toml');
+    expect(languageForFile('setup.cfg')).toBe('ini');
+    for (const name of ['Dockerfile', 'Dockerfile.prod', 'api.Dockerfile']) expect(languageForFile(name)).toBe('dockerfile');
   });
 
   it('does not call a Java import Python', () => {

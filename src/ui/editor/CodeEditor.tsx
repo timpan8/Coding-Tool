@@ -18,18 +18,32 @@ import { language as sql } from 'monaco-editor/languages/definitions/sql/sql.js'
 import { language as csharp } from 'monaco-editor/languages/definitions/csharp/csharp.js';
 import { language as go } from 'monaco-editor/languages/definitions/go/go.js';
 import { language as java } from 'monaco-editor/languages/definitions/java/java.js';
+import { language as dockerfile } from 'monaco-editor/languages/definitions/dockerfile/dockerfile.js';
+import { language as ini } from 'monaco-editor/languages/definitions/ini/ini.js';
 import { editorColors, themeName } from '../theme';
 import type { EditorProps } from './props';
 import { t } from '../text';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
-for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell, hcl, sql, csharp, go, java })) {
+for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell, hcl, sql, csharp, go, java, dockerfile, ini })) {
   monaco.languages.register({ id });
   monaco.languages.setMonarchTokensProvider(id, language);
 }
-const languageIds = ['powershell', 'javascript', 'typescript', 'python', 'xml', 'yaml', 'shell', 'hcl', 'sql', 'csharp', 'go', 'java', 'json', 'dotenv', 'plaintext'];
+const languageIds = ['powershell', 'javascript', 'typescript', 'python', 'xml', 'yaml', 'shell', 'hcl', 'sql', 'csharp', 'go', 'java', 'dockerfile', 'ini', 'toml', 'json', 'dotenv', 'plaintext'];
 monaco.languages.register({ id: 'json' });
 monaco.languages.setMonarchTokensProvider('json', { tokenizer: { root: [[/"(?:[^"\\]|\\.)*"/, 'string'], [/\b(?:true|false|null)\b/, 'keyword'], [/-?\d+(?:\.\d+)?/, 'number']] } });
+// No TOML definition ships with monaco either. Sections, keys, strings and comments is the whole of
+// what the editor needs to colour.
+monaco.languages.register({ id: 'toml' });
+monaco.languages.setMonarchTokensProvider('toml', { tokenizer: { root: [
+  [/^\s*#.*$/, 'comment'],
+  [/^\s*\[+[^\]]*\]+/, 'type'],
+  [/^\s*[\w.\-"']+(?=\s*=)/, 'key'],
+  [/"{3}[\s\S]*?"{3}|'{3}[\s\S]*?'{3}/, 'string'],
+  [/"(?:[^"\\]|\\.)*"|'[^']*'/, 'string'],
+  [/\b(?:true|false)\b/, 'keyword'],
+  [/-?\d[\d_]*(?:\.\d+)?/, 'number'],
+] } });
 // No dotenv definition ships with monaco, and the syntax is small enough to state outright: a
 // comment, a key, and the three shapes a value can take.
 monaco.languages.register({ id: 'dotenv' });

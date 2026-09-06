@@ -1,5 +1,5 @@
 export type Iso = string;
-export type LanguageId = 'powershell' | 'javascript' | 'typescript' | 'python' | 'json' | 'xml' | 'yaml' | 'shell' | 'dotenv' | 'hcl' | 'sql' | 'csharp' | 'go' | 'java' | 'plaintext';
+export type LanguageId = 'powershell' | 'javascript' | 'typescript' | 'python' | 'json' | 'xml' | 'yaml' | 'shell' | 'dotenv' | 'hcl' | 'sql' | 'csharp' | 'go' | 'java' | 'dockerfile' | 'ini' | 'toml' | 'plaintext';
 export type Category = 'secret' | 'identity' | 'infrastructure' | 'environment' | 'configuration' | 'testdata';
 export interface ProjectPathConfig { rootOverride: string | null; subfolders: string[] }
 export interface ProjectFile { id: string; name: string; language: LanguageId; order: number }
@@ -65,5 +65,5 @@ export type ImportMode = 'merge' | 'replace';
 /** What to do with an entity the vault already has: keep the vault's, take the file's, or keep both. */
 export type ImportResolution = 'keep' | 'replace' | 'duplicate';
 export interface ImportResult { added: number; replaced: number; duplicated: number; skipped: number }
-export const languages: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'dotenv', 'hcl', 'sql', 'csharp', 'go', 'java', 'plaintext'];
+export const languages: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'dotenv', 'hcl', 'sql', 'csharp', 'go', 'java', 'dockerfile', 'ini', 'toml', 'plaintext'];
 export const categories: Category[] = ['secret', 'identity', 'infrastructure', 'environment', 'configuration', 'testdata'];
