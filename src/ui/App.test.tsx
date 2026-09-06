@@ -7,7 +7,7 @@ import { IndexedDbProvider } from '../storage/IndexedDbProvider';
 import { binding, project, version } from '../test/fixtures/factories';
 
 // Minimal UI tests isolate Monaco's canvas rendering; real domain + IndexedDB are used.
-vi.mock('./editor/CodeEditor', () => ({ CodeEditor: ({ value, readOnly, onChange, onBinding }: {
+vi.mock('./editor/Editor', () => ({ Editor: ({ value, readOnly, onChange, onBinding }: {
   value: string; readOnly: boolean; onChange: (v: string) => void;
   onBinding: (s: { text: string; start: number; end: number; lineBefore: string; line: number }) => void;
 }) => <><textarea aria-label="Testkod" value={value} readOnly={readOnly} onChange={e => onChange(e.target.value)} />

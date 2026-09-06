@@ -440,3 +440,21 @@ test('completes placeholder names in the editor', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(page.locator('.editor-body')).toContainText('$b = "{{DB_PASSWORD}}');
 });
+
+// Report P6 and U15. Monaco was almost the whole bundle and loaded before anything could be typed.
+test.describe('narrow screen', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test('uses the plain editor instead of Monaco', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+    // Monaco has no touch selection handles and its scrolling fights the page's; the textarea is
+    // the better editor here, not a downgrade.
+    await expect(page.locator('.plain-editor')).toBeVisible();
+    await expect(page.locator('.monaco-editor')).toHaveCount(0);
+
+    await page.locator('.plain-editor').fill('$p = "Hunter2!"\n');
+    await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+    await page.reload();
+    await expect(page.locator('.plain-editor')).toHaveValue(/Hunter2/);
+  });
+});

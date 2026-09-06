@@ -13,8 +13,8 @@ import { language as python } from 'monaco-editor/languages/definitions/python/p
 import { language as xml } from 'monaco-editor/languages/definitions/xml/xml.js';
 import { language as yaml } from 'monaco-editor/languages/definitions/yaml/yaml.js';
 import { language as shell } from 'monaco-editor/languages/definitions/shell/shell.js';
-import type { LanguageId } from '../../types/models';
-import { editorColors, themeName, type ResolvedTheme } from '../theme';
+import { editorColors, themeName } from '../theme';
+import type { EditorProps } from './props';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell })) {
@@ -26,20 +26,9 @@ monaco.languages.register({ id: 'json' });
 monaco.languages.setMonarchTokensProvider('json', { tokenizer: { root: [[/"(?:[^"\\]|\\.)*"/, 'string'], [/\b(?:true|false|null)\b/, 'keyword'], [/-?\d+(?:\.\d+)?/, 'number']] } });
 monaco.editor.defineTheme('vault', { base: 'vs', inherit: true, rules: [], colors: editorColors.light });
 monaco.editor.defineTheme('vault-dark', { base: 'vs-dark', inherit: true, rules: [], colors: editorColors.dark });
-export interface Selection { text: string; start: number; end: number; lineBefore: string; line: number }
-interface Props {
-  documentKey?: string; active?: boolean; autoFocus?: boolean;
-  value: string; language: LanguageId; readOnly?: boolean; onChange?: (value: string) => void;
-  onBinding?: (selection: Selection) => void; onPlaceholder?: (name: string) => void;
-  describePlaceholder?: (name: string) => { category: string; aiReplacement: string; hasValue: boolean } | undefined;
-  /** Names offered when typing `{{`. */
-  placeholderNames?: string[];
-  focusName?: string; focusLine?: number; onLine?: (line: number) => void; theme?: ResolvedTheme;
-  /** Character ranges to mark as substituted. Empty in the template view, where the placeholders
-   * are visible as themselves. */
-  substitutions?: { start: number; end: number; name: string }[];
-}
-export function CodeEditor(props: Props) {
+export type { Selection } from './props';
+
+export function CodeEditor(props: EditorProps) {
   const host = useRef<HTMLDivElement>(null), editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const updating = useRef(false);
   const documents = useRef(new Map<string, { model: monaco.editor.ITextModel; view: monaco.editor.ICodeEditorViewState | null }>());
