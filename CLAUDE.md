@@ -142,5 +142,6 @@ that is not a bug. The batching property below it does cover every language.
   refusals. Add to it when you make a decision the code cannot show on its own.
 - `FORBATTRINGSRAPPORT.md` — a full review of the tool with per-finding status. Useful as a map of
   what was wrong and what the fix was.
-- `README.md` — user-facing. Its "Status" section is out of date: it lists the scanner, round-trip
-  matching, multiple files per project, version diffs and profile UI as not yet delivered. All exist.
+- `README.md` — user-facing, including the threat model that is also served at `#/security` in the
+  app. Keep the two in step: a security document that understates what the tool does is the same
+  class of defect as one that overstates it.
