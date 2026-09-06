@@ -39,10 +39,11 @@ export function VersionPanel({
   const [open, setOpen] = useState<string | null>(null);
 
   return (
-    <details className="version-history" open={versions.length > 0}>
-      <summary>
-        Sparade versioner <span>{versions.length}</span>
-      </summary>
+    <div className="version-history">
+      <div className="panel-title">
+        <h2>{t.versionPanel.title}</h2>
+        <span className="count">{versions.length}</span>
+      </div>
       {versions.map((version, index) => {
         const previous = versions[index + 1];
         const delta = previous ? changedLines(previous.templates, version.templates) : null;
@@ -90,6 +91,6 @@ export function VersionPanel({
       {!versions.length && (
         <p>{t.versionPanel.empty}</p>
       )}
-    </details>
+    </div>
   );
 }

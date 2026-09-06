@@ -65,11 +65,11 @@ export function FindingsPanel({
 
   if (!findings.length) return null;
   return (
-    <div className="findings-panel">
-      <div className="panel-title">
-        <h3>{t.findings.title}</h3>
+    <details className="findings-panel side-section" open>
+      <summary>
+        <h2>{t.findings.title}</h2>
         <span className="count">{findings.length}</span>
-      </div>
+      </summary>
       <p className="muted">
         Förslag, inte fynd. Ingen av dem blockerar kopiering — du avgör vad som är känsligt.
       </p>
@@ -126,7 +126,7 @@ export function FindingsPanel({
           </div>
         </div>
       ))}
-    </div>
+    </details>
   );
 }
 

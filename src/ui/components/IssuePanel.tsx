@@ -35,7 +35,7 @@ export function collectIssues(template: string, local: { text: string; issues: R
 }
 
 const label = (blocks: ('local' | 'ai')[]) =>
-  blocks.length === 2 ? t.issues.blocksBoth : blocks[0] === 'ai' ? 'blockerar Copy for AI' : 'blockerar Copy Local';
+  blocks.length === 2 ? t.issues.blocksBoth : blocks[0] === 'ai' ? t.issues.blocksAi : t.issues.blocksLocal;
 
 export function IssuePanel({
   issues,
@@ -51,9 +51,9 @@ export function IssuePanel({
   if (!issues.length) return null;
   return (
     <div className="issue-panel" role="alert">
-      <h3>
+      <h2>
         {issues.length} {issues.length === 1 ? 'problem' : 'problem'} hindrar kopiering
-      </h3>
+      </h2>
       {issues.map((issue) => (
         <div className="issue-row" key={`${issue.kind}:${issue.name}:${issue.start}`}>
           <button className="issue-item" onClick={() => onSelect(issue)}>

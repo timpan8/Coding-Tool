@@ -32,10 +32,11 @@ Använd produktionsförhandsvisningen för säkerhetskontroller. Utvecklingsserv
 1. Klistra in kod, dra in en fil, eller välj den ofarliga exempelkoden. Språket gissas vid inklistring och följer filändelsen när du drar in en fil.
 2. Byt språk i väljaren om gissningen blev fel — det är språket som avgör hur värden escapas.
 3. Markera ett värde och tryck **Ctrl+B** (eller högerklick → Skapa binding). Ange exempelvis `ADMIN_USERNAME`, ditt riktiga värde och `example.user` som AI-värde.
-4. Spara en version. Växla mellan **Mall**, **Local**, **AI** och kopiera rätt vy.
-5. Redigera endast mallen. Varje sparning skapar en ny version; återgång skapar också en ny version.
+4. Spara en version. Växla mellan **Mall**, **Local**, **AI** för att se vad som lämnar appen.
+5. Två utgångar sitter ovanför koden. **Kopiera för AI** (grön) kopierar direkt när något är bundet och inget ser ut som en hemlighet; annars öppnas en granskning först. **Kopiera RIKTIGT** (amber) armeras av ett tryck, visar vad som är på väg ut, och kopierar på det andra trycket. Riktiga värden i urklippet får en banner tills de är rensade.
+6. Redigera endast mallen. Varje sparning skapar en ny version; återgång skapar också en ny version.
 
-`Ctrl+Enter` = Copy for AI. `Ctrl+Shift+Enter` = Copy Local. `Ctrl+P` öppnar Mina projekt. `Ctrl+S` sparar en version. `?` visar hela listan. De tidigare `Ctrl+Shift+C` och `Ctrl+K` togs av utvecklarverktygen respektive Firefox sökfält.
+`Ctrl+Enter` = Kopiera för AI. `Ctrl+Shift+Enter` = Kopiera RIKTIGT (armerar, sedan kopierar). `Ctrl+P` öppnar Mina projekt. `Ctrl+S` sparar en version. `?` visar hela listan. De tidigare `Ctrl+Shift+C` och `Ctrl+K` togs av utvecklarverktygen respektive Firefox sökfält.
 
 ## Hosting: GitHub Pages
 

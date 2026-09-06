@@ -6,7 +6,7 @@ import { resolveBinding, resolveValue, suggestBinding, defaults, BindingRefusal 
 import { expandToLiteral } from '../domain/bindings/literal';
 import { applyBlocklist } from '../domain/blocklist';
 import { render, usage } from '../domain/render';
-import { auditForCopy, auditSelection, promptBlock } from '../domain/render/audit';
+import { auditForCopy, auditSelection, promptBlock, type CopyAudit } from '../domain/render/audit';
 import { buildValueIndex } from '../domain/render/leak';
 import { WorkspaceController } from './WorkspaceController';
 import { Editor, type Selection } from './editor/Editor';
@@ -31,6 +31,9 @@ import { CopyDialog } from './components/CopyDialog';
 import { EditorToolbar, type Mode } from './components/EditorToolbar';
 import { ProfileManager, ProfilePicker } from './components/ProfilePicker';
 import { IngestDialog } from './components/IngestDialog';
+import { Exits } from './components/Exits';
+import { useToasts } from './components/Toasts';
+import { ClipboardBanner, type ClipboardHold } from './components/ClipboardBanner';
 import { editorShortcuts, match, shortcuts } from './shortcuts';
 import { t } from './text';
 import { detectLanguage, languageForFile } from '../domain/detect';
@@ -111,12 +114,13 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [drawer, setDrawer] = useState(false), [query, setQuery] = useState(''), [drawerQuery, setDrawerQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('updated'), [languageFilter, setLanguageFilter] = useState(''), [statusFilter, setStatusFilter] = useState('');
   const [busy, setBusy] = useState(false), busyRef = useRef(false), [error, setError] = useState('');
-  const [notice, setNoticeText] = useState(''), [noticeTone, setNoticeTone] = useState<'info' | 'warn'>('info');
+  const [toast, toasts] = useToasts();
   /** Report U6. Every failure used to be a full-screen modal titled "Åtgärden behöver
    * uppmärksamhet", including ones the user can simply try again. The modal is for something that
-   * needs a decision; a refusal or a failed convenience belongs in the strip. */
-  const setNotice = (text: string) => { setNoticeText(text); setNoticeTone('info'); };
-  const warn = (text: string) => { setNoticeText(text); setNoticeTone('warn'); };
+   * needs a decision; a refusal or a failed convenience is a toast — a warning one, which stays
+   * longer and keeps its close button, but never a dialog in the way. */
+  const setNotice = (text: string) => toast(text, 'ok');
+  const warn = (text: string) => toast(text, 'warn');
 
   const [bindingDialog, setBindingDialog] = useState<{ binding: Binding; selection?: Selection; reuse?: string } | null>(null);
   const [showSecrets, setShowSecrets] = useState(false), [focusName, setFocusName] = useState(''), [focusLine, setFocusLine] = useState<number>();
@@ -132,7 +136,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [ingesting, setIngesting] = useState(false), [showShortcuts, setShowShortcuts] = useState(false), [dropping, setDropping] = useState(false);
   const [dismissed, refreshDismissals] = useDismissals(() => project ? storage.listDismissals(project.id) : Promise.resolve([]), project?.id ?? '');
   const findings = useScanner(mode === 'template' ? template : '', rules, dismissed);
-  const [countdown, setCountdown] = useState<number | null>(null), pendingClear = useRef<string | null>(null);
+  const [hold, setHold] = useState<ClipboardHold | null>(null), [armed, setArmed] = useState(false);
   const overview = useRef<HTMLDivElement>(null), overviewScroll = useRef(0);
   const navigateRef = useRef<(hash: string, replace?: boolean) => Promise<void>>(async () => {});
   /** File ids whose language came from the user or from a filename. Detection never overrides
@@ -169,7 +173,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       else if (hash === '#/' && (routeRef.current !== '#/' || controller.getSnapshot().session.project)) {
         await controller.newCode(); setMode('template'); setFocusName(''); setFocusLine(undefined);
       } else if (!['#/', '#/projects', '#/bindings', '#/backup', '#/settings', '#/security'].includes(hash)) throw new Error(t.refusal.unknownPage);
-      setShowSecrets(false); setDrawer(false); setNotice('');
+      setShowSecrets(false); setDrawer(false);
       setBindings(await storage.listBindings()); setLocation(hash, replace);
     });
   }
@@ -226,6 +230,16 @@ export function App({ storage }: { storage: StorageProvider }) {
   const visible = mode === 'template' ? template : mode === 'ai' ? ai.text : local.text;
   const issues = useMemo(() => collectIssues(template, local, ai), [template, local, ai]);
   const used = useMemo(() => usage(template), [template]);
+  /** What the second press of Copy RIKTIGT will write, counted from the local projection. */
+  const localChecklist = useMemo(() => {
+    const missing = [...new Set(local.issues.filter(i => i.kind === 'missing').map(i => i.name))];
+    return { resolved: used.length - missing.length, total: used.length, missing,
+      blocked: local.issues.filter(i => i.kind === 'context').length, secrets: local.secretRanges.length,
+      profile: profiles.find(p => p.id === options.profileId)?.name };
+  }, [used, local, profiles, options.profileId]);
+  // The arming lapses on its own, and the text changing under it is a reason to start over.
+  useEffect(() => { if (!armed) return; const id = setTimeout(() => setArmed(false), 5000); return () => clearTimeout(id); }, [armed]);
+  useEffect(() => { setArmed(false); }, [template, mode]);
   const activeBindings = bindings.filter(b => resolveBinding(b.name, bindings, options.projectId, options.versionId)?.id === b.id)
     .sort((a, b) => Number(Boolean(resolveValue(a, options.profileId))) - Number(Boolean(resolveValue(b, options.profileId))) || a.name.localeCompare(b.name));
   const saveStatus = phase === 'loading' ? t.save.loading : phase === 'error' ? t.save.failed : phase === 'saved' ? t.save.saved : t.save.saving;
@@ -614,26 +628,45 @@ export function App({ storage }: { storage: StorageProvider }) {
     setCopyMode(null);
     setNotice(which === 'local' ? t.copy.downloadedLocal : t.copy.downloaded);
   }
-  async function writeClipboard(text: string, which: 'local' | 'ai') {
+  async function writeClipboard(text: string, which: 'local' | 'ai', message?: string) {
     try {
       await navigator.clipboard.writeText(text); setCopyMode(null);
-      setNotice(which === 'local' ? t.copy.copiedLocal : t.copy.copiedAi);
-      const seconds = settings?.clipboardAutoClearSeconds ?? 0;
-      // Only the local copy carries real values, so only it is worth clearing.
-      if (which === 'local' && seconds > 0) { pendingClear.current = text; setCountdown(seconds); }
+      setNotice(message ?? (which === 'local' ? t.copy.copiedLocal : t.copy.copiedAi));
+      // Only the local copy carries real values, so only it gets the banner and the clearing. With
+      // auto-clear off the banner still says what is on the clipboard, with a button to clear it.
+      if (which === 'local') { const seconds = settings?.clipboardAutoClearSeconds ?? 0; setHold({ text, seconds: seconds > 0 ? seconds : null, pending: false }); }
     }
     catch { warn(t.refusal.clipboardDenied); }
   }
+  /** A failed clear is not a notice that scrolls away: the banner turns red and stays until the
+   * clipboard is actually clean, retrying whenever the tab gets focus back. */
+  async function clearHold(current: ClipboardHold) {
+    const outcome = await clearClipboard(current.text);
+    if (outcome === 'failed') { setHold({ ...current, seconds: null, pending: true }); return; }
+    setHold(null);
+    setNotice(outcome === 'cleared' ? t.copy.clipboardCleared : t.copy.clipboardReplaced);
+  }
   useEffect(() => {
-    if (countdown === null) return;
-    if (countdown > 0) { const id = setTimeout(() => setCountdown(countdown - 1), 1000); return () => clearTimeout(id); }
-    const text = pendingClear.current;
-    pendingClear.current = null; setCountdown(null);
-    if (text) void clearClipboard(text).then(outcome => setNotice(
-      outcome === 'cleared' ? t.copy.clipboardCleared
-        : outcome === 'replaced-by-other' ? t.copy.clipboardReplaced
-          : t.copy.clipboardStuck));
-  }, [countdown]);
+    if (!hold || hold.pending || hold.seconds === null) return;
+    if (hold.seconds > 0) { const id = setTimeout(() => setHold(h => h && h.seconds !== null ? { ...h, seconds: h.seconds - 1 } : h), 1000); return () => clearTimeout(id); }
+    void clearHold(hold);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clearHold reads nothing but the hold it is given.
+  }, [hold]);
+  useEffect(() => {
+    if (!hold?.pending) return;
+    const retry = () => { if (document.visibilityState === 'visible') void clearHold(hold); };
+    window.addEventListener('focus', retry); document.addEventListener('visibilitychange', retry);
+    return () => { window.removeEventListener('focus', retry); document.removeEventListener('visibilitychange', retry); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clearHold reads nothing but the hold it is given.
+  }, [hold]);
+  /** The dialog is for the cases that need a decision: something in the file looks like a secret,
+   * or nothing is protected while the code has strings that could be. Everything else copies on
+   * one press and says how many values were replaced. The scan runs here, synchronously, on the
+   * text being copied — the panel's idle-scheduled list may be 400 ms behind. */
+  function aiNeedsReview(result: CopyAudit) {
+    const serious = scan(template, rules).filter(f => !dismissed.has(f.fingerprint) && (f.severity === 'critical' || f.severity === 'high')).length;
+    return serious > 0 || (result.coverage.bound === 0 && result.coverage.literals > 0);
+  }
   async function copy(which: 'local' | 'ai') {
     if (!workspaceVisible) { warn(t.refusal.noFile); return; }
     if (!template.trim()) { warn(t.refusal.emptyFile); return; }
@@ -642,8 +675,25 @@ export function App({ storage }: { storage: StorageProvider }) {
     // being copied, not on whatever it last saw.
     const result = auditForCopy(template, bindings, { ...options, mode: which });
     if (!result.canCopy) { warn(t.refusal.copyBlocked); return; }
-    if (which === 'ai' || result.secretRanges.length) { setReviewed(false); setCopyMode(which); return; }
-    await writeClipboard(withPrompt(result.text, which, result.used.length), which);
+    if (which === 'ai') {
+      if (aiNeedsReview(result)) { setReviewed(false); setCopyMode('ai'); return; }
+      await writeClipboard(withPrompt(result.text, 'ai', result.used.length), 'ai', t.exits.copiedAi(result.used.length));
+      return;
+    }
+    // Invariant 9. The first press arms the button and shows what is about to leave; only the
+    // second press, inside the window, writes real values to the clipboard.
+    if (result.secretRanges.length && !armed) { setArmed(true); return; }
+    setArmed(false);
+    await writeClipboard(withPrompt(result.text, 'local', result.used.length), 'local');
+  }
+  /** The file goes through the same review as the clipboard, so when the review is needed the
+   * dialog opens and holds the download behind its checkbox. */
+  function downloadAi() {
+    if (!workspaceVisible || !template.trim()) { warn(t.refusal.emptyFile); return; }
+    const result = auditForCopy(template, bindings, { ...options, mode: 'ai' });
+    if (!result.canCopy) { warn(t.refusal.downloadBlocked); return; }
+    if (aiNeedsReview(result)) { setReviewed(false); setCopyMode('ai'); return; }
+    downloadCopy('ai');
   }
   /** Report U19. Asking an AI about one function should not mean handing over the whole file. The
    * selection is audited on its own, so a missing binding elsewhere does not block it, but the
@@ -687,13 +737,24 @@ export function App({ storage }: { storage: StorageProvider }) {
 
   return <div className="app-shell code-first"><a className="skip-link" href="#huvudinnehall">{t.nav.skip}</a><div className="main-shell">
     <header className="topbar"><a className="brand" href="#/" onClick={e => { e.preventDefault(); void navigate('#/'); }}><span className="brand-icon">{'</>'}</span><span>AI Code Vault</span></a>
-      <nav className="top-navigation" aria-label={t.nav.main}><button disabled={busy} onClick={() => void navigate('#/')}>{t.nav.newCode}</button><button disabled={busy} onClick={openDrawer}>{t.nav.projects} <kbd>Ctrl P</kbd></button><button onClick={() => setShowShortcuts(true)} aria-label={t.nav.showShortcuts}>{t.nav.shortcuts}</button><button disabled={busy} onClick={() => void navigate('#/bindings')}>{t.nav.bindings}</button><button disabled={busy} onClick={() => void navigate('#/backup')}>{t.nav.backup}</button><button onClick={() => void navigate('#/security')}>{t.nav.security}</button><button onClick={() => void navigate('#/settings')}>{t.nav.settings}</button></nav>
-      <ProfilePicker profiles={profiles} activeId={settings?.activeProfileId ?? null} onManage={() => setManagingProfiles(true)}
-        onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} /><label className="theme-choice">{t.app.theme}<select aria-label={t.app.theme} value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">{t.app.themeSystem}</option><option value="light">{t.app.themeLight}</option><option value="dark">{t.app.themeDark}</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
+      <nav className="top-navigation" aria-label={t.nav.main}>
+        <button className={workspaceVisible ? 'active' : ''} disabled={busy} onClick={() => void navigate('#/')}>{t.nav.newCode}</button>
+        <button disabled={busy} onClick={openDrawer}>{t.nav.projects} <kbd>Ctrl P</kbd></button>
+        <button className={route === '#/bindings' ? 'active' : ''} disabled={busy} onClick={() => void navigate('#/bindings')}>{t.nav.bindings}</button>
+        <button className={route === '#/backup' ? 'active' : ''} disabled={busy} onClick={() => void navigate('#/backup')}>{t.nav.backup}</button>
+        <button className={route === '#/settings' ? 'active' : ''} onClick={() => void navigate('#/settings')}>{t.nav.settings}</button>
+        <button className={route === '#/security' ? 'active' : ''} onClick={() => void navigate('#/security')}>{t.nav.security}</button>
+      </nav>
+      <div className="topbar-right">
+        <ProfilePicker profiles={profiles} activeId={settings?.activeProfileId ?? null} onManage={() => setManagingProfiles(true)}
+          onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} />
+        <label className="theme-choice">{t.app.theme}<select aria-label={t.app.theme} value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">{t.app.themeSystem}</option><option value="light">{t.app.themeLight}</option><option value="dark">{t.app.themeDark}</option></select></label>
+        <button className="icon-button" onClick={() => setShowShortcuts(true)} aria-label={t.nav.showShortcuts} title={t.nav.shortcuts}>?</button>
+        <span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span>
+      </div></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>{t.dialog.retrySave}</button></div>}
-    {countdown !== null && <div className="clipboard-countdown" role="status">{t.copy.clearingIn(countdown)}<button onClick={() => { pendingClear.current = null; setCountdown(null); setNotice(t.copy.clipboardKept); }}>Avbryt</button></div>}
-    {notice && <div className={`inline-notice ${noticeTone}`} role="status">{notice}<button aria-label={t.dialog.closeNotice} onClick={() => setNotice('')}>×</button></div>}
-    {updateReady && <div className="notice">{t.app.updateAvailable} <button onClick={() => void run(async () => { await controller.flush(); navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true }); updateReady.waiting?.postMessage({ type: 'ACTIVATE' }); })}>Ladda om</button></div>}
+    {hold && <ClipboardBanner hold={hold} onClear={() => void clearHold(hold)} onKeep={() => { setHold(null); setNotice(t.copy.clipboardKept); }} />}
+    {updateReady &&<div className="notice">{t.app.updateAvailable} <button onClick={() => void run(async () => { await controller.flush(); navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true }); updateReady.waiting?.postMessage({ type: 'ACTIVATE' }); })}>Ladda om</button></div>}
     {/* Report U9. inert on the whole main froze the page during every write, including the parts a
         write cannot corrupt: reading a document, a filter, the version list. It is now on the
         editing surface alone, and the busy state is visible in the header. Anything the rest can
@@ -702,11 +763,17 @@ export function App({ storage }: { storage: StorageProvider }) {
       <div className="workspace" hidden={!workspaceVisible} inert={busy}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : t.app.startNow}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
         <div className="file-info"><label>{t.workspace.language} <select aria-label={t.workspace.language} value={language} onChange={e => { languageChosen.current.add(session.activeFileId); controller.changeLanguage(e.target.value as LanguageId); }}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? t.workspace.files(session.files.length) : t.workspace.newProjectHint}{session.baseVersionId && t.workspace.basedOn(String(versions.find(v => v.id === session.baseVersionId)?.number ?? '?'))}</span></div>
-      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>{t.workspace.backToCurrent}</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
+      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>{t.workspace.backToCurrent}</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
         <div className="work-grid" onDragOver={e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDropping(true); } }}
           onDragLeave={e => { if (e.currentTarget === e.target) setDropping(false); }}
           onDrop={e => { e.preventDefault(); setDropping(false); void openFiles(e.dataTransfer.files); }}>
-          {dropping && <div className="drop-hint" aria-hidden="true">{t.workspace.dropHint}</div>}<section className={`editor-panel mode-${mode}`}>
+          {dropping && <div className="drop-hint" aria-hidden="true">{t.workspace.dropHint}</div>}
+          <aside className="version-column"><VersionPanel versions={versions} baseVersionId={session.baseVersionId} disabled={busy}
+            onPreview={v => setViewing({ version: v, compareTo: null })}
+            onCompare={v => setViewing({ version: v, compareTo: versions[versions.indexOf(v) + 1] ?? null })}
+            onRestore={(v, asNew) => void applyVersion(v, asNew)}
+            onDelete={v => void removeVersion(v)} /></aside>
+          <section className={`editor-panel mode-${mode}`}>
           <FileTabs files={session.files} activeId={session.activeFileId} disabled={busy}
             onSelect={id => { controller.selectFile(id); changeMode('template'); }}
             onAdd={() => void run(async () => { await controller.addFile(); changeMode('template'); })}
@@ -720,9 +787,11 @@ export function App({ storage }: { storage: StorageProvider }) {
               await controller.removeFile(id);
             })} />
           <EditorToolbar mode={mode} onMode={changeMode} canIngest={Boolean(project)} onIngest={() => setIngesting(true)}
-            hasText={Boolean(template.trim())} localIssues={local.issues} aiIssues={ai.issues} blockedCount={issues.length}
-            canCopySelection={mode === 'template' && Boolean(selected)} onCopy={which => void copy(which)}
-            onCopySelection={() => void copySelection()} />
+            canCopySelection={mode === 'template' && Boolean(selected)} onCopySelection={() => void copySelection()} />
+          <Exits hasText={Boolean(template.trim())} aiIssues={ai.issues} localIssues={local.issues} blockedCount={issues.length}
+            seriousFindings={findings.filter(f => f.severity === 'critical' || f.severity === 'high').length} armed={armed} checklist={localChecklist}
+            onCopyAi={() => void copy('ai')} onDownloadAi={downloadAi} onCopyLocal={() => void copy('local')}
+            onDetails={() => { setArmed(false); setReviewed(false); setCopyMode('local'); }} />
           {/* Report F-2.1. The AI banner claimed "SANERAD" unconditionally, in the strongest green
               in the editor, directly above unreplaced secrets whenever nothing was bound. */}
           <div className={`view-banner ${mode === 'ai' && !ai.used.length ? 'nothing-replaced' : ''}`} key={mode}><strong>{mode === 'template' ? t.workspace.bannerTemplate : mode === 'local' ? t.workspace.bannerLocal : ai.used.length ? t.workspace.bannerAi(ai.used.length) : t.workspace.bannerAiNothing}</strong><span>{mode === 'template' ? t.workspace.editableSource : t.workspace.readOnlyProjection}</span></div>
@@ -739,20 +808,18 @@ export function App({ storage }: { storage: StorageProvider }) {
               <button aria-pressed={wrap} onClick={() => void changeEditor({ editorWordWrap: !wrap }).catch(() => {})}>{t.workspace.wordWrap(wrap)}</button>
             </div>
             <span>{mode === 'local' ? t.workspace.localFooter : t.workspace.draftFooter}</span></div>
-        </section><aside className="binding-panel"><BindingPanel rows={toRows(activeBindings, used, options.profileId)} canCreate={Boolean(project)}
-            onFocus={b => { setMode('template'); setFocusName(b.name); }}
-            onEdit={b => setBindingDialog({ binding: b })}
-            onDelete={b => void removeBinding(b)}
-            onCreate={() => void newBinding()} />
+        </section><aside className="binding-panel">
           <IssuePanel issues={issues} onSelect={showIssue} fix={{ offered: issue => Boolean(leakedValue(issue)), apply: replaceLeak }} />
+          <details className="side-section" open>
+            <summary><h2>{t.bindingPanel.title}</h2><span className="count">{activeBindings.length}</span></summary>
+            <BindingPanel rows={toRows(activeBindings, used, options.profileId)} canCreate={Boolean(project)}
+              onFocus={b => { setMode('template'); setFocusName(b.name); }}
+              onEdit={b => setBindingDialog({ binding: b })}
+              onDelete={b => void removeBinding(b)}
+              onCreate={() => void newBinding()} />
+          </details>
           <FindingsPanel findings={findings} onShow={f => { changeMode('template'); setFocusLine(f.line); }}
             onBind={bindFinding} onBindMany={f => void bindFindings(f)} onDismiss={f => void dismissFinding(f)} />
-          <VersionPanel versions={versions} baseVersionId={session.baseVersionId} disabled={busy}
-            onPreview={v => setViewing({ version: v, compareTo: null })}
-            onCompare={v => setViewing({ version: v, compareTo: versions[versions.indexOf(v) + 1] ?? null })}
-            onRestore={(v, asNew) => void applyVersion(v, asNew)}
-            onDelete={v => void removeVersion(v)} />
-          <div className="m1-note"><b>{t.app.notYetTitle}</b><p>{t.app.notYetBody}</p></div>
         </aside></div>
       </div>
       <div className="overview-scroll" ref={overview} hidden={route !== '#/projects'} onScroll={e => { if (route === '#/projects') overviewScroll.current = e.currentTarget.scrollTop; }}><section className="dashboard">
@@ -836,6 +903,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     {labelling && <SaveVersionDialog next={Math.max(0, ...versions.map(v => v.number)) + 1} save={label => void saveVersion(label)} close={() => setLabelling(false)} />}
     {confirmDialog}
     {undoBar}
+    {toasts}
     {intro && <Intro close={() => setIntro(false)} />}
     {error && <Modal title={t.dialog.attention} close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>{t.dialog.close}</button></div></Modal>}
   </div>;

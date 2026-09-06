@@ -13,8 +13,8 @@ export interface Shortcut {
  * primary binding avoids the collision; the old one stays as an alias where it still works. */
 export const shortcuts: Shortcut[] = [
   { id: 'projects', keys: ['Ctrl+P', 'Ctrl+K'], label: 'Mina projekt', note: 'Ctrl+K tas av sökfältet i Firefox.' },
-  { id: 'copyAi', keys: ['Ctrl+Enter'], label: 'Copy for AI', note: 'Ctrl+Shift+C öppnar utvecklarverktygen i Chrome och Firefox.' },
-  { id: 'copyLocal', keys: ['Ctrl+Shift+Enter'], label: 'Copy Local' },
+  { id: 'copyAi', keys: ['Ctrl+Enter'], label: 'Kopiera för AI', note: 'Ctrl+Shift+C öppnar utvecklarverktygen i Chrome och Firefox.' },
+  { id: 'copyLocal', keys: ['Ctrl+Shift+Enter'], label: 'Kopiera RIKTIGT', note: 'Första trycket armerar, det andra kopierar.' },
   { id: 'save', keys: ['Ctrl+S'], label: 'Spara version' },
   { id: 'help', keys: ['Ctrl+/', '?'], label: 'Visa genvägar' },
 ];
