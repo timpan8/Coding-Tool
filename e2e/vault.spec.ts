@@ -421,3 +421,22 @@ test('holds a separate value per profile and falls back to the default', async (
   await expect(page.locator('.editor-body')).toContainText('test.internal');
   await expect(page.locator('.editor-body')).not.toContainText('prod.internal');
 });
+
+// Report F21. A placeholder had to be typed from memory, exactly, or it silently resolved to
+// nothing and blocked the copy.
+test('completes placeholder names in the editor', async ({ page }) => {
+  await type(page, '$a = "Hunter2!"\n');
+  await bind(page, 'Hunter2', 'Hunter2!', 'secret');
+  await page.locator('.binding-card').getByLabel(/^Redigera /).click();
+  await page.getByLabel('Bindingnamn').fill('DB_PASSWORD');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('\n$b = "{{');
+  await expect(page.locator('.suggest-widget')).toBeVisible();
+  await expect(page.locator('.suggest-widget')).toContainText('DB_PASSWORD');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.editor-body')).toContainText('$b = "{{DB_PASSWORD}}');
+});

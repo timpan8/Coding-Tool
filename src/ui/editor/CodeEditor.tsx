@@ -4,6 +4,7 @@ import * as monaco from 'monaco-editor/editor/editor.api.js';
 import 'monaco-editor/editor/contrib/find/browser/findController.js';
 import 'monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter.js';
 import 'monaco-editor/editor/contrib/hover/browser/hoverContribution.js';
+import 'monaco-editor/editor/contrib/suggest/browser/suggestController.js';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
 import { language as powershell } from 'monaco-editor/languages/definitions/powershell/powershell.js';
 import { language as javascript } from 'monaco-editor/languages/definitions/javascript/javascript.js';
@@ -31,6 +32,8 @@ interface Props {
   value: string; language: LanguageId; readOnly?: boolean; onChange?: (value: string) => void;
   onBinding?: (selection: Selection) => void; onPlaceholder?: (name: string) => void;
   describePlaceholder?: (name: string) => { category: string; aiReplacement: string; hasValue: boolean } | undefined;
+  /** Names offered when typing `{{`. */
+  placeholderNames?: string[];
   focusName?: string; focusLine?: number; onLine?: (line: number) => void; theme?: ResolvedTheme;
   /** Character ranges to mark as substituted. Empty in the template view, where the placeholders
    * are visible as themselves. */
@@ -90,6 +93,28 @@ export function CodeEditor(props: Props) {
       const name = placeholderAt(e.target.position);
       if (name) callbacks.current.onPlaceholder?.(name);
     });
+    // Typing {{ offers the bindings that already exist, so a name has to be remembered exactly
+    // only once. quickSuggestions stays off; this is triggered by the brace itself.
+    const completion = monaco.languages.registerCompletionItemProvider([...languageIds], {
+      triggerCharacters: ['{'],
+      provideCompletionItems(model, position) {
+        const line = model.getValueInRange({ startLineNumber: position.lineNumber, startColumn: 1, endLineNumber: position.lineNumber, endColumn: position.column });
+        const open = /\{\{([A-Z0-9_]*)$/.exec(line);
+        if (!open || model !== instance.getModel()) return { suggestions: [] };
+        const start = position.column - open[1].length;
+        const range = new monaco.Range(position.lineNumber, start, position.lineNumber, position.column);
+        return {
+          suggestions: (callbacks.current.placeholderNames ?? []).map(name => ({
+            label: name,
+            kind: monaco.languages.CompletionItemKind.Variable,
+            insertText: `${name}}}`,
+            detail: callbacks.current.describePlaceholder?.(name)?.hasValue ? 'binding' : 'binding · värde saknas',
+            range,
+          })),
+        };
+      },
+    });
+
     // A single click should still tell you what is behind the placeholder, without opening anything
     // and without showing the private value: this is the view people screen-share.
     const hover = monaco.languages.registerHoverProvider(
@@ -110,7 +135,7 @@ export function CodeEditor(props: Props) {
     decorateRef.current = decorate;
     decorate();
     if (callbacks.current.autoFocus) instance.focus();
-    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); mouse.dispose(); hover.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
+    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); mouse.dispose(); hover.dispose(); completion.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
   }, []);
   useEffect(() => {
     const instance = editor.current;
