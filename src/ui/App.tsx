@@ -18,6 +18,7 @@ import { BackupPanel } from './components/BackupPanel';
 import { RulesPanel } from './components/RulesPanel';
 import { useConfirm } from './components/ConfirmDialog';
 import { useUndo } from './components/UndoBar';
+import { Intro } from './components/Intro';
 import { collectIssues, IssuePanel, type LocatedIssue } from './components/IssuePanel';
 import { FindingsPanel, useDismissals, useScanner } from './components/FindingsPanel';
 import { FileTabs } from './components/FileTabs';
@@ -168,6 +169,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const workspaceVisible = route === '#/' || route.startsWith('#/project/');
   const fontSize = settings?.editorFontSize ?? 14, wrap = settings?.editorWordWrap ?? true;
   const [selected, setSelected] = useState<Selection | null>(null);
+  const [intro, setIntro] = useState(false);
 
   async function run(action: () => Promise<void>) {
     if (busyRef.current) return;
@@ -522,6 +524,14 @@ export function App({ storage }: { storage: StorageProvider }) {
     }
     catch { setError('Webbläsaren nekade urklippsåtkomst. Kontrollera sidans behörighet.'); }
   }
+  /** Recorded as seen when it is shown, not when it is closed. It has been seen either way, and
+   * writing on close races a reload made moments afterwards — the introduction would come back for
+   * someone who had just dismissed it. */
+  useEffect(() => {
+    if (!settings || settings.introSeen) return;
+    setIntro(true);
+    void storage.saveSettings({ ...settings, introSeen: true }).then(() => controller.reloadSettings()).catch(() => {});
+  }, [settings, storage, controller]);
   function openDrawer() { setDrawer(true); void controller.refreshProjects().catch(() => setError('Projektlistan kunde inte läsas. Din kod finns kvar.')); }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -607,7 +617,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <article className="document" hidden={route !== '#/settings'}><span className="eyebrow">DEN HÄR INSTALLATIONEN</span><h1>Inställningar</h1><p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p><dl><dt>Aktuellt origin</dt><dd>{location.origin}</dd><dt>App-sökväg</dt><dd>{location.pathname}</dd><dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd><dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd><dt>Beständig lagring</dt><dd>{!storageInfo ? 'Läser…' : !storageInfo.supported ? 'Stöds inte av webbläsaren' : storageInfo.persisted ? 'Ja · valvet vräks inte vid diskbrist' : 'Nej · webbläsaren får radera valvet'}</dd><dt>Utrymme</dt><dd>{storageInfo?.supported ? `${formatBytes(storageInfo.usedBytes)} av ${formatBytes(storageInfo.quotaBytes)}` : 'okänt'}</dd></dl>{storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert"><strong>Valvet kan raderas av webbläsaren</strong><p>Utan beständig lagring får webbläsaren slänga valvet när enheten får ont om utrymme. Det finns ingen backup att återställa från.</p><button onClick={() => void requestPersistence().then(state => { setStorageInfo(state); setNotice(state.persisted ? 'Beständig lagring beviljad.' : 'Webbläsaren nekade beständig lagring.'); })}>Begär beständig lagring</button></div>}<label>Enhetsnamn<input value={deviceName} onChange={e => setDeviceName(e.target.value)} /></label>
       <label className="check"><input type="checkbox" checked={settings?.includeAiPromptBlock ?? true} onChange={e => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, includeAiPromptBlock: e.target.checked }); await controller.reloadSettings(); } })} />Lägg en instruktion överst i AI-kopian</label>
       {settings?.includeAiPromptBlock && <label>Instruktionens text<textarea aria-label="Instruktion till AI" rows={3} defaultValue={settings.aiPromptText} onBlur={e => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, aiPromptText: e.target.value }); await controller.reloadSettings(); } })} /><small>Kopieras som en kommentar före koden, i det språk filen har. Gör det troligare att platshållarna kommer tillbaka orörda.</small></label>}
-      <label>Rensa urklipp efter Copy Local<select aria-label="Rensa urklipp efter Copy Local" value={settings?.clipboardAutoClearSeconds ?? 0} onChange={e => void run(async () => { if (settings) await storage.saveSettings({ ...settings, clipboardAutoClearSeconds: Number(e.target.value) }); await controller.reloadSettings(); })}><option value={0}>Aldrig</option><option value={30}>Efter 30 sekunder</option><option value={60}>Efter 1 minut</option><option value={300}>Efter 5 minuter</option></select><small>Skriver över urklippet när tiden gått. Nedräkningen visas och går att avbryta. Urklippshistorik och molnsynk ligger utanför appens kontroll.</small></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><p className="notice">Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.</p><RulesPanel storage={storage} rules={rules} notify={setNotice} onChange={() => void storage.listScannerRules().then(setRules)} /><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></article>
+      <label>Rensa urklipp efter Copy Local<select aria-label="Rensa urklipp efter Copy Local" value={settings?.clipboardAutoClearSeconds ?? 0} onChange={e => void run(async () => { if (settings) await storage.saveSettings({ ...settings, clipboardAutoClearSeconds: Number(e.target.value) }); await controller.reloadSettings(); })}><option value={0}>Aldrig</option><option value={30}>Efter 30 sekunder</option><option value={60}>Efter 1 minut</option><option value={300}>Efter 5 minuter</option></select><small>Skriver över urklippet när tiden gått. Nedräkningen visas och går att avbryta. Urklippshistorik och molnsynk ligger utanför appens kontroll.</small></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><button onClick={() => setIntro(true)}>Visa introduktionen igen</button><p className="notice">Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.</p><RulesPanel storage={storage} rules={rules} notify={setNotice} onChange={() => void storage.listScannerRules().then(setRules)} /><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></article>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>Lokalt valv · M1</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
@@ -662,6 +672,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     {labelling && <SaveVersionDialog next={Math.max(0, ...versions.map(v => v.number)) + 1} save={label => void saveVersion(label)} close={() => setLabelling(false)} />}
     {confirmDialog}
     {undoBar}
+    {intro && <Intro close={() => setIntro(false)} />}
     {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
   </div>;
 }

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
+import { open } from './app';
 
 /** Browser-level tests against the real Monaco editor.
  *
@@ -25,7 +26,7 @@ async function bind(page: Page, word: string, privateValue: string, category?: s
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
+  await open(page);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 });
 
@@ -101,7 +102,7 @@ test('masks a value categorised as a secret until it is revealed', async ({ page
 test('restores a vault from an exported file', async ({ browser }) => {
   const source = await browser.newContext();
   const page = await source.newPage();
-  await page.goto('/');
+  await open(page);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
   await type(page, '$p = "Hunter2"\n');
   await bind(page, 'Hunter2', 'Hunter2', 'secret');
@@ -127,7 +128,7 @@ test('restores a vault from an exported file', async ({ browser }) => {
   // A separate context is a separate origin storage: an empty vault, as after clearing site data.
   const restored = await browser.newContext();
   const fresh = await restored.newPage();
-  await fresh.goto('/');
+  await open(fresh);
   await expect(fresh.getByRole('status').first()).toContainText('Sparat lokalt');
   await fresh.evaluate(() => (location.hash = '#/projects'));
   await expect(fresh.locator('.project-cards')).not.toContainText('Backup-provet');
@@ -446,8 +447,30 @@ test('completes placeholder names in the editor', async ({ page }) => {
 // Report P6 and U15. Monaco was almost the whole bundle and loaded before anything could be typed.
 test.describe('narrow screen', () => {
   test.use({ viewport: { width: 390, height: 844 } });
-  test('uses the plain editor instead of Monaco', async ({ page }) => {
+  // The introduction is the first thing a phone sees. Nothing was wrong with it — a narrow-screen
+  // failure here turned out to be a duplicated navigation in the test, not a layout bug — but it is
+  // the one dialog every new user meets on whatever device they have, so it is held in place.
+  test('keeps the introduction usable on a phone', async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
     await page.goto('/');
+    const dialog = page.locator('dialog[open]');
+    await expect(dialog).toContainText('Mall — den du redigerar');
+    const box = await dialog.boundingBox();
+    expect(box!.width).toBeLessThanOrEqual(390);
+    for (const name of ['Hoppa över', 'Nästa']) {
+      const button = dialog.getByRole('button', { name });
+      const bounds = (await button.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+    }
+    await dialog.getByRole('button', { name: 'Hoppa över' }).click();
+    await expect(dialog).toHaveCount(0);
+    await context.close();
+  });
+
+  test('uses the plain editor instead of Monaco', async ({ page }) => {
+    // beforeEach already opened the app at this viewport; navigating again would only repeat it.
     await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
     // Monaco has no touch selection handles and its scrolling fights the page's; the textarea is
     // the better editor here, not a downgrade.
@@ -577,6 +600,35 @@ test('still reveals a placeholder when its binding is clicked', async ({ page })
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
   await page.locator('.binding-panel').getByRole('button', { name: /P_VALUE/ }).first().click();
   await expect(page.locator('.monaco-editor .selected-text').first()).toBeVisible();
+});
+
+// Report U13. Mall/Local/AI is the whole idea of the tool and was explained only by three banner
+// lines. Shown once on a fresh vault, and never again after it is closed.
+test('introduces the three views once, and can be brought back', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto('/');
+  const dialog = page.locator('dialog[open]');
+  await expect(dialog).toContainText('Mall — den du redigerar');
+
+  await dialog.getByRole('button', { name: 'Nästa' }).click();
+  await expect(dialog).toContainText('Local — koden med riktiga värden');
+  await dialog.getByRole('button', { name: 'Nästa' }).click();
+  await expect(dialog).toContainText('AI — koden utan dina värden');
+  await expect(dialog).toContainText('Ingenting lämnar den här datorn');
+  await dialog.getByRole('button', { name: 'Sätt igång' }).click();
+  await expect(dialog).toHaveCount(0);
+
+  // Closing it counts as having seen it, so a reload does not put it back.
+  await page.reload();
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+  // But it is still reachable for someone who wants it again.
+  await page.evaluate(() => (location.hash = '#/settings'));
+  await page.getByRole('button', { name: 'Visa introduktionen igen' }).click();
+  await expect(page.locator('dialog[open]')).toContainText('Mall — den du redigerar');
+  await context.close();
 });
 
 // Report U17. A delete is irreversible once the records are gone, so the way back is captured

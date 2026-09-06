@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { open } from './app';
 
 /** Report T1–T6. Measured rather than reasoned about: the previous pass found the tab list had no
  * panel to control, several buttons shared the name "Redigera", and two greys sat below AA. */
@@ -11,13 +12,13 @@ async function audit(page: Page, context?: string) {
 }
 
 test('the workspace has no accessibility violations', async ({ page }) => {
-  await page.goto('/');
+  await open(page);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
   expect(await audit(page)).toEqual([]);
 });
 
 test('the workspace stays clean with code, bindings and findings on screen', async ({ page }) => {
-  await page.goto('/');
+  await open(page);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
   await page.locator('.code-editor').click();
   await page.keyboard.type('$password = "Hunter2!"\n$host = "sql01.corp.local"\n');
@@ -26,13 +27,13 @@ test('the workspace stays clean with code, bindings and findings on screen', asy
 });
 
 test('the settings page has no accessibility violations', async ({ page }) => {
-  await page.goto('/#/settings');
+  await open(page, '#/settings');
   await expect(page.locator('.backup-panel')).toBeVisible();
   expect(await audit(page)).toEqual([]);
 });
 
 test('the project list has no accessibility violations', async ({ page }) => {
-  await page.goto('/');
+  await open(page);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
   await page.locator('.code-editor').click();
   await page.keyboard.type('$a = "one"\n');
@@ -43,13 +44,13 @@ test('the project list has no accessibility violations', async ({ page }) => {
 });
 
 test('the security page has no accessibility violations', async ({ page }) => {
-  await page.goto('/#/security');
+  await open(page, '#/security');
   await expect(page.locator('article.document').first()).toBeVisible();
   expect(await audit(page)).toEqual([]);
 });
 
 test('offers a skip link that stays out of the way until it is focused', async ({ page }) => {
-  await page.goto('/');
+  await open(page);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
   const skip = page.getByRole('link', { name: 'Hoppa till innehållet' });
 

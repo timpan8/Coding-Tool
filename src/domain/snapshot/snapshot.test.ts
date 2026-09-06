@@ -19,6 +19,7 @@ const settings = {
   aiPromptText: 'Behåll platshållarna.',
   editorFontSize: 14,
   editorWordWrap: true,
+  introSeen: true,
 };
 
 function workspace(): WorkspaceSnapshot {

@@ -634,6 +634,38 @@ main {
   font-size: 0.65rem;
   color: var(--text-subtle);
 }
+.intro {
+  max-width: 46ch;
+}
+.intro h3 {
+  margin: 12px 0 6px;
+  font-size: 0.95rem;
+}
+.intro p {
+  margin: 0 0 8px;
+  line-height: 1.55;
+}
+.intro-dots {
+  display: flex;
+  gap: 6px;
+}
+.intro-dots span {
+  width: 26px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.intro-dots span.done {
+  background: var(--accent-surface-strong);
+}
+.intro-dots span.current {
+  background: var(--accent);
+}
+.intro-step {
+  margin: 8px 0 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
 .undo-bar {
   position: fixed;
   left: 50%;
