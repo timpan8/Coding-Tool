@@ -120,11 +120,11 @@ export function isInExampleNamespace(value: string, ns: ExampleNamespace = DEFAU
   const v = value.toLowerCase()
   if (TEST_NET.test(v) || FAKE_GUID.test(v)) return true
   if (/^ex@mple-passw0rd-\d+$/.test(v) || /^example-(key|block|value)-\d+$/.test(v)) return true
-  if (/(^|[^a-z0-9])(example|exempel)([^a-z0-9]|$)/.test(v)) return true
-  const needles = [ns.mailDomain, ns.domain, ns.hostPrefix, ns.pathRoot, ns.tenant, ns.netbios].map((s) =>
-    s.toLowerCase(),
-  )
-  return needles.some((needle) => v.includes(needle))
+  if (/(^|[^a-z0-9])(example|exempel)\d*([^a-z0-9]|$)/.test(v)) return true
+  const needles = [ns.mailDomain, ns.domain, ns.hostPrefix, ns.pathRoot, ns.tenant].map((s) => s.toLowerCase())
+  if (needles.some((needle) => v.includes(needle))) return true
+  const netbios = ns.netbios.toLowerCase()
+  return new RegExp(`(^|[^a-z0-9])${netbios.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`).test(v)
 }
 
 /**

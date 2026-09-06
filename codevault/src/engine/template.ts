@@ -196,6 +196,11 @@ export function render(segments: readonly Segment[], mode: RenderMode, ctx: Temp
     }
     if (seg.regex) value = regexEscape(value)
 
+    if (ctx.plain) {
+      pieces.push(value)
+      continue
+    }
+
     const prevIsText = i > 0 && segments[i - 1]!.t === 'text'
     const next = segments[i + 1]
     const nextText = next && next.t === 'text' ? next.s : undefined

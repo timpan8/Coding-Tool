@@ -544,10 +544,7 @@ function annotateBindings(tokens: Token[]): void {
     if (t.kind === 'newline') {
       const prev = state.elem[state.elem.length - 1]
       const continues =
-        prev !== undefined &&
-        (prev.kind === 'operator' ||
-          (prev.kind === 'punct' && (prev.raw === '|' || prev.raw === ',')) ||
-          prev.kind === 'parameter')
+        prev !== undefined && (prev.kind === 'operator' || (prev.kind === 'punct' && (prev.raw === '|' || prev.raw === ',')))
       const frame = top()
       const parenContinues = frame !== undefined && (frame.open === '(' || frame.open === '[')
       if (!continues && !parenContinues) startElement()
@@ -584,6 +581,10 @@ function annotateBindings(tokens: Token[]): void {
           const frame = stack.pop()
           if (frame) {
             state = frame.saved
+            // The group was the argument: it consumed any pending parameter.
+            state.pendingParam = undefined
+            state.lastOperator = undefined
+            state.elem.push(t)
             if (frame.open === '{') fn = frame.fnBefore
           } else {
             startElement()

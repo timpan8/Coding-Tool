@@ -85,4 +85,6 @@ export interface TemplateContext {
   /** Decrypted real values; only needed for mode 'real'. */
   real?: ReadonlyMap<string, string>
   eol?: Eol
+  /** Plain-text mode: literal replacement, no PowerShell escaping. */
+  plain?: boolean
 }
