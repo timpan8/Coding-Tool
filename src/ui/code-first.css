@@ -203,7 +203,8 @@
   outline: 2px solid var(--accent-bright);
   outline-offset: 2px;
 }
-.empty-project-list {
+.empty-project-list,
+.empty-binding-list {
   text-align: center;
   padding: 50px;
   color: var(--text-muted);

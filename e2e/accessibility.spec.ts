@@ -43,6 +43,17 @@ test('the project list has no accessibility violations', async ({ page }) => {
   expect(await audit(page)).toEqual([]);
 });
 
+test('the bindings page has no accessibility violations', async ({ page }) => {
+  await open(page);
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.locator('.code-editor').click();
+  await page.keyboard.type('$a = "one"\n');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.getByRole('button', { name: 'Bindings' }).click();
+  await expect(page.locator('.bindings-page')).toBeVisible();
+  expect(await audit(page)).toEqual([]);
+});
+
 test('the security page has no accessibility violations', async ({ page }) => {
   await open(page, '#/security');
   await expect(page.locator('article.document').first()).toBeVisible();

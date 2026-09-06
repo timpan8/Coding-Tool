@@ -666,6 +666,54 @@ main {
   font-size: 0.7rem;
   color: var(--text-muted);
 }
+.bindings-page {
+  padding: 26px 30px 60px;
+}
+.binding-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px;
+  margin: 18px 0 14px;
+}
+.binding-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.binding-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.binding-table th,
+.binding-table td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.binding-table thead th {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.binding-table tbody th {
+  font-weight: 600;
+}
+.binding-table small {
+  display: block;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.row-actions {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+}
 .undo-bar {
   position: fixed;
   left: 50%;

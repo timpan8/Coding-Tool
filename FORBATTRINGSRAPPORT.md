@@ -175,7 +175,9 @@ utan att också lägga till dess escaping och test, annars faller det tillbaka p
 
 ### 3.3 Bindings
 
-**F14 · Bindings kan bara skapas genom att markera text i editorn.** Det finns ingen "Ny binding"-knapp. Vill man förbereda ett
+**F14 · Bindings kan bara skapas genom att markera text i editorn.** *(Åtgärdat: "Ny binding"-knapp
+utan markering, och `#/bindings` som egen route med sökning, filter på räckvidd och användning över
+hela valvet.)* Det finns ingen "Ny binding"-knapp. Vill man förbereda ett
 globalt värde innan koden finns går det inte. Lägg till en knapp i bindingpanelen och en global bindinghanterare
 (egen route) där alla bindings kan sökas, redigeras och rensas — inklusive globala som inte hör till något öppet projekt.
 

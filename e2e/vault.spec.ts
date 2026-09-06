@@ -602,6 +602,38 @@ test('still reveals a placeholder when its binding is clicked', async ({ page })
   await expect(page.locator('.monaco-editor .selected-text').first()).toBeVisible();
 });
 
+// Report F14. Bindings were reachable only through the project they belong to, which left a global
+// binding — the whole point of the global scope — unreachable unless some project happened to use
+// it, and a value from a deleted project invisible rather than gone.
+test('lists every binding in the vault, including global ones', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+
+  await page.getByRole('button', { name: 'Bindings' }).click();
+  const table = page.locator('.binding-table');
+  await expect(table).toContainText('P_VALUE');
+  await expect(table).toContainText('Projekt');
+
+  // A global binding can be made here. With a project open it still defaults to that project — the
+  // scope is a choice, and the page is what makes the global one reachable at all.
+  await page.getByRole('button', { name: '＋ Ny binding' }).click();
+  await page.getByLabel('Bindingnamn').fill('SHARED_TOKEN');
+  await page.getByLabel('Scope').selectOption('global');
+  await page.getByLabel('Privat värde · standard').fill('token-abc-123');
+  await page.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await expect(table).toContainText('SHARED_TOKEN');
+
+  // Filtering by scope is what makes a global one findable at all.
+  await page.getByLabel('Filtrera på räckvidd').selectOption('global');
+  await expect(table).toContainText('SHARED_TOKEN');
+  await expect(table).not.toContainText('P_VALUE');
+  await expect(page.locator('.binding-filters')).toContainText('1 av 2');
+
+  await page.getByLabel('Sök binding').fill('inget som finns');
+  await expect(page.locator('.empty-binding-list')).toBeVisible();
+});
+
 // Report F13. Adding a language means adding its escaping rule, or values fall through to the
 // generic one and are escaped for the wrong syntax. This is the end-to-end half of that.
 test('handles a Terraform file end to end, interpolation and all', async ({ page }) => {

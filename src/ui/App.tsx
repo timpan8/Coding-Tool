@@ -25,6 +25,7 @@ import { FileTabs } from './components/FileTabs';
 import { VersionPanel } from './components/VersionPanel';
 import { ProjectDetails } from './components/ProjectDetails';
 import { BindingPanel, toRows } from './components/BindingPanel';
+import { BindingsPage, useBindingUses } from './components/BindingsPage';
 import { ProfileManager, ProfilePicker } from './components/ProfilePicker';
 import { IngestDialog } from './components/IngestDialog';
 import { editorShortcuts, match, shortcuts } from './shortcuts';
@@ -199,7 +200,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       if (id) { await controller.open(id); setMode('template'); setFocusName(''); setFocusLine(undefined); }
       else if (hash === '#/' && (routeRef.current !== '#/' || controller.getSnapshot().session.project)) {
         await controller.newCode(); setMode('template'); setFocusName(''); setFocusLine(undefined);
-      } else if (!['#/', '#/projects', '#/settings', '#/security'].includes(hash)) throw new Error('Sidan finns inte. Öppna Mina projekt för att fortsätta.');
+      } else if (!['#/', '#/projects', '#/bindings', '#/settings', '#/security'].includes(hash)) throw new Error('Sidan finns inte. Öppna Mina projekt för att fortsätta.');
       setShowSecrets(false); setDrawer(false); setNotice('');
       setBindings(await storage.listBindings()); setLocation(hash, replace);
     });
@@ -262,6 +263,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const currentId = controller.getLastProjectId();
   const filtered = sortProjects(filterProjects(projects, query, languageFilter, statusFilter), sort);
   const facts = useProjectFacts(storage, projects, route === '#/projects');
+  const bindingUses = useBindingUses(storage, projects, route === '#/bindings');
   async function removeVersion(version: Version) {
     await run(async () => {
       if (version.id === session.baseVersionId) throw new Error('Utkastet bygger på den här versionen. Återställ en annan först.');
@@ -392,14 +394,19 @@ export function App({ storage }: { storage: StorageProvider }) {
       setNotice(`${file.name} inläst. Inget skickas någonstans.`);
     });
   }
+  /** No selection, so nothing is replaced in the template: the placeholder is typed by hand or
+   * picked from the editor's completion. Useful for preparing a value before the code exists.
+   *
+   * Without an open project the new binding is global, which is the case the bindings page exists
+   * for — a value shared across projects has nowhere else to be created. */
   function newBinding() {
     const current = controller.getSnapshot();
-    if (!current.session.project || !current.settings) return;
+    if (!current.settings) { setError('Inställningarna är inte inlästa ännu. Försök igen om ett ögonblick.'); return; }
     const time = new Date().toISOString();
-    // No selection, so nothing is replaced in the template: the placeholder is typed by hand or
-    // picked from the editor's completion. Useful for preparing a value before the code exists.
-    setBindingDialog({ binding: { id: crypto.randomUUID(), name: '', category: 'secret', scope: 'project',
-      scopeRef: current.session.project.id, description: '', aiReplacement: defaults.secret, values: {},
+    const project = current.session.project;
+    setBindingDialog({ binding: { id: crypto.randomUUID(), name: '', category: 'secret',
+      scope: project ? 'project' : 'global', scopeRef: project ? project.id : null,
+      description: '', aiReplacement: defaults.secret, values: {},
       escapeMode: 'auto', matchHints: { lastVariableNames: [], previousAiValues: [], aliases: [] },
       createdAt: time, updatedAt: time, deviceId: current.settings.deviceId } });
   }
@@ -551,7 +558,7 @@ export function App({ storage }: { storage: StorageProvider }) {
 
   return <div className="app-shell code-first"><a className="skip-link" href="#huvudinnehall">Hoppa till innehållet</a><div className="main-shell">
     <header className="topbar"><a className="brand" href="#/" onClick={e => { e.preventDefault(); void navigate('#/'); }}><span className="brand-icon">{'</>'}</span><span>AI Code Vault</span></a>
-      <nav className="top-navigation" aria-label="Huvudnavigation"><button disabled={busy} onClick={() => void navigate('#/')}>＋ Ny kod</button><button disabled={busy} onClick={openDrawer}>Mina projekt <kbd>Ctrl P</kbd></button><button onClick={() => setShowShortcuts(true)} aria-label="Visa kortkommandon">Genvägar</button><button onClick={() => void navigate('#/security')}>Säkerhet</button><button onClick={() => void navigate('#/settings')}>Inställningar</button></nav>
+      <nav className="top-navigation" aria-label="Huvudnavigation"><button disabled={busy} onClick={() => void navigate('#/')}>＋ Ny kod</button><button disabled={busy} onClick={openDrawer}>Mina projekt <kbd>Ctrl P</kbd></button><button onClick={() => setShowShortcuts(true)} aria-label="Visa kortkommandon">Genvägar</button><button disabled={busy} onClick={() => void navigate('#/bindings')}>Bindings</button><button onClick={() => void navigate('#/security')}>Säkerhet</button><button onClick={() => void navigate('#/settings')}>Inställningar</button></nav>
       <ProfilePicker profiles={profiles} activeId={settings?.activeProfileId ?? null} onManage={() => setManagingProfiles(true)}
         onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} /><label className="theme-choice">Tema<select aria-label="Tema" value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">System</option><option value="light">Ljust</option><option value="dark">Mörkt</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>Försök spara igen</button></div>}
@@ -616,6 +623,8 @@ export function App({ storage }: { storage: StorageProvider }) {
         <div className="project-cards">{filtered.map(p => <ProjectCard key={p.id} project={p} facts={facts[p.id]} current={p.id === currentId} open={() => void navigate(`#/project/${p.id}`)} />)}</div>
         {!filtered.length && <p className="empty-project-list">{projects.length ? 'Inga projekt matchar sökningen.' : 'Inga projekt ännu. Välj Ny kod och klistra in för att börja.'}</p>}
       </section></div>
+      <div className="overview-scroll" hidden={route !== '#/bindings'}><BindingsPage bindings={bindings} uses={bindingUses} profileId={options.profileId}
+        onEdit={b => setBindingDialog({ binding: b })} onDelete={b => void removeBinding(b)} onCreate={newBinding} /></div>
       <div hidden={route !== '#/security'}><Security /></div>
       <article className="document" hidden={route !== '#/settings'}><span className="eyebrow">DEN HÄR INSTALLATIONEN</span><h1>Inställningar</h1><p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p><dl><dt>Aktuellt origin</dt><dd>{location.origin}</dd><dt>App-sökväg</dt><dd>{location.pathname}</dd><dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd><dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd><dt>Beständig lagring</dt><dd>{!storageInfo ? 'Läser…' : !storageInfo.supported ? 'Stöds inte av webbläsaren' : storageInfo.persisted ? 'Ja · valvet vräks inte vid diskbrist' : 'Nej · webbläsaren får radera valvet'}</dd><dt>Utrymme</dt><dd>{storageInfo?.supported ? `${formatBytes(storageInfo.usedBytes)} av ${formatBytes(storageInfo.quotaBytes)}` : 'okänt'}</dd></dl>{storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert"><strong>Valvet kan raderas av webbläsaren</strong><p>Utan beständig lagring får webbläsaren slänga valvet när enheten får ont om utrymme. Det finns ingen backup att återställa från.</p><button onClick={() => void requestPersistence().then(state => { setStorageInfo(state); setNotice(state.persisted ? 'Beständig lagring beviljad.' : 'Webbläsaren nekade beständig lagring.'); })}>Begär beständig lagring</button></div>}<label>Enhetsnamn<input value={deviceName} onChange={e => setDeviceName(e.target.value)} /></label>
       <label className="check"><input type="checkbox" checked={settings?.includeAiPromptBlock ?? true} onChange={e => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, includeAiPromptBlock: e.target.checked }); await controller.reloadSettings(); } })} />Lägg en instruktion överst i AI-kopian</label>
