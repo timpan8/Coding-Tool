@@ -62,4 +62,70 @@ describe('WorkspaceController', () => {
     expect(controller.getSnapshot().phase).toBe('error');
     storage.createProjectWithDraft = original;
   });
+
+  it('keeps every open file after a storage failure, not only the active one', async () => {
+    const { storage, controller } = await setup(); teardown = () => storage.destroy();
+    controller.changeText('first file'); await controller.flush();
+    await controller.addFile(); controller.changeText('second file'); await controller.flush();
+    await controller.addFile(); controller.changeText('third file');
+
+    const original = storage.saveDraft.bind(storage);
+    storage.saveDraft = async () => { throw new Error('synthetic quota failure'); };
+    await expect(controller.flush()).rejects.toThrow('synthetic quota failure');
+    // Invariant 8: a partial write must not drop the files that are not on screen.
+    expect(Object.values(controller.getSnapshot().session.texts).sort()).toEqual(['first file', 'second file', 'third file']);
+    expect(controller.getSnapshot().phase).toBe('error');
+    storage.saveDraft = original;
+  });
+
+  it('keeps each file text separate and persists all of them', async () => {
+    const { storage, controller } = await setup(); teardown = () => storage.destroy();
+    controller.changeText('one'); await controller.flush();
+    await controller.addFile('python');
+    controller.changeText('two'); await controller.flush();
+
+    const project = (await storage.listProjects())[0];
+    expect(project.files).toHaveLength(2);
+    expect(project.files[1].name).toBe('del2.py');
+    const draft = await storage.getDraft(project.id);
+    expect(Object.values(draft!.templates).sort()).toEqual(['one', 'two']);
+
+    // Switching back shows the first file again, with its own language.
+    controller.selectFile(project.files[0].id);
+    expect(controller.getSnapshot().session.text).toBe('one');
+    expect(controller.getSnapshot().session.language).toBe('powershell');
+  });
+
+  it('removes a file without disturbing saved history', async () => {
+    const { storage, controller } = await setup(); teardown = () => storage.destroy();
+    controller.changeText('kept'); await controller.flush();
+    await controller.addFile(); controller.changeText('doomed'); await controller.flush();
+    await controller.saveVersion('med två filer');
+
+    const project = (await storage.listProjects())[0];
+    const doomed = project.files[1].id;
+    await controller.removeFile(doomed);
+
+    expect(controller.getSnapshot().session.files).toHaveLength(1);
+    expect((await storage.getDraft(project.id))!.templates[doomed]).toBeUndefined();
+    // The version still holds it, which is what makes a deleted file recoverable.
+    const versions = await storage.listVersions(project.id);
+    expect(versions[0].templates[doomed]).toBe('doomed');
+    expect(versions[0].files).toHaveLength(2);
+  });
+
+  it('restores every file a version held, not just the open one', async () => {
+    const { storage, controller } = await setup(); teardown = () => storage.destroy();
+    controller.changeText('a1'); await controller.flush();
+    await controller.addFile(); controller.changeText('b1'); await controller.flush();
+    await controller.saveVersion('v1');
+    const version = (await storage.listVersions((await storage.listProjects())[0].id))[0];
+
+    controller.changeText('b2'); await controller.flush();
+    controller.selectFile(controller.getSnapshot().session.files[0].id);
+    controller.changeText('a2'); await controller.flush();
+
+    await controller.applyVersion(version);
+    expect(Object.values(controller.getSnapshot().session.texts).sort()).toEqual(['a1', 'b1']);
+  });
 });

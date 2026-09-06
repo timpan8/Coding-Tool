@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { execFileSync } from 'node:child_process';
 
@@ -10,4 +11,6 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(`0.1.0 · ${process.env.GITHUB_SHA?.slice(0, 7) || commit}`) },
   build: { modulePreload: { polyfill: false } },
   server: { strictPort: true },
+  // Playwright owns e2e/; without this vitest claims those files and fails on its missing globals.
+  test: { exclude: [...configDefaults.exclude, 'e2e/**'] },
 });

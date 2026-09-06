@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render as mount, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render as mount, screen, waitFor, within } from '@testing-library/react';
 import { App } from './App';
 import { IndexedDbProvider } from '../storage/IndexedDbProvider';
 import { binding, project, version } from '../test/fixtures/factories';
 
 // Minimal UI tests isolate Monaco's canvas rendering; real domain + IndexedDB are used.
-vi.mock('./editor/CodeEditor', () => ({ CodeEditor: ({ value, readOnly, onChange, onBinding }: {
+vi.mock('./editor/Editor', () => ({ Editor: ({ value, readOnly, onChange, onBinding }: {
   value: string; readOnly: boolean; onChange: (v: string) => void;
   onBinding: (s: { text: string; start: number; end: number; lineBefore: string; line: number }) => void;
 }) => <><textarea aria-label="Testkod" value={value} readOnly={readOnly} onChange={e => onChange(e.target.value)} />
@@ -36,13 +36,21 @@ it('creates a project from first input, binds a selected value, renders both vie
   fireEvent.change(screen.getByLabelText('Projektnamn'), { target: { value: 'Create-ADUsers' } });
   fireEvent.keyDown(screen.getByLabelText('Projektnamn'), { key: 'Enter' });
   fireEvent.click(screen.getByRole('button', { name: 'Testmarkering' }));
-  fireEvent.change(await screen.findByLabelText('Namn'), { target: { value: 'ADMIN_USERNAME' } });
+  fireEvent.change(await screen.findByLabelText('Bindingnamn'), { target: { value: 'ADMIN_USERNAME' } });
   fireEvent.change(screen.getByLabelText('Privat värde · standard'), { target: { value: 'synthetic.user' } });
   fireEvent.click(screen.getByRole('button', { name: 'Spara binding' }));
   await waitFor(() => expect((editor as HTMLTextAreaElement).value).toContain('{{ADMIN_USERNAME}}'));
+  // Saving now asks for a label first, so the history is readable.
   fireEvent.click(screen.getByRole('button', { name: 'Spara version' }));
+  const labelField = await screen.findByLabelText('Versionsetikett');
+  fireEvent.change(labelField, { target: { value: 'första rundan' } });
+  fireEvent.click(within(labelField.closest('dialog')!).getByRole('button', { name: 'Spara version' }));
   await waitFor(async () => expect(await storage.listVersions((await storage.listProjects())[0].id)).toHaveLength(1));
+  expect((await storage.listVersions((await storage.listProjects())[0].id))[0].label).toBe('första rundan');
   fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
+  // Masked by default whatever the category: the category is guessed from the variable name.
+  expect((editor as HTMLTextAreaElement).value).not.toContain('synthetic.user');
+  fireEvent.click(screen.getByRole('button', { name: 'Visa värden' }));
   expect((editor as HTMLTextAreaElement).value).toContain('synthetic.user');
   fireEvent.click(screen.getByRole('tab', { name: 'AI' }));
   expect((editor as HTMLTextAreaElement).value).toContain('example.user');
@@ -50,7 +58,12 @@ it('creates a project from first input, binds a selected value, renders both vie
   fireEvent.click(screen.getByRole('button', { name: /Copy for AI/ }));
   expect(clipboard).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByRole('button', { name: 'Jag har granskat · kopiera för AI' }));
-  await waitFor(() => expect(clipboard).toHaveBeenCalledWith('$username = "example.user"'));
+  // The AI copy now carries an instruction block above the code, as a comment in the file's own
+  // language, telling the model to leave the placeholders alone.
+  await waitFor(() => expect(clipboard).toHaveBeenCalled());
+  const copied = clipboard.mock.calls.at(-1)![0];
+  expect(copied).toContain('$username = "example.user"');
+  expect(copied).toContain('# Koden nedan har privata värden');
   const projects = await storage.listProjects(), versions = await storage.listVersions(projects[0].id);
   expect(versions[0].templates[projects[0].files[0].id]).toBe('$username = "{{ADMIN_USERNAME}}"');
 });

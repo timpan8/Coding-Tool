@@ -3,6 +3,8 @@ import '../../../node_modules/monaco-editor/esm/vs/base/browser/ui/codicons/codi
 import * as monaco from 'monaco-editor/editor/editor.api.js';
 import 'monaco-editor/editor/contrib/find/browser/findController.js';
 import 'monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter.js';
+import 'monaco-editor/editor/contrib/hover/browser/hoverContribution.js';
+import 'monaco-editor/editor/contrib/suggest/browser/suggestController.js';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
 import { language as powershell } from 'monaco-editor/languages/definitions/powershell/powershell.js';
 import { language as javascript } from 'monaco-editor/languages/definitions/javascript/javascript.js';
@@ -11,66 +13,140 @@ import { language as python } from 'monaco-editor/languages/definitions/python/p
 import { language as xml } from 'monaco-editor/languages/definitions/xml/xml.js';
 import { language as yaml } from 'monaco-editor/languages/definitions/yaml/yaml.js';
 import { language as shell } from 'monaco-editor/languages/definitions/shell/shell.js';
-import type { LanguageId } from '../../types/models';
+import { language as hcl } from 'monaco-editor/languages/definitions/hcl/hcl.js';
+import { language as sql } from 'monaco-editor/languages/definitions/sql/sql.js';
+import { editorColors, themeName } from '../theme';
+import type { EditorProps } from './props';
+import { t } from '../text';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
-for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell })) {
+for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell, hcl, sql })) {
   monaco.languages.register({ id });
   monaco.languages.setMonarchTokensProvider(id, language);
 }
+const languageIds = ['powershell', 'javascript', 'typescript', 'python', 'xml', 'yaml', 'shell', 'hcl', 'sql', 'json', 'dotenv', 'plaintext'];
 monaco.languages.register({ id: 'json' });
 monaco.languages.setMonarchTokensProvider('json', { tokenizer: { root: [[/"(?:[^"\\]|\\.)*"/, 'string'], [/\b(?:true|false|null)\b/, 'keyword'], [/-?\d+(?:\.\d+)?/, 'number']] } });
-monaco.editor.defineTheme('vault', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#ffffff', 'editorLineNumber.foreground': '#728296', 'editor.lineHighlightBackground': '#f3f7fa' } });
-export interface Selection { text: string; start: number; end: number; lineBefore: string; line: number }
-interface Props {
-  documentKey?: string; active?: boolean; autoFocus?: boolean;
-  value: string; language: LanguageId; readOnly?: boolean; onChange?: (value: string) => void;
-  onBinding?: (selection: Selection) => void; onPlaceholder?: (name: string) => void;
-  focusName?: string; focusLine?: number; onLine?: (line: number) => void;
-}
-export function CodeEditor(props: Props) {
+// No dotenv definition ships with monaco, and the syntax is small enough to state outright: a
+// comment, a key, and the three shapes a value can take.
+monaco.languages.register({ id: 'dotenv' });
+monaco.languages.setMonarchTokensProvider('dotenv', { tokenizer: { root: [
+  [/^\s*#.*$/, 'comment'],
+  [/^\s*(?:export\s+)?[\w.]+(?==)/, 'key'],
+  [/"(?:[^"\\]|\\.)*"/, 'string'],
+  [/'[^']*'/, 'string'],
+  [/=/, 'operator'],
+] } });
+monaco.editor.defineTheme('vault', { base: 'vs', inherit: true, rules: [], colors: editorColors.light });
+monaco.editor.defineTheme('vault-dark', { base: 'vs-dark', inherit: true, rules: [], colors: editorColors.dark });
+export type { Selection } from './props';
+
+export function CodeEditor(props: EditorProps) {
   const host = useRef<HTMLDivElement>(null), editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const updating = useRef(false);
   const documents = useRef(new Map<string, { model: monaco.editor.ITextModel; view: monaco.editor.ICodeEditorViewState | null }>());
   const activeKey = useRef('');
   const callbacks = useRef(props);
+  const decorateRef = useRef<(() => void) | null>(null);
   callbacks.current = props;
   useEffect(() => {
     const model = monaco.editor.createModel(callbacks.current.value, callbacks.current.language);
     activeKey.current = callbacks.current.documentKey ?? 'default';
     documents.current.set(activeKey.current, { model, view: null });
-    const instance = monaco.editor.create(host.current!, { model, theme: 'vault', automaticLayout: true,
-      readOnly: callbacks.current.readOnly, minimap: { enabled: false }, fontSize: 14, lineHeight: 23,
-      scrollBeyondLastLine: false, wordWrap: 'on', padding: { top: 16 }, contextmenu: true,
-      links: false, hover: { enabled: 'off' }, unicodeHighlight: { ambiguousCharacters: false },
+    const instance = monaco.editor.create(host.current!, { model, theme: themeName(callbacks.current.theme ?? 'light'), automaticLayout: true,
+      readOnly: callbacks.current.readOnly, minimap: { enabled: false }, fontSize: callbacks.current.fontSize ?? 14,
+      lineHeight: Math.round((callbacks.current.fontSize ?? 14) * 1.65),
+      scrollBeyondLastLine: false, wordWrap: callbacks.current.wordWrap === false ? 'off' : 'on', padding: { top: 16 }, contextmenu: true,
+      links: false, hover: { enabled: 'on', delay: 250 }, unicodeHighlight: { ambiguousCharacters: false },
       quickSuggestions: false, parameterHints: { enabled: false }, renderValidationDecorations: 'off',
       ariaLabel: 'Kodredigerare', accessibilitySupport: 'auto' });
     editor.current = instance;
     const decorations = instance.createDecorationsCollection();
     const decorate = () => {
-      decorations.set(instance.getModel()!.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } })));
+      const model = instance.getModel()!;
+      const substitutions = callbacks.current.substitutions ?? [];
+      if (substitutions.length) {
+        decorations.set(substitutions.map(range => ({
+          range: monaco.Range.fromPositions(model.getPositionAt(range.start), model.getPositionAt(range.end)),
+          options: { inlineClassName: 'substituted-value', hoverMessage: { value: `Utbytt: **${range.name}**` } },
+        })));
+        return;
+      }
+      decorations.set(model.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } })));
     };
+    // Report U7. An empty selection used to return here, so Ctrl+B did nothing and said nothing.
+    // The editor reports what the selection is; deciding what to say about it is the app's job.
     const binding = () => {
       const model = instance.getModel()!;
       const selected = instance.getSelection();
-      if (!selected || selected.isEmpty()) return;
-      callbacks.current.onBinding?.({ text: model.getValueInRange(selected), start: model.getOffsetAt(selected.getStartPosition()),
+      if (!selected) { callbacks.current.onBinding?.({ text: '', start: 0, end: 0, lineBefore: '', line: 1 }); return; }
+      callbacks.current.onBinding?.({ text: selected.isEmpty() ? '' : model.getValueInRange(selected), start: model.getOffsetAt(selected.getStartPosition()),
         end: model.getOffsetAt(selected.getEndPosition()), lineBefore: model.getLineContent(selected.startLineNumber).slice(0, selected.startColumn - 1), line: selected.startLineNumber });
     };
     const action = instance.addAction({ id: 'create-binding', label: 'Skapa binding', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB], contextMenuGroupId: 'vault', run: binding });
     const change = instance.onDidChangeModelContent(() => { decorate(); if (!updating.current && !instance.getOption(monaco.editor.EditorOption.readOnly)) callbacks.current.onChange?.(instance.getValue()); });
     const modelChange = instance.onDidChangeModel(decorate);
     const line = instance.onDidChangeCursorPosition(e => callbacks.current.onLine?.(e.position.lineNumber));
-    const mouse = instance.onMouseDown(e => {
-      const position = e.target.position;
-      if (!position) return;
-      const matches = instance.getModel()!.findMatches('\\{\\{([A-Z][A-Z0-9_]{1,63})\\}\\}', false, true, false, null, true);
-      const match = matches.find(m => m.range.containsPosition(position));
-      if (match?.matches) callbacks.current.onPlaceholder?.(match.matches[1]);
+    const selected = instance.onDidChangeCursorSelection(() => {
+      const model = instance.getModel(), range = instance.getSelection();
+      if (!model || !range || range.isEmpty()) { callbacks.current.onSelectionChange?.(null); return; }
+      callbacks.current.onSelectionChange?.({ text: model.getValueInRange(range), start: model.getOffsetAt(range.getStartPosition()),
+        end: model.getOffsetAt(range.getEndPosition()), lineBefore: model.getLineContent(range.startLineNumber).slice(0, range.startColumn - 1), line: range.startLineNumber });
     });
+    const placeholderAt = (position: monaco.Position) => {
+      const matches = instance.getModel()!.findMatches('\\{\\{([A-Z][A-Z0-9_]{1,63})\\}\\}', false, true, false, null, true);
+      return matches.find(m => m.range.containsPosition(position))?.matches?.[1];
+    };
+    // Opening the editor on a single click made it impossible to put the caret inside a placeholder,
+    // and threw up a modal on a stray click while typing. A double click is the deliberate gesture.
+    const mouse = instance.onMouseUp(e => {
+      if (e.event.browserEvent.detail !== 2 || !e.target.position) return;
+      const name = placeholderAt(e.target.position);
+      if (name) callbacks.current.onPlaceholder?.(name);
+    });
+    // Typing {{ offers the bindings that already exist, so a name has to be remembered exactly
+    // only once. quickSuggestions stays off; this is triggered by the brace itself.
+    const completion = monaco.languages.registerCompletionItemProvider([...languageIds], {
+      triggerCharacters: ['{'],
+      provideCompletionItems(model, position) {
+        const line = model.getValueInRange({ startLineNumber: position.lineNumber, startColumn: 1, endLineNumber: position.lineNumber, endColumn: position.column });
+        const open = /\{\{([A-Z0-9_]*)$/.exec(line);
+        if (!open || model !== instance.getModel()) return { suggestions: [] };
+        const start = position.column - open[1].length;
+        const range = new monaco.Range(position.lineNumber, start, position.lineNumber, position.column);
+        return {
+          suggestions: (callbacks.current.placeholderNames ?? []).map(name => ({
+            label: name,
+            kind: monaco.languages.CompletionItemKind.Variable,
+            insertText: `${name}}}`,
+            detail: callbacks.current.describePlaceholder?.(name)?.hasValue ? 'binding' : t.editorHover.bindingNoValue,
+            range,
+          })),
+        };
+      },
+    });
+
+    // A single click should still tell you what is behind the placeholder, without opening anything
+    // and without showing the private value: this is the view people screen-share.
+    const hover = monaco.languages.registerHoverProvider(
+      [...languageIds],
+      {
+        provideHover(model, position) {
+          if (model !== instance.getModel()) return null;
+          const name = placeholderAt(position);
+          const info = name ? callbacks.current.describePlaceholder?.(name) : undefined;
+          if (!name) return null;
+          const lines = info
+            ? [`**${name}** · ${info.category}`, info.aiReplacement ? `AI-värde: \`${info.aiReplacement}\`` : '', info.hasValue ? t.editorHover.valueSet : t.editorHover.valueMissing]
+            : [`**${name}**`, t.editorHover.noBinding];
+          return { contents: lines.filter(Boolean).map(value => ({ value })) };
+        },
+      },
+    );
+    decorateRef.current = decorate;
     decorate();
     if (callbacks.current.autoFocus) instance.focus();
-    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); mouse.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
+    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); selected.dispose(); mouse.dispose(); hover.dispose(); completion.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
   }, []);
   useEffect(() => {
     const instance = editor.current;
@@ -83,7 +159,17 @@ export function CodeEditor(props: Props) {
       if (old) old.view = instance.saveViewState();
       let next = documents.current.get(key);
       if (!next) { next = { model: monaco.editor.createModel(props.value, props.language), view: null }; documents.current.set(key, next); }
+      // The map was unbounded and only cleared on unmount. Bounded by projects × views before
+      // multiple files existed; now projects × files × views, which grows without limit in a long
+      // session. Map preserves insertion order, so the oldest entry that is not in use is evicted.
       activeKey.current = key;
+      while (documents.current.size > 12) {
+        const oldest = [...documents.current.keys()].find(k => k !== key);
+        if (!oldest) break;
+        documents.current.get(oldest)?.model.dispose();
+        documents.current.delete(oldest);
+      }
+      documents.current.delete(key); documents.current.set(key, next);
       instance.setModel(next.model);
       if (next.view) instance.restoreViewState(next.view);
       if (props.active) instance.focus();
@@ -96,12 +182,27 @@ export function CodeEditor(props: Props) {
     }
     if (model.getLanguageId() !== props.language) monaco.editor.setModelLanguage(model, props.language);
   }, [props.value, props.language, props.readOnly, props.documentKey, props.active]);
+  // Its own effect: the model-sync effect below does not depend on these, so folding them in there
+  // would have meant a preference only took hold the next time the text or the file changed.
+  useEffect(() => {
+    editor.current?.updateOptions({ fontSize: props.fontSize ?? 14, lineHeight: Math.round((props.fontSize ?? 14) * 1.65),
+      wordWrap: props.wordWrap === false ? 'off' : 'on' });
+  }, [props.fontSize, props.wordWrap]);
+  useEffect(() => { monaco.editor.setTheme(themeName(props.theme ?? 'light')); }, [props.theme]);
+  useEffect(() => { decorateRef.current?.(); }, [props.substitutions, props.value]);
   useEffect(() => { if (props.active) { editor.current?.layout(); if (props.autoFocus) editor.current?.focus(); } }, [props.active, props.autoFocus]);
+  // props.value is a dependency because the placeholder may not be in the model yet when the name
+  // is requested — creating a binding sets both in the same commit. That made every later keystroke
+  // re-select the placeholder, so typing after creating a binding overwrote it and scrambled the
+  // file. The reveal is reported instead, and the caller drops the request once it has happened.
   useEffect(() => {
     if (!props.focusName || !editor.current) return;
     const model = editor.current.getModel()!;
     const matches = model.findMatches(`{{${props.focusName}}}`, false, false, true, null, false);
-    if (matches.length) { editor.current.setSelections(matches.map(m => new monaco.Selection(m.range.startLineNumber, m.range.startColumn, m.range.endLineNumber, m.range.endColumn))); editor.current.revealLineInCenter(matches[0].range.startLineNumber); }
+    if (!matches.length) return;
+    editor.current.setSelections(matches.map(m => new monaco.Selection(m.range.startLineNumber, m.range.startColumn, m.range.endLineNumber, m.range.endColumn)));
+    editor.current.revealLineInCenter(matches[0].range.startLineNumber);
+    callbacks.current.onFocused?.();
   }, [props.focusName, props.value]);
   useEffect(() => { if (props.focusLine) { editor.current?.revealLineInCenter(props.focusLine); editor.current?.setPosition({ lineNumber: props.focusLine, column: 1 }); } }, [props.focusLine]);
   return <div className="code-editor" ref={host} />;

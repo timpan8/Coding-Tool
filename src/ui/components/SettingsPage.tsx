@@ -1,0 +1,94 @@
+import type { ScannerRule, Settings } from '../../types/models';
+import type { StorageProvider } from '../../storage/StorageProvider';
+import { formatBytes, requestPersistence, type StorageState } from '../../storage/persistence';
+import { RulesPanel } from './RulesPanel';
+import { BackupPanel } from './BackupPanel';
+import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
+import { t } from '../text';
+
+/** Report K-a. This lived as one 3.5 kB line inside App.tsx, which is why every settings change made
+ * an unreadable diff.
+ *
+ * It owns no state. The workspace still holds the settings and decides how a write is sequenced —
+ * this asks for one through `save` and never touches storage for settings itself. */
+export function SettingsPage({
+  settings, storage, storageInfo, onStorageInfo, deviceName, onDeviceName,
+  rules, onRules, save, notify, confirm, showIntro,
+}: {
+  settings: Settings | null;
+  storage: StorageProvider;
+  storageInfo: StorageState | null;
+  onStorageInfo: (state: StorageState) => void;
+  deviceName: string;
+  onDeviceName: (name: string) => void;
+  rules: ScannerRule[];
+  onRules: () => void;
+  save: (patch: Partial<Settings>) => Promise<void>;
+  notify: (message: string) => void;
+  confirm: (request: ConfirmRequest) => Promise<ConfirmResult>;
+  showIntro: () => void;
+}) {
+  const persistence = !storageInfo ? t.settings.persistenceReading
+    : !storageInfo.supported ? t.settings.persistenceUnsupported
+      : storageInfo.persisted ? t.settings.persistenceYes
+        : t.settings.persistenceNo;
+
+  return <article className="document">
+    <span className="eyebrow">{t.settings.eyebrow}</span>
+    <h1>{t.settings.title}</h1>
+    <p>{t.settings.lead}</p>
+
+    <dl>
+      <dt>{t.settings.origin}</dt><dd>{location.origin}</dd>
+      <dt>{t.settings.path}</dt><dd>{location.pathname}</dd>
+      <dt>{t.settings.deviceId}</dt><dd>{settings?.deviceId}</dd>
+      <dt>{t.settings.storage}</dt><dd>{t.settings.storageValue}</dd>
+      <dt>{t.settings.persistence}</dt><dd>{persistence}</dd>
+      <dt>{t.settings.space}</dt>
+      <dd>{storageInfo?.supported ? t.settings.spaceUsed(formatBytes(storageInfo.usedBytes), formatBytes(storageInfo.quotaBytes)) : t.settings.spaceUnknown}</dd>
+    </dl>
+
+    {storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert">
+      <strong>{t.settings.atRiskTitle}</strong>
+      <p>{t.settings.atRiskBody}</p>
+      <button onClick={() => void requestPersistence().then(state => {
+        onStorageInfo(state);
+        notify(state.persisted ? t.settings.persistenceGranted : t.settings.persistenceDenied);
+      })}>{t.settings.requestPersistence}</button>
+    </div>}
+
+    <label>{t.settings.deviceName}<input value={deviceName} onChange={e => onDeviceName(e.target.value)} /></label>
+
+    <label className="check">
+      <input type="checkbox" checked={settings?.includeAiPromptBlock ?? true}
+        onChange={e => void save({ includeAiPromptBlock: e.target.checked }).catch(() => {})} />
+      {t.settings.includePrompt}
+    </label>
+
+    {settings?.includeAiPromptBlock && <label>{t.settings.promptText}
+      <textarea aria-label={t.settings.promptLabel} rows={3} defaultValue={settings.aiPromptText}
+        onBlur={e => void save({ aiPromptText: e.target.value }).catch(() => {})} />
+      <small>{t.settings.promptHint}</small>
+    </label>}
+
+    <label>{t.settings.clearClipboard}
+      <select aria-label={t.settings.clearClipboard} value={settings?.clipboardAutoClearSeconds ?? 0}
+        onChange={e => void save({ clipboardAutoClearSeconds: Number(e.target.value) }).catch(() => {})}>
+        <option value={0}>{t.settings.clearNever}</option>
+        <option value={30}>{t.settings.clear30}</option>
+        <option value={60}>{t.settings.clear60}</option>
+        <option value={300}>{t.settings.clear300}</option>
+      </select>
+      <small>{t.settings.clearHint}</small>
+    </label>
+
+    {/* Says "saved" only once the write has actually landed; save() rejects and reports its own
+        failure otherwise. */}
+    <button className="primary" onClick={() => void save({ deviceName }).then(() => notify(t.app.settingsSaved)).catch(() => {})}>{t.settings.save}</button>
+    <button onClick={showIntro}>{t.settings.showIntro}</button>
+    <p className="notice">{t.settings.backupNote}</p>
+
+    <RulesPanel storage={storage} rules={rules} notify={notify} onChange={onRules} />
+    <BackupPanel storage={storage} notify={notify} confirm={confirm} />
+  </article>;
+}

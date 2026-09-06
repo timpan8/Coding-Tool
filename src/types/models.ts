@@ -1,5 +1,5 @@
 export type Iso = string;
-export type LanguageId = 'powershell' | 'javascript' | 'typescript' | 'python' | 'json' | 'xml' | 'yaml' | 'shell' | 'plaintext';
+export type LanguageId = 'powershell' | 'javascript' | 'typescript' | 'python' | 'json' | 'xml' | 'yaml' | 'shell' | 'dotenv' | 'hcl' | 'sql' | 'plaintext';
 export type Category = 'secret' | 'identity' | 'infrastructure' | 'environment' | 'configuration' | 'testdata';
 export interface ProjectPathConfig { rootOverride: string | null; subfolders: string[] }
 export interface ProjectFile { id: string; name: string; language: LanguageId; order: number }
@@ -20,6 +20,9 @@ export interface Version {
   id: string; projectId: string; number: number; label: string; parentVersionId: string | null;
   branchName: string; status: 'stable' | 'testing' | 'experimental' | 'broken'; notes: string;
   templates: Record<string, string>; bindingUsage: BindingUsage[]; ingestReport?: IngestReport;
+  /** The file list as it stood when the version was saved. Without it a diff across a rename shows
+   * a phantom delete and add, and a preview cannot label its tabs. Absent on older records. */
+  files?: ProjectFile[];
   createdAt: Iso; deviceId: string;
 }
 export interface Binding {
@@ -44,17 +47,23 @@ export interface ScannerRule {
   id: string; name: string; pattern: string; flags: string; severity: 'critical' | 'high' | 'medium' | 'low';
   category: Category; suggestedAiReplacement?: string; enabled: boolean; builtIn: boolean; explanation: string;
 }
+/** A finding the user has judged harmless in this project. Keyed by a hash of the value, never the
+ * value, so the record is safe to store and to include in a backup. */
+export interface ScanDismissal { projectId: string; fingerprint: string; ruleId: string; reason: string; createdAt: Iso; deviceId: string }
 export interface Settings {
   deviceId: string; deviceName: string; globalRootPath: string; aiRootPath: string; defaultSubfolders: string[];
-  activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean;
-  clipboardAutoClearSeconds: number; maskSecretsInUi: boolean;
+  activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean; aiPromptText: string;
+  clipboardAutoClearSeconds: number; maskSecretsInUi: boolean; theme: 'system' | 'light' | 'dark';
+  editorFontSize: number; editorWordWrap: boolean; introSeen: boolean;
 }
-export interface WorkspaceSnapshot { projects: Project[]; versions: Version[]; drafts: ProjectDraft[]; bindings: Binding[]; profiles: Profile[]; datasets: Dataset[]; rules: ScannerRule[]; settings: Settings }
+export interface WorkspaceSnapshot { projects: Project[]; versions: Version[]; drafts: ProjectDraft[]; bindings: Binding[]; profiles: Profile[]; datasets: Dataset[]; rules: ScannerRule[]; dismissals: ScanDismissal[]; settings: Settings }
 export type ProjectSummary = Project;
 export type VersionSummary = Version;
 export interface BindingFilter { projectId?: string; versionId?: string }
 export interface DatasetFilter { projectId?: string }
 export type ImportMode = 'merge' | 'replace';
-export interface ImportResult { added: number; conflicts: number }
-export const languages: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'plaintext'];
+/** What to do with an entity the vault already has: keep the vault's, take the file's, or keep both. */
+export type ImportResolution = 'keep' | 'replace' | 'duplicate';
+export interface ImportResult { added: number; replaced: number; duplicated: number; skipped: number }
+export const languages: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'dotenv', 'hcl', 'sql', 'plaintext'];
 export const categories: Category[] = ['secret', 'identity', 'infrastructure', 'environment', 'configuration', 'testdata'];

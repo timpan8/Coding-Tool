@@ -1,0 +1,6 @@
+# The terse style in src is deliberate; Prettier must never rewrite it.
+*.ts
+*.tsx
+*.mjs
+dist/
+pnpm-lock.yaml

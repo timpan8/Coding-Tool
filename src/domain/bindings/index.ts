@@ -23,7 +23,7 @@ export const defaults: Record<Category, string> = {
   environment: 'C:\\Temp\\Example', configuration: 'EXAMPLE_VALUE', testdata: 'example.test',
 };
 export function suggestBinding(lineBefore: string, selected: string): { name: string; category: Category } {
-  const variable = /[\"'$]?([A-Za-z_][A-Za-z0-9_]*)[\"']?\s*[:=][^=]*$/.exec(lineBefore)?.[1] || 'VALUE';
+  const variable = /["'$]?([A-Za-z_][A-Za-z0-9_]*)["']?\s*[:=][^=]*$/.exec(lineBefore)?.[1] || 'VALUE';
   const name = variable.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase().slice(0, 64);
   const category: Category = /pass|secret|token|key/i.test(variable) ? 'secret'
     : /^(?:[a-z]:[\\/]|\\\\|\/)/i.test(selected) ? 'environment'
