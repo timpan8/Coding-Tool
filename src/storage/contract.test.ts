@@ -48,6 +48,25 @@ export function storageContract(factory: () => { storage: StorageProvider; clean
     expect(await storage.getProject(p.id)).toBeUndefined(); expect(await storage.listVersions(p.id)).toEqual([]);
     expect(await storage.getProject(other.id)).toEqual(other); expect(await storage.listBindings()).toEqual([global]);
   });
+  // What the undo bar rests on: the capture has to hold everything the cascade removes, or undoing
+  // a delete would quietly restore a project with its versions and private values missing.
+  it('captures everything a project deletion would remove, so it can be put back', async () => {
+    const p = project(), other = project(); await storage.saveProject(p); await storage.saveProject(other);
+    const v = version(p); await storage.commitVersion({ ...p, currentVersionId: v.id }, v);
+    const scoped = binding({ scopeRef: p.id }), global = binding({ scope: 'global', scopeRef: null });
+    await storage.saveBinding(scoped); await storage.saveBinding(global);
+
+    const captured = await storage.captureProject(p.id);
+    await storage.deleteProject(p.id);
+    expect(await storage.getProject(p.id)).toBeUndefined();
+
+    await storage.importAll(captured, 'merge');
+    expect(await storage.getProject(p.id)).toEqual({ ...p, currentVersionId: v.id });
+    expect(await storage.listVersions(p.id)).toEqual([v]);
+    expect((await storage.listBindings()).map(b => b.id).sort()).toEqual([global.id, scoped.id].sort());
+    // The other project was never part of the capture and is untouched throughout.
+    expect(await storage.getProject(other.id)).toEqual(other);
+  });
   // Import used to be required to reject outright; it now applies a payload the caller has already
   // validated and planned. This is the one existing expectation deliberately inverted.
   it('leaves the vault alone on re-import unless a conflict is explicitly resolved', async () => {

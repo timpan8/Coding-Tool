@@ -17,6 +17,7 @@ import { filterProjects, ProjectCard, ProjectFilters, sortProjects, useProjectFa
 import { BackupPanel } from './components/BackupPanel';
 import { RulesPanel } from './components/RulesPanel';
 import { useConfirm } from './components/ConfirmDialog';
+import { useUndo } from './components/UndoBar';
 import { collectIssues, IssuePanel, type LocatedIssue } from './components/IssuePanel';
 import { FindingsPanel, useDismissals, useScanner } from './components/FindingsPanel';
 import { FileTabs } from './components/FileTabs';
@@ -153,6 +154,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [theme, setTheme] = useState<ThemeChoice>(paintHint()), [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [storageInfo, setStorageInfo] = useState<StorageState | null>(null), asked = useRef(false);
   const [confirm, confirmDialog] = useConfirm();
+  const [offerUndo, undoBar] = useUndo(setNotice);
   const [rules, setRules] = useState<ScannerRule[]>([]), [profiles, setProfiles] = useState<Profile[]>([]), [managingProfiles, setManagingProfiles] = useState(false);
   const [ingesting, setIngesting] = useState(false), [showShortcuts, setShowShortcuts] = useState(false), [dropping, setDropping] = useState(false);
   const [dismissed, refreshDismissals] = useDismissals(() => project ? storage.listDismissals(project.id) : Promise.resolve([]), project?.id ?? '');
@@ -179,7 +181,13 @@ export function App({ storage }: { storage: StorageProvider }) {
     routeRef.current = hash; setRoute(hash);
   }
   async function navigate(hash: string, replace = false) {
-    if (busyRef.current) { history.replaceState(null, '', routeRef.current); return; }
+    // Report U6. Cancelling silently left the address bar snapping back with nothing said, which
+    // reads as a broken link rather than as "not now".
+    if (busyRef.current) {
+      history.replaceState(null, '', routeRef.current);
+      setNotice('Sidbytet väntar tills den pågående åtgärden är klar. Försök igen om ett ögonblick.');
+      return;
+    }
     await run(async () => {
       await controller.flush();
       const id = /^#\/project\/([a-f0-9-]+)$/.exec(hash)?.[1];
@@ -254,10 +262,17 @@ export function App({ storage }: { storage: StorageProvider }) {
       if (version.id === session.baseVersionId) throw new Error('Utkastet bygger på den här versionen. Återställ en annan först.');
       if (!await confirm({ title: `Radera v${version.number}?`, danger: true, confirmLabel: 'Radera versionen',
         body: <><p>{version.label ? `"${version.label}"` : 'Versionen'} tas bort ur historiken för alltid.</p><p>Utkastet du arbetar i påverkas inte.</p></> })) return;
+      // The record itself is the way back. Version-scoped bindings go with it, so they are read
+      // before the delete — afterwards there is nothing left to read.
+      const scoped = (await storage.listBindings()).filter(b => b.scope === 'version' && b.scopeRef === version.id);
       await storage.deleteVersion(version.id);
       await controller.reloadVersions();
       setViewing(null);
-      setNotice(`v${version.number} raderad.`);
+      offerUndo({ label: `v${version.number} är raderad.`, restore: async () => {
+        await storage.importAll({ versions: [version], bindings: scoped }, 'merge');
+        await controller.reloadVersions();
+        setBindings(await storage.listBindings());
+      } });
     });
   }
   async function removeProject(id: string, name: string) {
@@ -267,6 +282,8 @@ export function App({ storage }: { storage: StorageProvider }) {
       if (!await confirm({ title: `Radera ${name}?`, danger: true, confirmLabel: 'Radera projektet', typeToConfirm: 'RADERA',
         body: <><p>Följande försvinner för alltid från den här datorn:</p><ul><li>{versions.length} sparade versioner</li><li>{scoped.length} bindings som hör till projektet, med sina privata värden</li><li>Det pågående utkastet</li></ul><p>Globala bindings påverkas inte. Exportera en backup först om du är osäker.</p></> })) return;
       const wasOpen = controller.getSnapshot().session.project?.id === id;
+      // Read before the delete: afterwards there is nothing left to read.
+      const captured = await storage.captureProject(id);
       await storage.deleteProject(id);
       // The session still points at the deleted project, so it must be dropped before anything
       // else runs; a later flush would try to save a draft for a project that is gone.
@@ -274,7 +291,11 @@ export function App({ storage }: { storage: StorageProvider }) {
       await controller.refreshProjects();
       setBindings(await storage.listBindings());
       if (wasOpen) setLocation('#/', true);
-      setNotice(`${name} raderat.`);
+      offerUndo({ label: `${name} är raderat.`, restore: async () => {
+        await storage.importAll(captured, 'merge');
+        await controller.refreshProjects();
+        setBindings(await storage.listBindings());
+      } });
     });
   }
   async function saveVersion(label: string) {
@@ -414,8 +435,17 @@ export function App({ storage }: { storage: StorageProvider }) {
         option: value && here ? { label: `Skriv tillbaka det privata värdet på ${here === 1 ? 'platsen' : `de ${here} platserna`} i den här filen`, defaultChecked: true } : undefined });
       if (!answer) return;
       if (answer.optionChecked && value) controller.changeText(template.split(`{{${binding.name}}}`).join(value));
+      const before = template;
       await storage.deleteBinding(binding.id); setBindings(await storage.listBindings());
       await controller.flush();
+      offerUndo({ label: `${binding.name} är raderad.`, restore: async () => {
+        await storage.importAll({ bindings: [binding] }, 'merge');
+        setBindings(await storage.listBindings());
+        // The value was written back into the template as part of the same action, so undoing one
+        // without the other would leave the file and the vault disagreeing.
+        if (answer.optionChecked && value) controller.changeText(before);
+        await controller.flush();
+      } });
     });
   }
   async function applyVersion(version: Version, save = false) {
@@ -631,6 +661,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       }} />}
     {labelling && <SaveVersionDialog next={Math.max(0, ...versions.map(v => v.number)) + 1} save={label => void saveVersion(label)} close={() => setLabelling(false)} />}
     {confirmDialog}
+    {undoBar}
     {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
   </div>;
 }

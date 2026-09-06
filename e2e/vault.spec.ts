@@ -163,8 +163,9 @@ test('requires a typed confirmation before deleting a project', async ({ page })
   await dialog.getByLabel(/Skriv RADERA/).fill('RADERA');
   await expect(remove).toBeEnabled();
   await remove.click();
-  // Navigating before the delete settles would be cancelled, so wait for its acknowledgement.
-  await expect(page.locator('.inline-notice')).toContainText('Ska raderas raderat');
+  // Navigating before the delete settles would be cancelled, so wait for its acknowledgement — the
+  // undo bar, which is what reports a delete now.
+  await expect(page.locator('.undo-bar')).toContainText('Ska raderas är raderat');
 
   await page.evaluate(() => (location.hash = '#/projects'));
   await expect(page.locator('.project-cards')).not.toContainText('Ska raderas');
@@ -576,6 +577,57 @@ test('still reveals a placeholder when its binding is clicked', async ({ page })
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
   await page.locator('.binding-panel').getByRole('button', { name: /P_VALUE/ }).first().click();
   await expect(page.locator('.monaco-editor .selected-text').first()).toBeVisible();
+});
+
+// Report U17. A delete is irreversible once the records are gone, so the way back is captured
+// before the delete and offered for ten seconds.
+test('undoes a deleted project, with its versions and bindings', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.getByRole('button', { name: 'Ändra projektnamn' }).click();
+  await page.getByLabel('Projektnamn').fill('Ångra-provet');
+  await page.getByLabel('Projektnamn').press('Enter');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+
+  await page.getByRole('button', { name: 'Radera projekt' }).click();
+  const dialog = page.locator('dialog[open]');
+  await dialog.getByLabel(/Skriv RADERA/).fill('RADERA');
+  await dialog.getByRole('button', { name: 'Radera projektet' }).click();
+  // Wait for the delete to settle before navigating: a navigation while the app is busy is
+  // refused, and the projects page is only hidden, so assertions would pass against stale markup.
+  await expect(page.locator('.undo-bar')).toContainText('Ångra-provet är raderat');
+  await page.getByRole('button', { name: 'Mina projekt' }).click();
+  await page.getByRole('button', { name: 'Visa alla projekt →' }).click();
+  await expect(page.locator('.empty-project-list')).toBeVisible();
+
+  await page.locator('.undo-bar').getByRole('button', { name: 'Ångra', exact: true }).click();
+  await expect(page.locator('.inline-notice')).toContainText('Ångrat');
+  const card = page.locator('.project-card');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Ångra-provet');
+  // The version and the binding came back with it, not just the project row.
+  await expect(card).toContainText('1 versioner');
+  await expect(card).toContainText('1 bindings');
+});
+
+// The offer disappears on its own, so it can never be mistaken for a lasting way back.
+test('withdraws the undo offer when the window has passed', async ({ page }) => {
+  await type(page, '$a = "one"\n');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('.version-item')).toHaveCount(2);
+
+  // v1 rather than v2: the draft is based on the newest version, which cannot be deleted.
+  await page.locator('.version-item').last().getByRole('button', { name: /^v1/ }).click();
+  await page.locator('.version-item').last().getByRole('button', { name: /Radera/ }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Radera versionen' }).click();
+  await expect(page.locator('.undo-bar')).toBeVisible();
+  await expect(page.locator('.undo-bar')).toBeHidden({ timeout: 15000 });
 });
 
 // Report U19. Asking an AI about one function should not mean handing over the whole file.

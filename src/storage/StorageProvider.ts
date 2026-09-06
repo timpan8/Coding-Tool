@@ -10,6 +10,9 @@ export interface StorageProvider {
   getProject(id: string): Promise<Project | undefined>;
   saveProject(p: Project): Promise<void>;
   deleteProject(id: string): Promise<void>;
+  /** Everything a delete of this project would take with it, in the shape importAll accepts. Read
+   * before the delete so the action can be undone by putting the same records back. */
+  captureProject(id: string): Promise<Partial<WorkspaceSnapshot>>;
   getDraft(projectId: string): Promise<ProjectDraft | undefined>;
   createProjectWithDraft(project: Project, draft: ProjectDraft): Promise<ProjectDraft>;
   saveDraft(draft: ProjectDraft, expectedRevision: number, metadata: ProjectDraftMetadata): Promise<ProjectDraft>;

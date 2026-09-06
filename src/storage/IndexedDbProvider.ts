@@ -27,6 +27,22 @@ export class IndexedDbProvider implements StorageProvider {
   async listProjects() { return this.db.projects.orderBy('updatedAt').reverse().toArray(); }
   async getProject(id: string) { return this.db.projects.get(id); }
   async saveProject(p: Project) { await this.db.projects.put(p); }
+  async captureProject(id: string): Promise<Partial<WorkspaceSnapshot>> {
+    return this.db.transaction('r', [this.db.projects, this.db.versions, this.db.bindings, this.db.datasets, this.db.drafts, this.db.dismissals], async () => {
+      const project = await this.db.projects.get(id);
+      if (!project) return {};
+      const versions = await this.listVersions(id), versionIds = versions.map(v => v.id);
+      const draft = await this.db.drafts.get(id);
+      return {
+        projects: [project],
+        versions,
+        drafts: draft ? [draft] : [],
+        bindings: await this.db.bindings.filter(b => b.scope === 'project' && b.scopeRef === id || b.scope === 'version' && versionIds.includes(b.scopeRef || '')).toArray(),
+        datasets: await this.db.datasets.where('projectId').equals(id).toArray(),
+        dismissals: await this.db.dismissals.where('projectId').equals(id).toArray(),
+      };
+    });
+  }
   async deleteProject(id: string) {
     await this.db.transaction('rw', [this.db.projects, this.db.versions, this.db.bindings, this.db.datasets, this.db.drafts, this.db.dismissals], async () => {
       const ids = (await this.listVersions(id)).map(v => v.id);
