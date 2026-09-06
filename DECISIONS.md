@@ -211,3 +211,43 @@ urklippshistorik står där för att det är det enda en webbsida inte kan göra
 **Paletten bytte värden, inte namn.** Tokennamnen och kopplingen grönt = AI, tegel = Local, gult =
 varning är oförändrade; nya tokens finns bara för amber (`--real*`), status (`--ok*`) och
 information (`--info*`). `contrast.test.ts` och `theme.test.ts` mäter fortfarande varje par.
+
+## 2026-09-06 — Uppfångning vid inklistring
+
+**Förkryssat, aldrig automatiskt.** Det som klistras in granskas, och panelen kryssar i förväg för
+de fynd där raden själv sagt vad värdet är: en tilldelning till `password`, en `-Identity`, en
+`-Server`. Ett rent mönsterfynd — en sökväg, en e-postadress i en kommentar — står okryssat.
+Ingenting byts ut förrän någon trycker "Skapa N bindings", och det som byttes går att ångra i ett
+steg. Blocklistan är fortfarande undantaget: där är beslutet redan fattat, och den byter direkt.
+Förkryssningen sker en gång per inklistring, den första gången skanningen har något att visa, och
+rör aldrig kryssrutorna igen: att kryssa ur en rad är ett beslut, och skanningen körs på varje
+tangenttryck.
+
+**Var i koden, inte bara vad.** Varje rad i panelen visar raden värdet står på, med värdet självt
+maskerat och resten av raden som den är — resten står redan i editorn. Att peka på raden tonar
+spannet i editorn, att klicka rubriken markerar det. Editorn fick ett `focusRange` med nonce för
+det, eftersom `focusLine` inte kunde be om samma rad två gånger.
+
+**Regler som läser raden.** Användarnamn, server, domän och tenant-id fångas på tilldelningar och
+PowerShell-parametrar, inte bara på värdets form, för det är formen på ett skript skrivet för en
+miljö. Ett fynd inuti ett annat fynd rapporteras inte: `dc01.corp` inuti `dc01.corp.local` är
+samma värde sett av en smalare regel, och att binda båda hade förstört mallen. Entropiregeln får
+inte vinna på bredd — den ser `Source=sql01.corp.local` som en körning och skulle annars sluka
+servernamnet en regel kan namnge. Verktygets egna exempelvärden är aldrig fynd: `example.user` i
+en tilldelning är hur en sanerad fil ser ut, och att rapportera den hade lärt folk att avfärda
+panelen. Personnumret kontrollräknas med Luhn, så ett ordernummer med datumform inte kallas person.
+
+**Ett AI-värde per binding.** Två bindings med samma AI-värde är ett värde i AI-kopian, och när
+koden kommer tillbaka kan återmatchningens nivå två inte skilja dem åt. Generatorn ger därför ett
+värde som ingen annan binding använder, format efter det riktiga värdet — adress för adress, GUID
+för GUID, fullt värdnamn för fullt värdnamn — i reserverade namnrymder. Den första i en serie
+behåller kategorins gamla standardvärde, så en binding gjord i dag läser som en gjord i går.
+Dialogen varnar när ett AI-värde redan används, men vägrar inte: den som skriver in det kan ha
+ett skäl.
+
+**Sanera text sparar ingenting.** Felmeddelanden, transcript och kommandoutdata bär samma värden
+som skripten men är inga skript. Sidan kör valvet över vilken text som helst: kända riktiga värden
+byts mot sina AI-värden, blocklistan tillämpas, resten granskas av samma regler. Kopieringen går
+genom samma exaktvärdeskontroll som ett projekt, och ett värde som ändå står kvar stoppar den. Att
+binda därifrån ger en global binding, eftersom ett värde mött i ett felmeddelande inte hör till
+något projekt.

@@ -1,6 +1,7 @@
-import type { Category, ScannerRule } from '../../types/models';
+import type { Category, LanguageId, ScannerRule } from '../../types/models';
 import { placeholderRegex } from '../render';
-import { compileRules, type CompiledRule } from './rules';
+import { isExampleValue } from '../bindings/examples';
+import { compileRules, isBuiltInRule, warningsFor, type CompiledRule } from './rules';
 
 export * from './rules';
 
@@ -20,12 +21,20 @@ export interface Finding {
   /** Stable across edits to the rest of the file, so dismissing a finding sticks. Derived from the
    * value, never containing it. */
   fingerprint: string;
+  /** True when the rule read the value off an assignment or a parameter, so the line itself said
+   * what the value is. A finding like that is worth pre-selecting; a bare pattern match is not. */
+  assigned: boolean;
+  /** What the surrounding line says about the value — a secret in a Write-Host, a path in a
+   * Remove-Item. Advice beside the finding, never a gate. */
+  warnings: string[];
 }
 
 export interface ScanOptions {
   /** Ranges already protected by a placeholder, so a value the user has bound is not re-reported. */
   skipRanges?: { start: number; end: number }[];
   maxMatchesPerRule?: number;
+  /** Lets the line around a finding be read for warnings. Only PowerShell has any today. */
+  language?: LanguageId;
 }
 
 /** 512 kB. A file larger than this is not what this tool is for, and scanning it would block the
@@ -81,11 +90,17 @@ export function scan(text: string, rules: ScannerRule[] | CompiledRule[], option
     return low + 1;
   };
 
+  const lineText = (offset: number) => {
+    const start = lineStarts[lineOf(offset) - 1];
+    const end = text.indexOf('\n', start);
+    return text.slice(start, end === -1 ? text.length : end);
+  };
+
   for (const rule of compiled) {
     if (rule.invalid) continue;
-    const raw: { start: number; end: number }[] = [];
+    const raw: { start: number; end: number; assigned: boolean }[] = [];
     if (typeof rule.match === 'function') {
-      raw.push(...rule.match(text).slice(0, cap));
+      raw.push(...rule.match(text).slice(0, cap).map((r) => ({ ...r, assigned: false })));
     } else {
       const expression = new RegExp(rule.match.source, rule.match.flags);
       expression.lastIndex = 0;
@@ -100,13 +115,17 @@ export function scan(text: string, rules: ScannerRule[] | CompiledRule[], option
         // whole assignment.
         const captured = match[1];
         const start = captured ? match.index + match[0].indexOf(captured) : match.index;
-        raw.push({ start, end: start + (captured ?? match[0]).length });
+        // A capture group means the rule read the value off something that named it.
+        raw.push({ start, end: start + (captured ?? match[0]).length, assigned: Boolean(captured) && captured !== match[0] });
         if (raw.length >= cap) break;
       }
     }
     for (const range of raw) {
       if (overlaps(range, skip)) continue;
       const value = text.slice(range.start, range.end);
+      // The tool's own stand-ins are not findings: `example.user` in an assignment is what a
+      // sanitised file looks like, and reporting it would teach people to dismiss the panel.
+      if (isExampleValue(value)) continue;
       findings.push({
         ruleId: rule.id,
         ruleName: rule.name,
@@ -119,6 +138,8 @@ export function scan(text: string, rules: ScannerRule[] | CompiledRule[], option
         maskedExcerpt: maskExcerpt(value),
         suggestedAiReplacement: rule.suggestedAiReplacement,
         fingerprint: fingerprint(rule.id, value),
+        assigned: range.assigned,
+        warnings: warningsFor(lineText(range.start), rule.category, options.language),
       });
     }
   }
@@ -140,5 +161,18 @@ export function scan(text: string, rules: ScannerRule[] | CompiledRule[], option
       || (fallback(existing) === fallback(finding) && order[finding.severity] < order[existing.severity]);
     if (wins) best.set(key, finding);
   }
-  return [...best.values()].sort((a, b) => a.start - b.start);
+  // A finding inside another finding is the same value seen by a narrower rule: `dc01.corp` inside
+  // `dc01.corp.local`, a random-looking run inside a password. The wider span is the whole value,
+  // and binding both would corrupt the template. Sorted widest first so containers are kept —
+  // except the entropy fallback, which sees `Source=sql01.corp.local` as one run and must not
+  // swallow the server name a rule could actually name.
+  // A term the user added is never dropped: they asked for exactly that text to be pointed at,
+  // whatever a built-in rule found around it.
+  const contains = (outer: Finding, inner: Finding) => outer.start <= inner.start && inner.end <= outer.end;
+  const named = [...best.values()].filter((f) => !fallback(f) || ![...best.values()].some((g) => !fallback(g) && contains(f, g)));
+  const kept: Finding[] = [];
+  for (const finding of named.sort((a, b) => b.end - b.start - (a.end - a.start) || a.start - b.start)) {
+    if (!isBuiltInRule(finding.ruleId) || !kept.some((wider) => contains(wider, finding))) kept.push(finding);
+  }
+  return kept.sort((a, b) => a.start - b.start);
 }

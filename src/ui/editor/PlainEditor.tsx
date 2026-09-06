@@ -8,7 +8,7 @@ import type { EditorProps } from './props';
  * selection handles and its own scrolling fights the page's. It supports the parts of the interface
  * that carry meaning — text, read-only, selection for Ctrl+B — and quietly ignores decorations,
  * hovers and completion, which have nowhere to go here. */
-export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, focusLine, onLine, fontSize, wordWrap, onSelectionChange }: EditorProps) {
+export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, focusLine, focusRange, onLine, fontSize, wordWrap, onSelectionChange }: EditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -22,6 +22,14 @@ export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, f
     area.focus();
     area.setSelectionRange(offset, offset);
   }, [focusLine]);
+
+  // A textarea cannot colour a span, but it can select one: that is what "show me where" means here.
+  useEffect(() => {
+    const area = ref.current;
+    if (!area || !focusRange) return;
+    area.focus();
+    area.setSelectionRange(focusRange.start, focusRange.end);
+  }, [focusRange]);
 
   function selection() {
     const area = ref.current;

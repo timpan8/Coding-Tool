@@ -41,9 +41,41 @@ function highEntropy(text: string) {
   return hits;
 }
 
+/** Swedish personnummer with the Luhn check, so a date followed by four digits — an order number,
+ * a timestamp — is not called a person. YYMMDD-XXXX or YYYYMMDD-XXXX, separator optional. */
+export function looksLikePersonnummer(value: string): boolean {
+  const m = /^(\d{2})?(\d{2})(\d{2})(\d{2})[-+]?(\d{4})$/.exec(value.trim());
+  if (!m) return false;
+  const month = Number(m[3]);
+  const day = Number(m[4]);
+  // Day up to 91: a coordination number adds 60 to the day of birth.
+  if (month < 1 || month > 12 || day < 1 || day > 91) return false;
+  const digits = (m[2] + m[3] + m[4] + m[5]).split('').map(Number);
+  let sum = 0;
+  for (let i = 0; i < 10; i++) {
+    let d = digits[i];
+    if (i % 2 === 0) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+  }
+  return sum % 10 === 0;
+}
+
+const PERSONNUMMER = /\b(?:19|20)?\d{6}[-+]?\d{4}\b/g;
+
+function personnummerHits(text: string) {
+  const hits: { start: number; end: number }[] = [];
+  for (const match of text.matchAll(PERSONNUMMER)) {
+    if (looksLikePersonnummer(match[0])) hits.push({ start: match.index, end: match.index + match[0].length });
+  }
+  return hits;
+}
+
 /** Patterns of the form `builtin:name` resolve to code rather than to an expression, for the
  * checks that cannot be written as one. */
-const builtIns: Record<string, CompiledRule['match']> = { 'builtin:entropy': highEntropy };
+const builtIns: Record<string, CompiledRule['match']> = { 'builtin:entropy': highEntropy, 'builtin:personnummer': personnummerHits };
 
 const rule = (
   id: string,
@@ -53,7 +85,30 @@ const rule = (
   category: Category,
   explanation: string,
   suggestedAiReplacement?: string,
-): ScannerRule => ({ id, name, pattern, flags: 'g', severity, category, explanation, suggestedAiReplacement, enabled: true, builtIn: true });
+  flags = 'g',
+): ScannerRule => ({ id, name, pattern, flags, severity, category, explanation, suggestedAiReplacement, enabled: true, builtIn: true });
+
+/** A value in a PowerShell parameter: quoted or bare, never a variable — `-Server $dc` names
+ * nothing the scanner can point at. */
+const parameterValue = String.raw`\s+["']?((?!\$)[^"'\s,)]+)`;
+
+/** PowerShell commands that write to the screen, a file or a log. A secret that lands in one of
+ * them ends up somewhere the script's author did not think of as the place it lives. */
+export const OUTPUT_COMMANDS = /\b(?:write-host|write-output|write-verbose|write-debug|write-information|write-warning|write-error|out-file|add-content|set-content|tee-object|write-log|out-string|write-eventlog|start-transcript)\b/i;
+/** Commands that remove or move whatever the path points at. A wrong path here is not a typo. */
+export const DESTRUCTIVE_COMMANDS = /\b(?:remove-item|clear-content|move-item|rename-item|remove-itemproperty|clear-item)\b/i;
+export const OUTPUT_WARNING = 'Hemligheten står i en utskrifts- eller loggsats.';
+export const DESTRUCTIVE_WARNING = 'Sökvägen används i ett kommando som tar bort eller flyttar.';
+
+/** What the line around a finding says about it. Only PowerShell has the vocabulary for this;
+ * elsewhere the list is empty rather than guessed. */
+export function warningsFor(line: string, category: Category, language?: string): string[] {
+  if (language !== 'powershell') return [];
+  const warnings: string[] = [];
+  if (category === 'secret' && OUTPUT_COMMANDS.test(line)) warnings.push(OUTPUT_WARNING);
+  if (category === 'environment' && DESTRUCTIVE_COMMANDS.test(line)) warnings.push(DESTRUCTIVE_WARNING);
+  return warnings;
+}
 
 /** Seeded lazily and merged with stored overrides by id, so a rule the user disabled stays
  * disabled and new built-ins appear without a migration. */
@@ -62,7 +117,35 @@ export const builtInRules: ScannerRule[] = [
     'Lång sträng med hög entropi. Ser ut som en nyckel eller ett genererat lösenord.', '<SECRET>'),
   rule('secret-assignment', 'Tilldelning till hemlighet',
     String.raw`(?:password|passwd|pwd|secret|token|apikey|api_key|client_secret|credential|connectionstring)\s*[:=]\s*["']([^"'\n]{3,})["']`,
-    'critical', 'secret', 'Ett värde tilldelas ett namn som antyder en hemlighet.', '<PASSWORD>'),
+    'critical', 'secret', 'Ett värde tilldelas ett namn som antyder en hemlighet.', '<PASSWORD>', 'gi'),
+  // The assignments and parameters below are what a PowerShell script written for one environment
+  // is full of. None of them is a secret; all of them say which environment it was.
+  rule('username-assignment', 'Tilldelning till användarnamn',
+    String.raw`(?:user(?:name)?|login|samaccountname|upn|userprincipalname|identity|account(?:name)?)\s*[:=]\s*["']([^"'\n]{2,})["']`,
+    'medium', 'identity', 'Ett värde tilldelas ett namn som antyder ett användarnamn eller konto.', 'example.user', 'gi'),
+  rule('username-parameter', 'Användarnamn som parameter',
+    String.raw`-(?:UserName|User|Identity|SamAccountName|UserPrincipalName|Account)${parameterValue}`,
+    'medium', 'identity', 'Ett konto anges direkt som parameter till ett kommando.', 'example.user', 'gi'),
+  rule('server-parameter', 'Server som parameter',
+    String.raw`-(?:ComputerName|Server|DomainController|SqlServer|SmtpServer|HostName|ServerInstance|VIServer|Target)${parameterValue}`,
+    'medium', 'infrastructure', 'Ett servernamn anges direkt som parameter till ett kommando.', 'SRV-EXAMPLE01', 'gi'),
+  rule('connection-server', 'Server i anslutningssträng',
+    String.raw`\b(?:Server|Data Source|Host)\s*=\s*([^;"'\n]{2,})`,
+    'medium', 'infrastructure', 'En anslutningssträng pekar ut en riktig server.', 'server.example.test', 'gi'),
+  rule('domain-parameter', 'Domän som parameter',
+    String.raw`-(?:Domain|DomainName|DnsDomain|Realm)${parameterValue}`,
+    'medium', 'infrastructure', 'En domän anges direkt som parameter till ett kommando.', 'corp.example', 'gi'),
+  rule('tenant-id', 'Tenant-, klient- eller prenumerations-id',
+    String.raw`(?:-(?:TenantId|ClientId|ApplicationId|AppId|SubscriptionId|ObjectId)\s+|(?:tenant(?:id)?|client(?:id)?|app(?:lication)?id|subscription(?:id)?)\s*[:=]\s*)["']?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`,
+    'medium', 'configuration', 'Ett id som pekar ut en tenant, en app-registrering eller en prenumeration.', '11111111-2222-4333-8444-000000000001', 'gi'),
+  rule('unix-path', 'Unix-sökväg',
+    String.raw`(?:^|[\s"'=(])(/(?:home|etc|var|opt|srv|mnt|Users|root|tmp)/[^\s"'<>|)]+)`,
+    'low', 'environment', 'En absolut sökväg kan avslöja användarnamn eller mappstruktur.', '/opt/example/project01', 'gm'),
+  // Two labels before the top-level domain, so a bare `company.se` is left alone and an intranet
+  // host is not. An address's domain is the email rule's business, hence the look-behind.
+  rule('fqdn', 'Fullständigt värdnamn',
+    String.raw`(?<![@\w.-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.){2,}(?:se|com|net|org|nu|io|cloud|dev|app))\b`,
+    'low', 'infrastructure', 'Ett fullständigt värdnamn pekar ut en riktig server eller tjänst.', 'server.example.test', 'gi'),
   rule('aws-key', 'AWS-nyckel-ID', String.raw`\b(?:AKIA|ASIA)[0-9A-Z]{16}\b`, 'critical', 'secret',
     'Ser ut som ett AWS Access Key ID.', '<AWS_ACCESS_KEY_ID>'),
   rule('github-token', 'GitHub-token', String.raw`\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b|\bgithub_pat_[A-Za-z0-9_]{22,}\b`,
@@ -76,7 +159,9 @@ export const builtInRules: ScannerRule[] = [
   rule('private-ip', 'Privat IP-adress',
     String.raw`\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b`,
     'medium', 'infrastructure', 'En adress i ett privat nät avslöjar hur nätverket ser ut.', '10.0.0.1'),
-  rule('internal-host', 'Internt värdnamn', String.raw`\b[a-z0-9][a-z0-9-]*\.(?:local|corp|internal|intranet|lan|home)\b`,
+  // The whole chain of labels, so `sql01.corp.local` is one value and not `sql01.corp` with a tail
+  // left in the template — half a host name bound is the defect the literal widening exists for.
+  rule('internal-host', 'Internt värdnamn', String.raw`\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:local|corp|internal|intranet|lan|home)\b`,
     'medium', 'infrastructure', 'Ett internt värdnamn avslöjar hur miljön är uppbyggd.', 'server.example.test'),
   rule('unc-path', 'UNC-sökväg', String.raw`\\\\[A-Za-z0-9._-]+\\[^\s"'<>|]+`, 'medium', 'environment',
     'En UNC-sökväg pekar ut en riktig server och utdelning.', String.raw`\\server.example.test\share`),
@@ -84,8 +169,8 @@ export const builtInRules: ScannerRule[] = [
     'En absolut sökväg kan avslöja användarnamn eller mappstruktur.', String.raw`C:\Temp\Example`),
   rule('email', 'E-postadress', String.raw`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`, 'low', 'identity',
     'En riktig e-postadress är en personuppgift.', 'example.user@example.test'),
-  rule('personnummer', 'Personnummer', String.raw`\b(?:19|20)?\d{6}[-+]?\d{4}\b`, 'high', 'identity',
-    'Ser ut som ett personnummer.', '19700101-0000'),
+  rule('personnummer', 'Personnummer', 'builtin:personnummer', 'high', 'identity',
+    'Ser ut som ett personnummer, och kontrollsiffran stämmer.', '19700101-0000'),
   // The AI value keeps the shape rather than the meaning: code that parses a GUID still parses one,
   // and a reader can see at a glance what the placeholder stands for. The nil GUID would look like
   // an unset value and invite exactly the wrong assumption.
@@ -107,6 +192,7 @@ export const builtInRules: ScannerRule[] = [
  * company domain", "flag this server name" — and if expressions are ever offered they belong in a
  * worker that can be terminated, not behind a filter. */
 const builtInIds = new Set(builtInRules.map((r) => r.id));
+export const isBuiltInRule = (id: string) => builtInIds.has(id);
 const escapeLiteral = (term: string) => term.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
 export function compileRules(rules: ScannerRule[]): CompiledRule[] {

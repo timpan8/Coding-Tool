@@ -8,7 +8,7 @@ Statisk React/TypeScript-app för GitHub Pages. Kod lagras som mallar med `{{BIN
 
 Ett projekt kan ha flera filer. Versioner har etiketter, går att jämföra, förhandsgranska skrivskyddat och radera. Bindings kan byta namn i alla mallar på en gång, raderas med värdet återskrivet i filen, ha ett värde per profil, och nås samlat på `#/bindings` — vilket är enda stället en global binding går att komma åt. Kod som kommer tillbaka från en AI kan klistras in och matchas mot dina värden igen, i tre nivåer där den tredje alltid är ett förslag.
 
-En heuristisk scanner letar efter värden som liknar hemligheter och varnar per träff. Den blockerar aldrig: en falsk positiv som inte går att kvittera är hur ett verktyg blir kringgått. Reglerna går att stänga av och komplettera med egna sökord.
+En heuristisk scanner letar efter värden som liknar hemligheter och varnar per träff. Den blockerar aldrig: en falsk positiv som inte går att kvittera är hur ett verktyg blir kringgått. Reglerna går att stänga av och komplettera med egna sökord. När kod klistras in listas det den bär — användarnamn, lösenord, servrar, domäner, tenant-id, sökvägar — med rad och sammanhang; att peka på en rad tonar värdet i editorn. Det raden själv pekat ut är förkryssat, och ett tryck skapar bindings för de förkryssade med ett AI-värde var som inget annat i valvet använder. Sidan **Sanera** kör samma sak över felmeddelanden och transcript utan att spara något.
 
 Arton språk har var sitt escaping-regelverk. Kontexter som inte kan hanteras säkert vägras med besked om vad man ska göra i stället, i stället för att gissas.
 
@@ -31,7 +31,7 @@ Använd produktionsförhandsvisningen för säkerhetskontroller. Utvecklingsserv
 
 1. Klistra in kod, dra in en fil, eller välj den ofarliga exempelkoden. Språket gissas vid inklistring och följer filändelsen när du drar in en fil.
 2. Byt språk i väljaren om gissningen blev fel — det är språket som avgör hur värden escapas.
-3. Markera ett värde och tryck **Ctrl+B** (eller högerklick → Skapa binding). Ange exempelvis `ADMIN_USERNAME`, ditt riktiga värde och `example.user` som AI-värde.
+3. Granska listan **Hittade N värden i det du klistrade in** till höger och tryck **Skapa N bindings**, eller markera ett värde och tryck **Ctrl+B** (eller högerklick → Skapa binding). Namn och AI-värde föreslås; ändra dem om du vill.
 4. Spara en version. Växla mellan **Mall**, **Local**, **AI** för att se vad som lämnar appen.
 5. Två utgångar sitter ovanför koden. **Kopiera för AI** (grön) kopierar direkt när något är bundet och inget ser ut som en hemlighet; annars öppnas en granskning först. **Kopiera RIKTIGT** (amber) armeras av ett tryck, visar vad som är på väg ut, och kopierar på det andra trycket. Riktiga värden i urklippet får en banner tills de är rensade.
 6. Redigera endast mallen. Varje sparning skapar en ny version; återgång skapar också en ny version.

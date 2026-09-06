@@ -88,17 +88,20 @@ export function CodeEditor(props: EditorProps) {
       accessibilitySupport: 'auto' });
     editor.current = instance;
     const decorations = instance.createDecorationsCollection();
+    // Three layers in one collection: the substitutions of a projection, or the placeholder chips
+    // of the template, and on top of either the spans the review panel is pointing at. They used to
+    // be either/or, which left nowhere for a third kind of mark to go.
     const decorate = () => {
       const model = instance.getModel()!;
+      const at = (span: { start: number; end: number }) => monaco.Range.fromPositions(model.getPositionAt(span.start), model.getPositionAt(span.end));
       const substitutions = callbacks.current.substitutions ?? [];
-      if (substitutions.length) {
-        decorations.set(substitutions.map(range => ({
-          range: monaco.Range.fromPositions(model.getPositionAt(range.start), model.getPositionAt(range.end)),
-          options: { inlineClassName: 'substituted-value', hoverMessage: { value: `Utbytt: **${range.name}**` } },
-        })));
-        return;
+      const items: monaco.editor.IModelDeltaDecoration[] = substitutions.length
+        ? substitutions.map(range => ({ range: at(range), options: { inlineClassName: 'substituted-value', hoverMessage: { value: `Utbytt: **${range.name}**` } } }))
+        : model.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } }));
+      for (const span of callbacks.current.highlights ?? []) {
+        items.push({ range: at(span), options: { inlineClassName: span.tone === 'active' ? 'candidate-active' : 'candidate-highlight' } });
       }
-      decorations.set(model.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } })));
+      decorations.set(items);
     };
     // Report U7. An empty selection used to return here, so Ctrl+B did nothing and said nothing.
     // The editor reports what the selection is; deciding what to say about it is the app's job.
@@ -218,7 +221,7 @@ export function CodeEditor(props: EditorProps) {
       wordWrap: props.wordWrap === false ? 'off' : 'on' });
   }, [props.fontSize, props.wordWrap]);
   useEffect(() => { monaco.editor.setTheme(themeName(props.theme ?? 'light')); }, [props.theme]);
-  useEffect(() => { decorateRef.current?.(); }, [props.substitutions, props.value]);
+  useEffect(() => { decorateRef.current?.(); }, [props.substitutions, props.value, props.highlights]);
   useEffect(() => { if (props.active) { editor.current?.layout(); if (props.autoFocus) editor.current?.focus(); } }, [props.active, props.autoFocus]);
   // props.value is a dependency because the placeholder may not be in the model yet when the name
   // is requested — creating a binding sets both in the same commit. That made every later keystroke
@@ -234,5 +237,14 @@ export function CodeEditor(props: EditorProps) {
     callbacks.current.onFocused?.();
   }, [props.focusName, props.value]);
   useEffect(() => { if (props.focusLine) { editor.current?.revealLineInCenter(props.focusLine); editor.current?.setPosition({ lineNumber: props.focusLine, column: 1 }); } }, [props.focusLine]);
+  // Keyed on the nonce, so asking for the same span twice reveals it twice.
+  useEffect(() => {
+    if (!props.focusRange || !editor.current) return;
+    const model = editor.current.getModel()!;
+    const range = monaco.Range.fromPositions(model.getPositionAt(props.focusRange.start), model.getPositionAt(props.focusRange.end));
+    editor.current.setSelection(range);
+    editor.current.revealRangeInCenter(range);
+    editor.current.focus();
+  }, [props.focusRange]);
   return <div className="code-editor" ref={host} />;
 }

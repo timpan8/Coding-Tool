@@ -45,6 +45,19 @@ export function suggestBinding(
   return { name: freeName(base.length > 1 ? base : `${base}_VALUE`, bindings, scope), category };
 }
 
+/** A name for a value the scanner found where there is no assignment to read one from — an error
+ * message, a transcript. The rule that found it says what kind of thing it is. */
+export function suggestNameForRule(ruleId: string): string {
+  const names: Record<string, string> = {
+    'secret-assignment': 'PASSWORD', 'builtin:entropy': 'SECRET', 'aws-key': 'AWS_KEY', 'github-token': 'GITHUB_TOKEN', jwt: 'JWT',
+    pem: 'PRIVATE_KEY', 'basic-auth-url': 'CONNECTION_URL', 'private-ip': 'IP', 'internal-host': 'HOST', fqdn: 'HOST',
+    'unc-path': 'UNC_PATH', 'windows-path': 'PATH', 'unix-path': 'PATH', email: 'EMAIL', personnummer: 'PERSONNUMMER',
+    guid: 'GUID', 'tenant-id': 'TENANT_ID', 'username-assignment': 'USERNAME', 'username-parameter': 'USERNAME',
+    'server-parameter': 'SERVER', 'connection-server': 'SERVER', 'domain-parameter': 'DOMAIN',
+  };
+  return names[ruleId] ?? 'VALUE';
+}
+
 /** Counts up until the name is free in the scope the binding will land in — the same comparison
  * validateBinding makes, so a suggestion can never be rejected by it. The suffix is trimmed back
  * into the 64 characters the name rule allows rather than pushing the name past it.

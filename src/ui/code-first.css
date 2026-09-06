@@ -769,6 +769,101 @@
   color: var(--danger-text);
   word-break: break-all;
 }
+/* The line the value sits on, value masked: where in the code, not only what. */
+.finding-context {
+  display: block;
+  margin: 5px 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.finding-context mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--warn-surface);
+  color: var(--danger-text);
+  font-weight: 600;
+}
+.finding-category {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.finding-warning {
+  color: var(--warn-text);
+  font-weight: 600;
+}
+.findings-group {
+  margin: 14px 0 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+/* Where the review panel is pointing: every candidate faintly, the one under the pointer clearly. */
+.candidate-highlight {
+  background: var(--warn-surface);
+  box-shadow: inset 0 -2px 0 0 var(--warn-border);
+}
+.candidate-active {
+  background: var(--accent-surface-strong);
+  box-shadow: 0 0 0 1px var(--accent-border-strong);
+  border-radius: 3px;
+}
+.sanitize-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 30px 35px 60px;
+}
+.sanitize-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.sanitize-grid label {
+  margin: 0;
+}
+.sanitize-grid textarea {
+  display: block;
+  width: 100%;
+  min-height: 340px;
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+.sanitize-grid small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+.sanitize-findings {
+  max-width: 640px;
+  margin-top: 20px;
+}
+.sanitize-findings .finding-top {
+  justify-content: space-between;
+}
+.sanitize-findings .finding-top small {
+  color: var(--text-muted);
+}
+@media (max-width: 750px) {
+  .sanitize-grid {
+    grid-template-columns: 1fr;
+  }
+  .sanitize-page {
+    padding: 18px 12px;
+  }
+}
 .finding p {
   margin: 0 0 6px;
   font-size: 0.75rem;

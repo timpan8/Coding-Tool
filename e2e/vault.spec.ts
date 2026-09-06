@@ -401,7 +401,7 @@ test('binds a whole set of findings in one go', async ({ page }) => {
 
   await page.getByLabel('Markera alla').check();
   await page.getByRole('button', { name: 'Skapa 3 bindings' }).click();
-  await expect(page.locator('.findings-panel')).toHaveCount(0);
+  await expect(page.locator('.finding')).toHaveCount(0);
   await expect(page.locator('.editor-body')).not.toContainText('Hunter2!');
   await expect(page.locator('.editor-body')).not.toContainText('sql01.corp.local');
   await expect(page.locator('.editor-body')).not.toContainText('anna@company.se');
@@ -534,7 +534,8 @@ test('counts down and clears the clipboard after a local copy', async ({ page, c
 // Report F1. The rules exist to be adjusted: a value that is an example in one project is a real
 // secret in another, and a company's own domain is not in any built-in list.
 test('lets rules be turned off and a term of your own added', async ({ page }) => {
-  await type(page, '$c = "https://intranet.mittforetag.se/api"\n$mail = "anna@example.com"\n');
+  // A real-looking address: one at example.com is the tool's own stand-in and is never a finding.
+  await type(page, '$c = "https://intranet.mittforetag.se/api"\n$mail = "anna@company.se"\n');
   await expect(page.locator('.findings-panel')).toContainText('E-postadress');
   await expect(page.locator('.findings-panel')).not.toContainText('mittforetag.se');
   // '#/' means "new code", so returning has to be to this project's own route.
@@ -1287,4 +1288,98 @@ test('holds the download behind the same review as the clipboard', async ({ page
   await expect(save).toBeDisabled();
   await dialog.getByRole('checkbox').check();
   await expect(save).toBeEnabled();
+});
+
+// PR 2. A pasted script lists what it carries, with the line and where on it, ticked in advance
+// where the line itself said what the value is. One press binds the ticked ones, each with an AI
+// value nothing else in the vault uses.
+test('reviews the values a pasted script carries and binds the ticked ones in one go', async ({ page }) => {
+  await paste(page, [
+    '$UserName = "svc_adsync"',
+    '$Password = "Hunter2-Very-Secret!"',
+    'Get-ADUser -Identity tlindqvist -Server dc01.corp.local',
+    '$share = "\\\\fs01\\payroll\\2026"',
+    '$log = "C:\\Scripts\\AdSync\\run.log"',
+    '',
+  ].join('\n'));
+  const panel = page.locator('.findings-panel');
+  await expect(panel).toContainText('Hittade');
+  await expect(panel).toContainText('rad 2');
+  // The context says where on the line, with the value itself masked.
+  await expect(panel.locator('.finding-context').first()).toBeVisible();
+  await expect(panel).not.toContainText('Hunter2-Very-Secret!');
+  await expect(panel).toContainText('Hemlighet');
+  // Ticked in advance: the assigned secret and usernames. A bare path match is not.
+  await expect(panel.getByLabel(/Välj Tilldelning till hemlighet/)).toBeChecked();
+  await expect(panel.getByLabel(/Välj Tilldelning till användarnamn/)).toBeChecked();
+  await expect(panel.getByLabel(/Välj Användarnamn som parameter/)).toBeChecked();
+  await expect(panel.getByLabel(/Välj Windows-sökväg/)).not.toBeChecked();
+
+  // Pointing at a row lights its span up in the editor; the head button selects it there.
+  await panel.locator('.finding').first().hover();
+  await expect(page.locator('.monaco-editor .candidate-active')).toHaveCount(1);
+  await panel.getByRole('button', { name: /Visa Tilldelning till hemlighet på rad 2/ }).click();
+  await expect(page.locator('.monaco-editor .selected-text').first()).toBeVisible();
+
+  await panel.getByRole('button', { name: /^Skapa \d+ bindings$/ }).click();
+  await expect(page.locator('.editor-body')).toContainText('{{PASSWORD}}');
+  await expect(page.locator('.editor-body')).toContainText('{{USER_NAME}}');
+  await expect(page.locator('.editor-body')).toContainText('{{USERNAME}}');
+  await expect(page.locator('.editor-body')).toContainText('{{SERVER}}');
+  await expect(page.locator('.editor-body')).not.toContainText('Hunter2-Very-Secret!');
+  await expect(page.locator('.editor-body')).not.toContainText('tlindqvist');
+
+  // Different stand-ins for the two usernames, a full name for the full server name.
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.locator('.editor-body')).toContainText('<PASSWORD>');
+  await expect(page.locator('.editor-body')).toContainText('example.user"');
+  await expect(page.locator('.editor-body')).toContainText('example.user2');
+  await expect(page.locator('.editor-body')).toContainText('server.example.test');
+  // And Local gives the file back as it was pasted.
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
+  await expect(page.locator('.editor-body')).toContainText('svc_adsync');
+  await expect(page.locator('.editor-body')).toContainText('dc01.corp.local');
+});
+
+// A value the vault already holds is offered as its placeholder rather than as a second binding.
+test('offers the existing placeholder for a pasted value the vault already knows', async ({ page }) => {
+  await type(page, '$host = "sql01.corp.local"\n');
+  await bind(page, 'sql01', 'sql01.corp.local', 'infrastructure');
+  await paste(page, '$backup = "sql01.corp.local"\n');
+  const panel = page.locator('.findings-panel');
+  await panel.getByRole('button', { name: 'Använd {{HOST}}' }).click();
+  await expect(page.locator('.editor-body')).not.toContainText('sql01.corp.local');
+  await expect(page.locator('.toast', { hasText: '{{HOST}}' })).toBeVisible();
+  await page.evaluate(() => (location.hash = '#/bindings'));
+  await expect(page.locator('.binding-card')).toHaveCount(1);
+});
+
+// PR 2. Error messages and transcripts carry the same values as scripts but are not scripts: the
+// sanitise page runs the vault over any text and saves nothing.
+test('sanitises pasted text against the vault without saving anything', async ({ page }) => {
+  await type(page, '$host = "sql01.corp.local"\n');
+  await bind(page, 'sql01', 'sql01.corp.local', 'infrastructure');
+  await go(page, 'Sanera', '.sanitize-page');
+  await page.getByLabel('Text att sanera').fill('Connection to sql01.corp.local failed for svc_adsync\nPassword = "Hunter2-Very-Secret!"\n');
+  const output = page.getByLabel('Saniterad text');
+  await expect(output).toHaveValue(/server\.example\.test/);
+  await expect(output).not.toHaveValue(/sql01\.corp\.local/);
+  await expect(page.locator('.sanitize-findings')).toContainText('Tilldelning till hemlighet');
+
+  await page.locator('.sanitize-page').getByRole('button', { name: 'Kopiera för AI' }).click();
+  await expect(page.locator('.toast', { hasText: 'Saniterad text kopierad' })).toBeVisible();
+  expect(await clipboard(page)).toContain('server.example.test');
+
+  // Binding from here makes a global binding, and the output follows it at once.
+  await page.locator('.sanitize-findings').getByRole('button', { name: 'Bind nu' }).first().click();
+  await expect(page.locator('dialog[open]')).toContainText('Skapa binding');
+  await expect(page.locator('dialog[open]').getByLabel('Bindingnamn')).toHaveValue('PASSWORD');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara binding' }).click();
+  await expect(output).toHaveValue(/<PASSWORD>/);
+  await expect(output).not.toHaveValue(/Hunter2/);
+
+  // Nothing else was saved: still the one project from the start.
+  await page.evaluate(() => (location.hash = '#/projects'));
+  await expect(page.locator('.project-card')).toHaveCount(1);
 });
