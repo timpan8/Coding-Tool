@@ -29,7 +29,7 @@ Använd produktionsförhandsvisningen för säkerhetskontroller. Utvecklingsserv
 4. Spara en version. Växla mellan **Mall**, **Local**, **AI** och kopiera rätt vy.
 5. Redigera endast mallen. Varje sparning skapar en ny version; återgång skapar också en ny version.
 
-`Ctrl+Shift+C` = Copy for AI. `Ctrl+Alt+C` = Copy Local. `Ctrl+K` fokuserar dashboardens sökfält. Övriga kortkommandon införs med sina milstolpar.
+`Ctrl+Enter` = Copy for AI. `Ctrl+Shift+Enter` = Copy Local. `Ctrl+P` öppnar Mina projekt. `Ctrl+S` sparar en version. `?` visar hela listan. De tidigare `Ctrl+Shift+C` och `Ctrl+K` togs av utvecklarverktygen respektive Firefox sökfält.
 
 ## Hosting: GitHub Pages
 

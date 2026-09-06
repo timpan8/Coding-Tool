@@ -873,3 +873,31 @@ dialog:has(.version-view) {
 .ingest-decisions .suggested b {
   color: var(--warn-text);
 }
+
+.shortcut-table {
+  width: 100%;
+  margin-bottom: 16px;
+  border-collapse: collapse;
+}
+.shortcut-table th {
+  padding: 9px 0;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.shortcut-table td {
+  padding: 9px 0;
+  text-align: right;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.shortcut-table kbd {
+  margin-left: 5px;
+}
+.shortcut-table small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+}

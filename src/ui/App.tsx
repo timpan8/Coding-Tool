@@ -25,6 +25,7 @@ import { ProjectDetails } from './components/ProjectDetails';
 import { BindingPanel, toRows } from './components/BindingPanel';
 import { ProfileManager, ProfilePicker } from './components/ProfilePicker';
 import { IngestDialog } from './components/IngestDialog';
+import { match, shortcuts } from './shortcuts';
 // Also lazy: it pulls in the same editor bundle, and version history is not on the first screen.
 const DiffEditor = lazy(() => import('./editor/DiffEditor').then(m => ({ default: m.DiffEditor })));
 import { scan, type Finding } from '../domain/scanner';
@@ -151,7 +152,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [storageInfo, setStorageInfo] = useState<StorageState | null>(null), asked = useRef(false);
   const [confirm, confirmDialog] = useConfirm();
   const [rules, setRules] = useState<ScannerRule[]>([]), [profiles, setProfiles] = useState<Profile[]>([]), [managingProfiles, setManagingProfiles] = useState(false);
-  const [ingesting, setIngesting] = useState(false);
+  const [ingesting, setIngesting] = useState(false), [showShortcuts, setShowShortcuts] = useState(false);
   const [dismissed, refreshDismissals] = useDismissals(() => project ? storage.listDismissals(project.id) : Promise.resolve([]), project?.id ?? '');
   const findings = useScanner(mode === 'template' ? template : '', rules, dismissed);
   const [countdown, setCountdown] = useState<number | null>(null), pendingClear = useRef<string | null>(null);
@@ -424,17 +425,20 @@ export function App({ storage }: { storage: StorageProvider }) {
   function openDrawer() { setDrawer(true); void controller.refreshProjects().catch(() => setError('Projektlistan kunde inte läsas. Din kod finns kvar.')); }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || document.querySelector('dialog[open]')) return;
-      if (e.key.toLowerCase() === 'k') { e.preventDefault(); openDrawer(); }
-      if (e.key.toLowerCase() === 'c' && e.shiftKey) { e.preventDefault(); void copy('ai'); }
-      if (e.key.toLowerCase() === 'c' && e.altKey) { e.preventDefault(); void copy('local'); }
+      if (document.querySelector('dialog[open]')) return;
+      const typing = e.target instanceof HTMLElement && /^(INPUT|TEXTAREA)$/.test(e.target.tagName);
+      if (match(e, 'help') && !typing) { e.preventDefault(); setShowShortcuts(true); return; }
+      if (match(e, 'projects')) { e.preventDefault(); openDrawer(); }
+      if (match(e, 'copyAi')) { e.preventDefault(); void copy('ai'); }
+      if (match(e, 'copyLocal')) { e.preventDefault(); void copy('local'); }
+      if (match(e, 'save')) { e.preventDefault(); if (project && template.trim()) setLabelling(true); }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   });
 
   return <div className="app-shell code-first"><div className="main-shell">
     <header className="topbar"><a className="brand" href="#/" onClick={e => { e.preventDefault(); void navigate('#/'); }}><span className="brand-icon">{'</>'}</span><span>AI Code Vault</span></a>
-      <nav className="top-navigation" aria-label="Huvudnavigation"><button disabled={busy} onClick={() => void navigate('#/')}>＋ Ny kod</button><button disabled={busy} onClick={openDrawer}>Mina projekt <kbd>Ctrl K</kbd></button><button onClick={() => void navigate('#/security')}>Säkerhet</button><button onClick={() => void navigate('#/settings')}>Inställningar</button></nav>
+      <nav className="top-navigation" aria-label="Huvudnavigation"><button disabled={busy} onClick={() => void navigate('#/')}>＋ Ny kod</button><button disabled={busy} onClick={openDrawer}>Mina projekt <kbd>Ctrl P</kbd></button><button onClick={() => setShowShortcuts(true)} aria-label="Visa kortkommandon">Genvägar</button><button onClick={() => void navigate('#/security')}>Säkerhet</button><button onClick={() => void navigate('#/settings')}>Inställningar</button></nav>
       <ProfilePicker profiles={profiles} activeId={settings?.activeProfileId ?? null} onManage={() => setManagingProfiles(true)}
         onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} /><label className="theme-choice">Tema<select aria-label="Tema" value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">System</option><option value="light">Ljust</option><option value="dark">Mörkt</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>Försök spara igen</button></div>}
@@ -520,6 +524,10 @@ export function App({ storage }: { storage: StorageProvider }) {
       await controller.reloadProject();
       setNotice('Projektuppgifterna är sparade.');
     }} />}
+    {showShortcuts && <Modal title="Kortkommandon" close={() => setShowShortcuts(false)}>
+      <table className="shortcut-table"><tbody>{shortcuts.map(s => <tr key={s.id}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}<tr><th scope="row">Skapa binding</th><td><kbd>Ctrl+B</kbd><small>Markera ett värde i editorn först.</small></td></tr></tbody></table>
+      <div className="dialog-actions"><button className="primary" onClick={() => setShowShortcuts(false)}>Stäng</button></div>
+    </Modal>}
     {ingesting && <IngestDialog bindings={bindings} close={() => setIngesting(false)} apply={next => {
       controller.changeText(next); setIngesting(false); changeMode('template');
       setNotice('Mallen är ersatt. Granska innan du sparar en version.');

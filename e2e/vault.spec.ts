@@ -484,3 +484,25 @@ test('puts placeholders back into code that comes home from an AI', async ({ pag
   await page.getByRole('button', { name: 'Visa värden' }).click();
   await expect(page.locator('.editor-body')).toContainText('sql01.corp.local');
 });
+
+// Report F28. The shortcuts were documented only in the README, and two of them were taken by the
+// browser: Ctrl+K by Firefox's search bar, Ctrl+Shift+C by the element inspector.
+test('lists its shortcuts and uses combinations the browser leaves alone', async ({ page }) => {
+  await page.getByRole('button', { name: 'Visa kortkommandon' }).click();
+  const dialog = page.locator('dialog[open]');
+  await expect(dialog).toContainText('Ctrl+Enter');
+  await expect(dialog).toContainText('utvecklarverktygen');
+  await dialog.getByRole('button', { name: 'Stäng', exact: true }).click();
+
+  await type(page, '$p = "Hunter2!"\n');
+  await bind(page, 'Hunter2', 'Hunter2!', 'secret');
+
+  // Ctrl+Enter opens the AI copy review rather than copying blind.
+  await page.keyboard.press('Control+Enter');
+  await expect(page.locator('dialog[open]')).toContainText('AI-export');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Avbryt' }).click();
+
+  // Ctrl+S asks for a version label.
+  await page.keyboard.press('Control+s');
+  await expect(page.getByLabel('Versionsetikett')).toBeVisible();
+});
