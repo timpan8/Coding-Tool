@@ -34,7 +34,7 @@ npm install
 npm run dev        # http://127.0.0.1:5173
 ```
 
-Produktion: `npm run build` ger en statisk `dist/`-mapp som kan serveras från vilken statisk host som helst (GitHub Pages, en mapp bakom en enkel webbserver, eller `npm run preview` lokalt). Appen behöver ingen backend.
+Produktion: `npm run build` ger en statisk `dist/`-mapp som kan serveras från vilken statisk host som helst (GitHub Pages, en mapp bakom en enkel webbserver, eller `npm run preview` lokalt). Appen behöver ingen backend. Servera alltid över http(s), inte via `file://`, annars fungerar urklipp, kryptering och lagring inkonsekvent.
 
 ```
 npm run build
@@ -42,12 +42,45 @@ npm run preview     # http://127.0.0.1:4173
 npm run check-deps  # alla licenser tillåtna, THIRD-PARTY-NOTICES.md skrivs
 ```
 
+GitHub Pages: bygg med `npm run build` och publicera innehållet i `dist/` (till exempel på en `gh-pages`-gren). Om sidan ligger under en undermapp, sätt `base` i `vite.config.ts` till mappens namn innan du bygger.
+
 Tester och lint:
 
 ```
-npm test
-npm run lint
+npm test            # Vitest: motor, valv, fixtures, egenskapstester
+npm run lint        # ESLint + tsc
+npm run test:e2e    # Playwright i Chromium: hela kärnloopen i en riktig webbläsare
 ```
+
+Sidan **Om** i appen kör motorns fixture-svit i webbläsaren (självtest) och visar THIRD-PARTY-NOTICES.
+
+## Arbetsflöde
+
+1. Första start: välj master-lösenord och spara återställningsnyckeln.
+2. **Importera från min editor** eller **Ny version från AI**: klistra in, granska kandidaterna (auto, bekräfta, nya, saknas, okända), spara.
+3. **Kopiera för AI** ger den sanerade renderingen, alltid genom läckvakten. **Kopiera riktigt** kräver två tryck och visar en checklista först.
+4. Nästa version från AI:n: klistra in, fälten återappliceras, granska det som inte var exakt.
+5. **Diff** jämför två versioner på mallnivå: fält är atomära markörer, ändrade exempelvärden ger ingen hunk.
+6. **Sanera text** för felmeddelanden och transcript som inte ska sparas som version.
+
+Kortkommandon:
+
+| Tangent | Gör |
+| --- | --- |
+| `Ctrl+Shift+N` | Ny version från AI |
+| `Ctrl+Shift+M` | Markera markerad text som fält |
+| `Ctrl+Shift+C` | Kopiera för AI |
+| `Ctrl+Shift+D` | Diff |
+| `Alt+Upp` / `Alt+Ner` | Byt version |
+| `Ctrl+Shift+L` | Lås valvet |
+
+"Kopiera riktigt" har med avsikt inget kortkommando.
+
+## Vad som ingår och vad som väntar
+
+Ingår: mall + fält, konservativ återapplicering med granskningsvy, läckvakt i tre pass, krypterat valv med återställningsnyckel, auto-lås, roterande krypterad backup och struktur-export, import av backup från en annan maskin med merge, sanera-text-ruta, tabellblock som fält, diff, härledda sökvägsfält från en Root, New-Item-rad.
+
+Väntar (v2): testdatatabeller med generatorer, miljöprofiler (Test/Prod), sökvägssänk-panel med klicka-för-att-tillämpa, standardsnippets, patch-läge för partiella AI-svar, semantisk sammanfattning av vad som ändrats mellan versioner.
 
 ## Struktur
 
@@ -56,7 +89,7 @@ src/engine/   rena funktioner utan DOM (lexer, mall, återapplicering, läckvakt
 src/vault/    kryptering, lagring, lås, backup, merge
 src/ui/       Preact-gränssnitt
 src/i18n/     UI-strängar (sv default, en fallback)
-tests/        Vitest: fixtures och egenskapstester
+tests/        Vitest: fixtures och egenskapstester; tests/e2e: Playwright
 scripts/      check-deps.mjs (licenser och THIRD-PARTY-NOTICES)
 ```
 
