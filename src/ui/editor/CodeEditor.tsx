@@ -170,11 +170,18 @@ export function CodeEditor(props: EditorProps) {
   useEffect(() => { monaco.editor.setTheme(themeName(props.theme ?? 'light')); }, [props.theme]);
   useEffect(() => { decorateRef.current?.(); }, [props.substitutions, props.value]);
   useEffect(() => { if (props.active) { editor.current?.layout(); if (props.autoFocus) editor.current?.focus(); } }, [props.active, props.autoFocus]);
+  // props.value is a dependency because the placeholder may not be in the model yet when the name
+  // is requested — creating a binding sets both in the same commit. That made every later keystroke
+  // re-select the placeholder, so typing after creating a binding overwrote it and scrambled the
+  // file. The reveal is reported instead, and the caller drops the request once it has happened.
   useEffect(() => {
     if (!props.focusName || !editor.current) return;
     const model = editor.current.getModel()!;
     const matches = model.findMatches(`{{${props.focusName}}}`, false, false, true, null, false);
-    if (matches.length) { editor.current.setSelections(matches.map(m => new monaco.Selection(m.range.startLineNumber, m.range.startColumn, m.range.endLineNumber, m.range.endColumn))); editor.current.revealLineInCenter(matches[0].range.startLineNumber); }
+    if (!matches.length) return;
+    editor.current.setSelections(matches.map(m => new monaco.Selection(m.range.startLineNumber, m.range.startColumn, m.range.endLineNumber, m.range.endColumn)));
+    editor.current.revealLineInCenter(matches[0].range.startLineNumber);
+    callbacks.current.onFocused?.();
   }, [props.focusName, props.value]);
   useEffect(() => { if (props.focusLine) { editor.current?.revealLineInCenter(props.focusLine); editor.current?.setPosition({ lineNumber: props.focusLine, column: 1 }); } }, [props.focusLine]);
   return <div className="code-editor" ref={host} />;

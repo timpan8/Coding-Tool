@@ -30,4 +30,7 @@ export interface EditorProps {
   substitutions?: { start: number; end: number; name: string }[];
   fontSize?: number;
   wordWrap?: boolean;
+  /** Fires once `focusName` has actually been revealed, so the caller can clear the request.
+   * `focusName` is a command, not state: left standing it would be re-applied on every edit. */
+  onFocused?: () => void;
 }

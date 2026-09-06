@@ -332,6 +332,14 @@ bekräftelsedialog och trevligare att använda.
 > Bristen var att ingenting pekade på att funktionen fanns. Åtgärdat genom att kortkommandolistan
 > nu har ett eget avsnitt för editorns egna kommandon.
 
+**U18b · Editorn åt upp platshållaren man just skapat.** _(Hittades under genomförandet, inte vid den
+första granskningen.)_ När en binding sparades bad appen editorn att visa den nya platshållaren, men
+begäran låg kvar, och samma effekt kör om när texten ändras. Varje tangenttryckning därefter
+markerade om platshållaren, så nästa tecken skrev över den. Att skriva en rad efter att ha skapat en
+binding förstörde filen — `$p = "{{P_VALUE}}"` blev `$p = "q = "plain value here"`. Verifierat i
+webbläsaren, både före och efter fixen. Begäran är nu ett engångskommando: editorn rapporterar när
+den visat platshållaren och appen släpper begäran då.
+
 **U19 · Ingen delvis kopiering.** Man kan inte markera ett stycke och kopiera bara det i sanerad form. Det är ett vanligt behov
 när man frågar en AI om en enskild funktion.
 

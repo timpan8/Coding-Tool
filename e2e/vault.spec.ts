@@ -550,6 +550,34 @@ test('recognises the language of pasted code and can write the result to a file'
   expect(written).not.toContain('Hunter2!');
 });
 
+// Saving a binding asked the editor to reveal the new placeholder, but the request stayed set, and
+// the reveal effect also runs when the text changes — so every keystroke afterwards re-selected the
+// placeholder and the next character overwrote it. Typing a line after creating a binding scrambled
+// the file: `$p = "{{P_VALUE}}"` became `$p = "q = "plain value here"`.
+test('does not eat the placeholder when you keep typing after creating a binding', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('$q = "plain value here"\n');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  // Monaco renders no-break spaces, so the text is normalised before it is compared.
+  const text = (await page.locator('.view-lines').innerText()).replace(/\u00a0/g, ' ');
+  expect(text).toContain('$p = "{{P_VALUE}}"');
+  expect(text).toContain('$q = "plain value here"');
+});
+
+// The reveal itself must still work: clicking a binding in the panel selects its placeholder.
+test('still reveals a placeholder when its binding is clicked', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\nWrite-Host "padding"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.locator('.binding-panel').getByRole('button', { name: /P_VALUE/ }).first().click();
+  await expect(page.locator('.monaco-editor .selected-text').first()).toBeVisible();
+});
+
 // Report U18. Font size and wrap were hardcoded; find and replace worked but nothing said so.
 test('keeps editor preferences and points at the editor commands', async ({ page }) => {
   await type(page, '$a = "one"\n');
