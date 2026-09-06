@@ -2,6 +2,7 @@ import type { LanguageId, Project, ProjectDraft, ProjectFile, Settings, Version 
 import type { StorageProvider } from '../storage/StorageProvider';
 import { DraftConflictError } from '../storage/StorageProvider';
 import { usage } from '../domain/render';
+import { t } from './text';
 
 const now = () => new Date().toISOString();
 const extensions: Record<LanguageId, string> = { powershell: 'ps1', javascript: 'js', typescript: 'ts', python: 'py', json: 'json', xml: 'xml', yaml: 'yaml', shell: 'sh', dotenv: 'env', hcl: 'tf', sql: 'sql', plaintext: 'txt' };
@@ -26,7 +27,7 @@ const fileName = (language: LanguageId, index: number) =>
 function blank(): WorkSession {
   const file: ProjectFile = { id: crypto.randomUUID(), name: fileName('powershell', 0), language: 'powershell', order: 0 };
   return { key: crypto.randomUUID(), project: null, draft: null, files: [file], activeFileId: file.id, texts: { [file.id]: '' },
-    text: '', language: 'powershell', name: 'Namnlöst projekt', baseVersionId: null, versions: [], changed: 0, saved: 0 };
+    text: '', language: 'powershell', name: t.controller.untitled, baseVersionId: null, versions: [], changed: 0, saved: 0 };
 }
 /** Serializes working-copy writes independently of React renders and routing.
  * A captured revision is acknowledged only after its transaction succeeds.
@@ -77,7 +78,7 @@ export class WorkspaceController {
     if (!this.state.session.project && !this.state.error) void this.flush().catch(() => {});
   }
   rename(name: string) {
-    name = name.trim() || 'Namnlöst projekt';
+    name = name.trim() || t.controller.untitled;
     if (name === this.state.session.name) return;
     if (!this.state.session.project && !this.state.session.text.trim()) { this.session({ name }); return; }
     this.edit({ name });
@@ -110,7 +111,7 @@ export class WorkspaceController {
   async removeFile(fileId: string) {
     await this.flush();
     const s = this.state.session;
-    if (s.files.length < 2) throw new Error('Ett projekt måste ha minst en fil.');
+    if (s.files.length < 2) throw new Error(t.controller.needsOneFile);
     const files = s.files.filter(f => f.id !== fileId).map((f, order) => ({ ...f, order }));
     const texts = { ...s.texts };
     delete texts[fileId];
@@ -164,7 +165,7 @@ export class WorkspaceController {
   }
   private report(error: unknown) {
     this.conflict = error instanceof DraftConflictError;
-    this.publish({ phase: 'error', error: this.conflict ? (error as Error).message : 'Lokal sparning misslyckades. Din text finns kvar i fliken. Försök igen eller kopiera mallen till en lokal fil innan du lämnar sidan.' });
+    this.publish({ phase: 'error', error: this.conflict ? (error as Error).message : t.controller.saveFailed });
   }
   async newCode() {
     await this.flush();
@@ -176,7 +177,7 @@ export class WorkspaceController {
     await this.initialize();
     if (this.state.session.project?.id === id) return;
     const [project, draft, versions] = await Promise.all([this.storage.getProject(id), this.storage.getDraft(id), this.storage.listVersions(id)]);
-    if (!project) throw new Error('Projektet finns inte längre.');
+    if (!project) throw new Error(t.controller.projectGone);
     // A project with no files is repairable rather than permanently unopenable.
     const files = project.files.length ? [...project.files].sort((a, b) => a.order - b.order)
       : [{ id: crypto.randomUUID(), name: `script.${extensions[project.language]}`, language: project.language, order: 0 }];

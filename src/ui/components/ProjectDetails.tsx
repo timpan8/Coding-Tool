@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Project } from '../../types/models';
 import { Modal } from './Modal';
+import { t } from '../text';
 
 const statuses: { value: Project['status']; label: string }[] = [
   { value: 'experimental', label: 'Experiment' },
@@ -46,12 +47,12 @@ export function ProjectDetails({
     <Modal title="Om projektet" close={close}>
       <label>
         Beskrivning
-        <input autoFocus aria-label="Beskrivning" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Vad gör den här koden?" />
+        <input autoFocus aria-label="Beskrivning" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t.details.descriptionHint} />
       </label>
       <label>
         Taggar
         <input aria-label="Taggar" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="ad, rapport, drift" />
-        <small>Kommaseparerade. Sökningen i Alla projekt matchar mot dem.</small>
+        <small>{t.details.tagsHint}</small>
       </label>
       <label>
         Status

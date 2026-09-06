@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { ScanDismissal, ScannerRule } from '../../types/models';
 import { scan, type Finding } from '../../domain/scanner';
+import { t } from '../text';
 
 const severityLabel: Record<Finding['severity'], string> = {
-  critical: 'Kritisk',
-  high: 'Hög',
-  medium: 'Medel',
-  low: 'Låg',
+  critical: t.severity.critical,
+  high: t.severity.high,
+  medium: t.severity.medium,
+  low: t.severity.low,
 };
 
 /** Runs the scan off the typing path.
@@ -47,7 +48,7 @@ export function FindingsPanel({
   return (
     <div className="findings-panel">
       <div className="panel-title">
-        <h3>Misstänkta värden</h3>
+        <h3>{t.findings.title}</h3>
         <span className="count">{findings.length}</span>
       </div>
       <p className="muted">

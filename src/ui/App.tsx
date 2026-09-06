@@ -84,7 +84,7 @@ function SaveVersionDialog({ next, save, close }: { next: number; save: (label: 
         <input autoFocus aria-label="Versionsetikett" value={label} onChange={e => setLabel(e.target.value)}
           placeholder="t.ex. innan omskrivningen av inloggningen"
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(label); } }} />
-        <small>Valfritt, men gör historiken läsbar. Datum och antal ändrade rader visas ändå.</small>
+        <small>{t.version.labelHint}</small>
       </label>
       <div className="dialog-actions">
         <button onClick={close}>Avbryt</button>
@@ -228,7 +228,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     await run(async () => {
       if (version.id === session.baseVersionId) throw new Error(t.version.draftBasedOnIt);
       if (!await confirm({ title: t.version.deleteTitle(version.number), danger: true, confirmLabel: t.version.deleteConfirm,
-        body: <><p>{version.label ? `"${version.label}"` : 'Versionen'} tas bort ur historiken för alltid.</p><p>{t.version.deleteDraftUnaffected}</p></> })) return;
+        body: <><p>{t.version.deleteBody(version.label)}</p><p>{t.version.deleteDraftUnaffected}</p></> })) return;
       // The record itself is the way back. Version-scoped bindings go with it, so they are read
       // before the delete — afterwards there is nothing left to read.
       const scoped = (await storage.listBindings()).filter(b => b.scope === 'version' && b.scopeRef === version.id);
@@ -247,7 +247,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       const [versions, all] = await Promise.all([storage.listVersions(id), storage.listBindings()]);
       const scoped = all.filter(b => b.scope === 'project' && b.scopeRef === id);
       if (!await confirm({ title: t.project.deleteTitle(name), danger: true, confirmLabel: t.project.deleteConfirm, typeToConfirm: 'RADERA',
-        body: <><p>{t.project.deleteLead}</p><ul><li>{versions.length} sparade versioner</li><li>{scoped.length} bindings som hör till projektet, med sina privata värden</li><li>{t.project.deleteDraft}</li></ul><p>{t.project.deleteGlobalsSafe}</p></> })) return;
+        body: <><p>{t.project.deleteLead}</p><ul><li>{t.project.deleteVersions(versions.length)}</li><li>{t.project.deleteBindings(scoped.length)}</li><li>{t.project.deleteDraft}</li></ul><p>{t.project.deleteGlobalsSafe}</p></> })) return;
       const wasOpen = controller.getSnapshot().session.project?.id === id;
       // Read before the delete: afterwards there is nothing left to read.
       const captured = await storage.captureProject(id);
@@ -404,7 +404,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       const here = template.split(`{{${binding.name}}}`).length - 1;
       const answer = await confirm({ title: t.binding.deleteTitle(binding.name), danger: true, confirmLabel: t.binding.deleteConfirm,
         body: <><p>Bindingen används i {locations.length} sparade versioner av det här projektet{here ? `, och ${here} gånger i den öppna filen` : ''}.</p>
-          <p>{value ? t.binding.valueGone : t.binding.noValue} Sparade versioner behåller sina platshållare.</p></>,
+          <p>{value ? t.binding.valueGone : t.binding.noValue} {t.binding.placeholdersKept}</p></>,
         // Deleting used to leave {{NAME}} behind with nothing to resolve it, which blocks copying
         // until the user tracks down every one by hand.
         option: value && here ? { label: `Skriv tillbaka det privata värdet på ${here === 1 ? 'platsen' : `de ${here} platserna`} i den här filen`, defaultChecked: true } : undefined });
@@ -425,7 +425,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   }
   async function applyVersion(version: Version, save = false) {
     if (!await confirm({ title: `Använd v${version.number}?`, confirmLabel: t.version.replaceDraft,
-      body: <><p>Det nuvarande arbetsutkastet ersätts av innehållet i v{version.number}.</p><p>{t.version.replaceDraftKept}</p></> })) return;
+      body: <><p>{t.version.replaceDraftBody(version.number)}</p><p>{t.version.replaceDraftKept}</p></> })) return;
     await run(async () => { await controller.applyVersion(version); if (save) await controller.saveVersion(t.version.restoredTo(version.number)); changeMode('template'); });
   }
   /** Editor preferences live in settings, not in component state: they should survive a reload and
@@ -525,7 +525,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     <header className="topbar"><a className="brand" href="#/" onClick={e => { e.preventDefault(); void navigate('#/'); }}><span className="brand-icon">{'</>'}</span><span>AI Code Vault</span></a>
       <nav className="top-navigation" aria-label={t.nav.main}><button disabled={busy} onClick={() => void navigate('#/')}>{t.nav.newCode}</button><button disabled={busy} onClick={openDrawer}>{t.nav.projects} <kbd>Ctrl P</kbd></button><button onClick={() => setShowShortcuts(true)} aria-label={t.nav.showShortcuts}>{t.nav.shortcuts}</button><button disabled={busy} onClick={() => void navigate('#/bindings')}>{t.nav.bindings}</button><button onClick={() => void navigate('#/security')}>{t.nav.security}</button><button onClick={() => void navigate('#/settings')}>{t.nav.settings}</button></nav>
       <ProfilePicker profiles={profiles} activeId={settings?.activeProfileId ?? null} onManage={() => setManagingProfiles(true)}
-        onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} /><label className="theme-choice">Tema<select aria-label="Tema" value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">System</option><option value="light">Ljust</option><option value="dark">Mörkt</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
+        onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} /><label className="theme-choice">{t.app.theme}<select aria-label={t.app.theme} value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">{t.app.themeSystem}</option><option value="light">{t.app.themeLight}</option><option value="dark">{t.app.themeDark}</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>{t.dialog.retrySave}</button></div>}
     {countdown !== null && <div className="clipboard-countdown" role="status">{t.copy.clearingIn(countdown)}<button onClick={() => { pendingClear.current = null; setCountdown(null); setNotice(t.copy.clipboardKept); }}>Avbryt</button></div>}
     {notice && <div className={`inline-notice ${noticeTone}`} role="status">{notice}<button aria-label={t.dialog.closeNotice} onClick={() => setNotice('')}>×</button></div>}
@@ -537,7 +537,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     <main id="huvudinnehall" aria-busy={busy}>
       <div className="workspace" hidden={!workspaceVisible} inert={busy}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : t.app.startNow}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
-        <div className="file-info"><label>{t.workspace.language} <select aria-label={t.workspace.language} value={language} onChange={e => { languageChosen.current.add(session.activeFileId); controller.changeLanguage(e.target.value as LanguageId); }}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? `${session.files.length} ${session.files.length === 1 ? 'fil' : 'filer'}` : t.workspace.newProjectHint}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
+        <div className="file-info"><label>{t.workspace.language} <select aria-label={t.workspace.language} value={language} onChange={e => { languageChosen.current.add(session.activeFileId); controller.changeLanguage(e.target.value as LanguageId); }}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? t.workspace.files(session.files.length) : t.workspace.newProjectHint}{session.baseVersionId && t.workspace.basedOn(String(versions.find(v => v.id === session.baseVersionId)?.number ?? '?'))}</span></div>
       </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>{t.workspace.backToCurrent}</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
         <div className="work-grid" onDragOver={e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDropping(true); } }}
           onDragLeave={e => { if (e.currentTarget === e.target) setDropping(false); }}
@@ -561,11 +561,11 @@ export function App({ storage }: { storage: StorageProvider }) {
             onCopySelection={() => void copySelection()} />
           <div className="view-banner" key={mode}><strong>{mode === 'template' ? t.workspace.bannerTemplate : mode === 'local' ? t.workspace.bannerLocal : t.workspace.bannerAi}</strong><span>{mode === 'template' ? t.workspace.editableSource : t.workspace.readOnlyProjection}</span></div>
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>{t.workspace.editAsTemplate}</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? t.workspace.hideValues : t.workspace.showValues}</button></div>}
-          <div className="editor-body" id="kodvy" role="tabpanel" aria-labelledby={`vy-${mode}`}>{!template && mode === 'template' && <div className="paste-prompt"><strong>Klistra in din kod här</strong><span>Projektet skapas automatiskt och sparas lokalt.</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>eller prova med exempelkod</button>}</div>}
+          <div className="editor-body" id="kodvy" role="tabpanel" aria-labelledby={`vy-${mode}`}>{!template && mode === 'template' && <div className="paste-prompt"><strong>{t.workspace.pasteHere}</strong><span>{t.workspace.pasteHereHint}</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>{t.workspace.trySample}</button>}</div>}
             <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { noteLanguage(text); controller.changeText(text); }} onBinding={createBinding}
               onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }}
               fontSize={fontSize} wordWrap={wrap} onSelectionChange={setSelected} onFocused={() => setFocusName('')} />
-          </div><div className="editor-footer"><span>{visible.split('\n').length} rader · {used.length} bindings</span>
+          </div><div className="editor-footer"><span>{t.workspace.lines(visible.split('\n').length)} · {t.workspace.bindingCount(used.length)}</span>
             <div className="editor-tools" role="group" aria-label={t.workspace.editorSettings}>
               <button aria-label={t.workspace.smallerText} title={t.workspace.smallerText} disabled={fontSize <= 10} onClick={() => void changeEditor({ editorFontSize: fontSize - 1 }).catch(() => {})}>A−</button>
               <span aria-live="polite">{fontSize} px</span>
@@ -590,7 +590,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         </aside></div>
       </div>
       <div className="overview-scroll" ref={overview} hidden={route !== '#/projects'} onScroll={e => { if (route === '#/projects') overviewScroll.current = e.currentTarget.scrollTop; }}><section className="dashboard">
-        <div className="dashboard-heading"><div><span className="eyebrow">DITT LOKALA VALV</span><h1>Alla projekt</h1><p>Ditt pågående arbete ligger kvar medan du letar.</p></div><div className="heading-actions">{currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>{t.workspace.backToCurrent}</button>}<button className="primary" onClick={() => void navigate('#/')}>{t.nav.newCode}</button></div></div>
+        <div className="dashboard-heading"><div><span className="eyebrow">{t.project.vaultEyebrow}</span><h1>{t.project.allProjects}</h1><p>{t.project.listLead}</p></div><div className="heading-actions">{currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>{t.workspace.backToCurrent}</button>}<button className="primary" onClick={() => void navigate('#/')}>{t.nav.newCode}</button></div></div>
         <ProjectFilters query={query} onQuery={setQuery} sort={sort} onSort={setSort} language={languageFilter} onLanguage={setLanguageFilter} status={statusFilter} onStatus={setStatusFilter} count={filtered.length} />
         <div className="project-cards">{filtered.map(p => <ProjectCard key={p.id} project={p} facts={facts[p.id]} current={p.id === currentId} open={() => void navigate(`#/project/${p.id}`)} />)}</div>
         {!filtered.length && <p className="empty-project-list">{projects.length ? t.project.noMatch : t.project.empty}</p>}
@@ -629,7 +629,7 @@ export function App({ storage }: { storage: StorageProvider }) {
           modified={viewing.version.templates[session.activeFileId] ?? ''} /></Suspense>
       </div>
       <p className="notice">Skrivskyddad mall som den såg ut när versionen sparades. Ditt utkast är orört{viewing.version.files && viewing.version.files.length > 1 ? `. Visar ${session.files.find(f => f.id === session.activeFileId)?.name} av ${viewing.version.files.length} filer` : ''}.</p>
-      <div className="dialog-actions"><button onClick={() => setViewing(null)}>Stäng</button><button className="primary" onClick={() => { const v = viewing.version; setViewing(null); void applyVersion(v); }}>{t.version.restoreThis}</button></div>
+      <div className="dialog-actions"><button onClick={() => setViewing(null)}>{t.dialog.close}</button><button className="primary" onClick={() => { const v = viewing.version; setViewing(null); void applyVersion(v); }}>{t.version.restoreThis}</button></div>
     </Modal>}
     {details && project && <ProjectDetails project={project} close={() => setDetails(false)} save={async patch => {
       await storage.saveProject({ ...project, ...patch, updatedAt: new Date().toISOString() });
@@ -640,7 +640,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <table className="shortcut-table"><tbody>{shortcuts.map(s => <tr key={s.id}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}</tbody></table>
       <h3>{t.app.inTheEditor}</h3>
       <table className="shortcut-table"><tbody>{editorShortcuts.map(s => <tr key={s.label}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}</tbody></table>
-      <div className="dialog-actions"><button className="primary" onClick={() => setShowShortcuts(false)}>Stäng</button></div>
+      <div className="dialog-actions"><button className="primary" onClick={() => setShowShortcuts(false)}>{t.dialog.close}</button></div>
     </Modal>}
     {ingesting && <IngestDialog bindings={bindings} close={() => setIngesting(false)} apply={next => {
       controller.changeText(next); setIngesting(false); changeMode('template');
@@ -664,6 +664,6 @@ export function App({ storage }: { storage: StorageProvider }) {
     {confirmDialog}
     {undoBar}
     {intro && <Intro close={() => setIntro(false)} />}
-    {error && <Modal title={t.dialog.attention} close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
+    {error && <Modal title={t.dialog.attention} close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>{t.dialog.close}</button></div></Modal>}
   </div>;
 }

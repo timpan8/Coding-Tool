@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Profile } from '../../types/models';
 import { Modal } from './Modal';
+import { t } from '../text';
 
 /** The top bar showed a fixed "Profil: Standard" label that looked like a control and was not one,
  * while Binding.values was already keyed by profile and resolveValue already had the fallback.
@@ -81,7 +82,7 @@ export function ProfileManager({
             </button>
           </div>
         ))}
-        {!profiles.length && <p className="muted">Inga profiler ännu. Standard används för alla värden.</p>}
+        {!profiles.length && <p className="muted">{t.profiles.empty}</p>}
       </div>
       <label>
         Ny profil
@@ -99,7 +100,7 @@ export function ProfileManager({
         />
       </label>
       <div className="dialog-actions">
-        <button onClick={close}>Stäng</button>
+        <button onClick={close}>{t.dialog.close}</button>
         <button className="primary" disabled={busy || !name.trim()} onClick={() => void add()}>
           Lägg till
         </button>

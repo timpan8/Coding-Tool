@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Version } from '../../types/models';
+import { t } from '../text';
 
 const when = (iso: string) => new Date(iso).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -58,7 +59,7 @@ export function VersionPanel({
                 <small>
                   {when(version.createdAt)}
                   {delta !== null && ` · ${delta} ändrade rader`}
-                  {version.id === baseVersionId && ' · utkastet bygger på den här'}
+                  {version.id === baseVersionId && t.versionPanel.draftBasedOnThis}
                 </small>
               </span>
             </button>
@@ -87,7 +88,7 @@ export function VersionPanel({
         );
       })}
       {!versions.length && (
-        <p>Utkastet sparas automatiskt. Spara en version när du vill kunna komma tillbaka hit.</p>
+        <p>{t.versionPanel.empty}</p>
       )}
     </details>
   );

@@ -348,7 +348,10 @@ den visat platshållaren och appen släpper begäran då.
 **U19 · Ingen delvis kopiering.** Man kan inte markera ett stycke och kopiera bara det i sanerad form. Det är ett vanligt behov
 när man frågar en AI om en enskild funktion.
 
-**U20 · Gränssnittet finns bara på svenska.** All text är hårdkodad. Det är ett rimligt val för en enanvändarapp, men om
+**U20 · Gränssnittet finns bara på svenska.** *(Åtgärdat: 332 strängar i `src/ui/text.ts`, med
+varierande meddelanden som funktioner så att svensk pluralböjning ligger hos texten. Tre undantag,
+medvetna: säkerhetssidan och introduktionen är dokument med inbäddad markup och översätts som
+dokument; `shortcuts.ts` är redan en tabell där etiketten hör ihop med tangenten.)* All text är hårdkodad. Det är ett rimligt val för en enanvändarapp, men om
 verktyget någon gång ska delas är strängextraktion mycket billigare att göra nu, vid 1 279 rader, än senare.
 
 ---

@@ -1,4 +1,5 @@
 import type { RenderIssue } from '../../domain/render';
+import { t } from '../text';
 
 export type IssueView = 'template' | 'local' | 'ai';
 export interface LocatedIssue extends RenderIssue {
@@ -34,7 +35,7 @@ export function collectIssues(template: string, local: { text: string; issues: R
 }
 
 const label = (blocks: ('local' | 'ai')[]) =>
-  blocks.length === 2 ? 'blockerar båda kopieringarna' : blocks[0] === 'ai' ? 'blockerar Copy for AI' : 'blockerar Copy Local';
+  blocks.length === 2 ? t.issues.blocksBoth : blocks[0] === 'ai' ? 'blockerar Copy for AI' : 'blockerar Copy Local';
 
 export function IssuePanel({ issues, onSelect }: { issues: LocatedIssue[]; onSelect: (issue: LocatedIssue) => void }) {
   if (!issues.length) return null;

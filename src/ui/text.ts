@@ -6,7 +6,17 @@
  * especially — lives with the text instead of at the call site.
  *
  * A second locale is an object of the same shape: `const en: typeof sv = { … }` and the compiler
- * lists everything still missing. */
+ * lists everything still missing.
+ *
+ * Three things are deliberately not here.
+ *
+ * The security page and the introduction are documents, not interface strings: their paragraphs
+ * carry inline markup, and cutting them into keyed fragments would need a rich-text message format
+ * and would make both the code and the text worse. They are translated as documents, by replacing
+ * the component.
+ *
+ * shortcuts.ts is already one table, where each label belongs beside the key it describes. Moving
+ * only the labels here would split one thing across two files. */
 export const sv = {
   nav: {
     newCode: '＋ Ny kod',
@@ -252,6 +262,155 @@ export const sv = {
     renameHint: 'Dubbelklicka för att byta namn',
     remove: (name: string) => `Ta bort ${name}`,
     add: 'Lägg till fil',
+  },
+  review: {
+    needsReview: 'Granskning krävs',
+    suspicious: (n: number) => `${n} misstänkta värden hittades`,
+    nothingToProtect: 'Ingenting att skydda hittades i koden',
+    nothingProtected: 'Inga värden är skyddade',
+    clean: 'Inga kända problem hittades',
+    boundOf: (bound: number, literals: number) => `${bound} av ${literals}`,
+    coverageTail: (replaced: number) => ` strängvärden är kopplade till bindings. ${replaced} förekomster ersätts vid kopiering.`,
+    nothingBound: 'Inget värde är kopplat till en binding, så allt nedan skickas som det står.',
+    finding: (line: number, rule: string) => `rad ${line} · ${rule} · `,
+    andMore: (n: number) => `och ${n} till`,
+    scopeListed: 'de misstänkta värden som listas ovan',
+    scopeScan: 'en genomsökning efter misstänkta värden',
+    scopeNote: (scope: string) => `Kontrollen omfattar saknade bindings, stödd escaping, exakta kända privata värden och ${scope}. Mönstren fångar det som liknar hemligheter — inte allt som är känsligt i just din miljö. Läs igenom koden själv innan du delar den.`,
+    localTitle: '⚠ Kopiera riktiga värden',
+    aiTitle: 'AI-export · granska före kopiering',
+    localWarning: 'Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.',
+    localClipboardNote: 'Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.',
+    acknowledge: (n: number) => `Jag har tittat på de ${n} misstänkta värdena och vill ändå kopiera.`,
+    download: 'Ladda ned som fil',
+    copyLocalConfirm: 'Kopiera LOCAL med secrets',
+    copyAiReviewed: 'Jag har granskat · kopiera för AI',
+    copyAnyway: 'Kopiera oskyddad kod ändå',
+  },
+  bindingDialog: {
+    acknowledgeFirst: 'Bekräfta att AI-värdet är granskat innan du sparar.',
+    saveFailed: 'Bindingen kunde inte sparas. Ändringarna finns kvar i dialogen.',
+    name: 'Namn',
+    nameLabel: 'Bindingnamn',
+    renameNote: 'Platshållaren skrivs om i alla versioner och utkast som använder den.',
+    category: 'Kategori',
+    scope: 'Scope',
+    scopeProject: 'Projekt',
+    scopeGlobal: 'Globalt',
+    scopeVersion: 'Version',
+    aiValue: 'AI-värde',
+    defaultValue: 'Privat värde · standard',
+    profileValue: (profile: string) => `Privat värde för ${profile}`,
+    showValue: 'Visa privat värde',
+    emptyMeansDefault: 'Tomt betyder att standardvärdet används.',
+    raw: 'Raw · ingen escaping',
+    rawNote: 'Raw stänger av escaping. Värdet läggs in ordagrant och kan ändra kodens syntax och betydelse.',
+    description: 'Beskrivning',
+    vagueBefore: 'AI-värdet ser inte ut som en tydlig platshållare, till exempel ',
+    vagueAfter: '. Jag har granskat att det är ofarligt att dela.',
+    replaceAll: (n: number) => `Ersätt alla identiska förekomster i filen (${n} st)`,
+    lead: 'Ange privata värden utan kodens escaping. Endast AI-värdet visas i den sanerade vyn.',
+    saving: 'Sparar…',
+    save: 'Spara binding',
+  },
+  projectList: {
+    sortBy: 'Sortera',
+    sortUpdated: 'Senast ändrade',
+    sortCreated: 'Senast skapade',
+    sortName: 'Namn',
+    search: 'Sök i alla projekt',
+    searchHint: 'Sök namn, tagg eller filnamn…',
+    filterLanguage: 'Filtrera på språk',
+    filterStatus: 'Filtrera på status',
+    current: 'Pågående →',
+    open: 'Öppna →',
+    fileCount: (n: number) => `${n} ${n === 1 ? 'fil' : 'filer'}`,
+  },
+  drawer: {
+    close: 'Stäng projektpanelen',
+    search: 'Sök projekt',
+    searchHint: 'Namn, tagg eller filnamn',
+    currentPrefix: 'Pågående · ',
+    noMatch: 'Inga projekt matchar sökningen.',
+    empty: 'Dina projekt visas här när du har klistrat in kod.',
+    seeAll: 'Visa alla projekt →',
+    title: 'Mina projekt',
+  },
+  bindingPanel: {
+    title: 'Bindings',
+    used: 'En binding används',
+    hasValue: 'Privat värde angivet',
+    missingValue: '⚠ VÄRDE SAKNAS',
+    occurrences: (n: number) => `${n} ${n === 1 ? 'förekomst' : 'förekomster'}`,
+    empty: 'Dina privata värden får en egen plats här.',
+  },
+  severity: {
+    critical: 'Kritisk',
+    high: 'Hög',
+    medium: 'Medel',
+    low: 'Låg',
+  },
+  rules: {
+    ownTerm: 'Ett sökord du själv lagt till.',
+    termAdded: 'Sökordet är tillagt.',
+    literalNote: 'Matchas ordagrant, oavsett stora eller små bokstäver. Reguljära uttryck stöds inte.',
+  },
+  findings: {
+    title: 'Misstänkta värden',
+  },
+  ingest: {
+    tier1: 'Platshållare kvar',
+    tier2: 'Återställd',
+    tier3: 'Liknar — granska själv',
+    title: 'Klistra in kod från AI',
+    pasteHere: 'Klistra in svaret här',
+    codeLabel: 'Kod från AI',
+    summary: (applied: number, suggestions: number) => `${applied} platshållare på plats, ${suggestions} att granska`,
+    replacesTemplate: 'Den öppna filens mall ersätts. Spara en version först om du vill kunna gå tillbaka.',
+  },
+  backup: {
+    privateExported: 'Privata värden exporterade.',
+    exportFailed: 'Exporten misslyckades. Inget har ändrats.',
+    fileUnreadable: 'Filen kunde inte läsas.',
+    importDone: 'Importen är klar.',
+    importFailed: 'Importen misslyckades. Valvet är oförändrat.',
+    clearLead: 'Allt på den här datorn raderas för alltid:',
+    clearNoUndo: 'Det finns ingen ångra. Exportera en backup först om du kan behöva något av det igen.',
+    cleared: 'Valvet är rensat.',
+    plaintextWarning: 'Båda filerna innehåller dina riktiga värden i klartext.',
+    restore: 'Återställ',
+    fileRejected: 'Filen kunde inte användas',
+    replacedElsewhere: 'Valvet har bytts ut under den öppna sessionen. Ladda om innan du arbetar vidare.',
+    planTitle: 'Så här skulle importen se ut',
+    blocked: 'Importen är blockerad',
+    keepBoth: 'Behåll båda — importera som kopia',
+    keepVault: 'Behåll det som finns i valvet',
+  },
+  versionPanel: {
+    draftBasedOnThis: ' · utkastet bygger på den här',
+    empty: 'Utkastet sparas automatiskt. Spara en version när du vill kunna komma tillbaka hit.',
+  },
+  details: {
+    descriptionHint: 'Vad gör den här koden?',
+    tagsHint: 'Kommaseparerade. Sökningen i Alla projekt matchar mot dem.',
+  },
+  profiles: {
+    empty: 'Inga profiler ännu. Standard används för alla värden.',
+  },
+  issues: {
+    blocksBoth: 'blockerar båda kopieringarna',
+  },
+  editorHover: {
+    bindingNoValue: 'binding · värde saknas',
+    valueSet: 'Privat värde är angivet.',
+    valueMissing: '⚠ Privat värde saknas.',
+    noBinding: '⚠ Ingen binding med det här namnet.',
+  },
+  controller: {
+    untitled: 'Namnlöst projekt',
+    needsOneFile: 'Ett projekt måste ha minst en fil.',
+    saveFailed: 'Lokal sparning misslyckades. Din text finns kvar i fliken. Försök igen eller kopiera mallen till en lokal fil innan du lämnar sidan.',
+    projectGone: 'Projektet finns inte längre.',
   },
 } as const;
 

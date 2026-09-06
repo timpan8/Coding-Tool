@@ -1,5 +1,6 @@
 import type { Binding } from '../../types/models';
 import { resolveValue } from '../../domain/bindings';
+import { t } from '../text';
 
 export interface BindingRow {
   binding: Binding;
@@ -26,7 +27,7 @@ export function BindingPanel({
   return (
     <>
       <div className="panel-title">
-        <h2>Bindings</h2>
+        <h2>{t.bindingPanel.title}</h2>
         <span className="count">{rows.length}</span>
         <button className="text-button" disabled={!canCreate} onClick={onCreate}>
           ＋ Ny
@@ -37,7 +38,7 @@ export function BindingPanel({
       </p>
       {orphans > 0 && (
         <p className="orphan-note">
-          {orphans === 1 ? 'En binding används' : `${orphans} bindings används`} inte i den här filen. De ligger kvar
+          {orphans === 1 ? t.bindingPanel.used : `${orphans} bindings används`} inte i den här filen. De ligger kvar
           med sina privata värden och kan blockera kopiering om värdet dyker upp i koden.
         </p>
       )}
@@ -55,16 +56,16 @@ export function BindingPanel({
               binding.category === 'secret' ? (
                 '••••••••'
               ) : (
-                'Privat värde angivet'
+                t.bindingPanel.hasValue
               )
             ) : (
-              <span className="danger-text">⚠ VÄRDE SAKNAS</span>
+              <span className="danger-text">{t.bindingPanel.missingValue}</span>
             )}
           </div>
           <div className="binding-example">AI: {binding.aiReplacement}</div>
           <div className="binding-actions">
             <small className={occurrences === 0 ? 'danger-text' : ''}>
-              {occurrences} {occurrences === 1 ? 'förekomst' : 'förekomster'}
+              {t.bindingPanel.occurrences(occurrences)}
             </small>
             <button className="text-button" aria-label={`Redigera ${binding.name}`} onClick={() => onEdit(binding)}>
               Redigera
@@ -78,7 +79,7 @@ export function BindingPanel({
       {!rows.length && (
         <div className="bindings-empty">
           {'{{NAMN}}'}
-          <p>Dina privata värden får en egen plats här.</p>
+          <p>{t.bindingPanel.empty}</p>
         </div>
       )}
     </>

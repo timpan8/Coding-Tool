@@ -4,6 +4,7 @@ import type { StorageProvider } from '../../storage/StorageProvider';
 import { parseSnapshot, planImport, toSnapshot, type ImportPlan, type Snapshot, type SnapshotKind } from '../../domain/snapshot';
 import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
 import { download } from '../download';
+import { t } from '../text';
 
 const stamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
 
@@ -33,9 +34,9 @@ export function BackupPanel({
         deviceName: settings.deviceName,
       });
       download(`ai-code-vault-${kind}-${stamp()}.acv.json`, JSON.stringify(snapshot, null, 2));
-      notify(kind === 'full' ? 'Hela valvet exporterat.' : 'Privata värden exporterade.');
+      notify(kind === 'full' ? 'Hela valvet exporterat.' : t.backup.privateExported);
     } catch {
-      notify('Exporten misslyckades. Inget har ändrats.');
+      notify(t.backup.exportFailed);
     } finally {
       setBusy(false);
     }
@@ -57,7 +58,7 @@ export function BackupPanel({
       const current = await storage.exportAll();
       setPending({ snapshot: parsed.snapshot, plan: planImport(parsed.snapshot, current) });
     } catch {
-      setProblems(['Filen kunde inte läsas.']);
+      setProblems([t.backup.fileUnreadable]);
     } finally {
       setBusy(false);
     }
@@ -72,9 +73,9 @@ export function BackupPanel({
       );
       setResult(await storage.importAll(pending.snapshot.payload, 'merge', resolutions));
       setPending(null);
-      notify('Importen är klar.');
+      notify(t.backup.importDone);
     } catch (error) {
-      setProblems([error instanceof Error ? error.message : 'Importen misslyckades. Valvet är oförändrat.']);
+      setProblems([error instanceof Error ? error.message : t.backup.importFailed]);
     } finally {
       setBusy(false);
     }
@@ -89,12 +90,12 @@ export function BackupPanel({
       typeToConfirm: 'RENSA',
       body: (
         <>
-          <p>Allt på den här datorn raderas för alltid:</p>
+          <p>{t.backup.clearLead}</p>
           <ul>
             <li>{workspace.projects.length} projekt med all versionshistorik</li>
             <li>{workspace.bindings.length} bindings, med sina privata värden</li>
           </ul>
-          <p>Det finns ingen ångra. Exportera en backup först om du kan behöva något av det igen.</p>
+          <p>{t.backup.clearNoUndo}</p>
         </>
       ),
     });
@@ -102,7 +103,7 @@ export function BackupPanel({
     setBusy(true);
     try {
       await storage.clearAll();
-      notify('Valvet är rensat.');
+      notify(t.backup.cleared);
       location.reload();
     } finally {
       setBusy(false);
@@ -125,11 +126,11 @@ export function BackupPanel({
         </button>
       </div>
       <p className="notice">
-        <b>Båda filerna innehåller dina riktiga värden i klartext.</b> Skillnaden är att den privata utelämnar
+        <b>{t.backup.plaintextWarning}</b> Skillnaden är att den privata utelämnar
         projektkoden, inte att den är ofarlig. Förvara dem som du förvarar lösenorden de innehåller.
       </p>
 
-      <h2>Återställ</h2>
+      <h2>{t.backup.restore}</h2>
       <label className="file-picker">
         Välj en exporterad fil
         <input type="file" accept=".json,.acv.json,application/json" disabled={busy} onChange={(e) => void choose(e)} />
@@ -137,7 +138,7 @@ export function BackupPanel({
 
       {problems.length > 0 && (
         <div className="import-problems" role="alert">
-          <strong>Filen kunde inte användas</strong>
+          <strong>{t.backup.fileRejected}</strong>
           <ul>
             {problems.map((problem, index) => (
               <li key={index}>{problem}</li>
@@ -153,9 +154,9 @@ export function BackupPanel({
           </p>
           {/* The open session still holds the draft revision the vault had a moment ago. Carrying on
               would write into a project that may no longer exist, so reloading is not optional. */}
-          <p>Valvet har bytts ut under den öppna sessionen. Ladda om innan du arbetar vidare.</p>
+          <p>{t.backup.replacedElsewhere}</p>
           <button className="primary" onClick={() => location.reload()}>
-            Ladda om appen
+            {t.app.reload}
           </button>
         </div>
       )}
@@ -171,14 +172,14 @@ export function BackupPanel({
 
       {pending && (
         <div className="import-plan">
-          <strong>Så här skulle importen se ut</strong>
+          <strong>{t.backup.planTitle}</strong>
           <p>
             {pending.plan.summary.added} nya, {pending.plan.summary.conflicts} krockar,{' '}
             {pending.plan.summary.identical} redan identiska.
           </p>
           {pending.plan.blockers.length > 0 ? (
             <div className="import-problems" role="alert">
-              <strong>Importen är blockerad</strong>
+              <strong>{t.backup.blocked}</strong>
               <ul>
                 {pending.plan.blockers.map((blocker, index) => (
                   <li key={index}>{blocker}</li>
@@ -191,8 +192,8 @@ export function BackupPanel({
                 <label>
                   Vid krock
                   <select value={resolution} onChange={(e) => setResolution(e.target.value as ImportResolution)}>
-                    <option value="duplicate">Behåll båda — importera som kopia</option>
-                    <option value="keep">Behåll det som finns i valvet</option>
+                    <option value="duplicate">{t.backup.keepBoth}</option>
+                    <option value="keep">{t.backup.keepVault}</option>
                     <option value="replace">Ta filens version</option>
                   </select>
                 </label>

@@ -1,36 +1,37 @@
 import type { Coverage } from '../../domain/render/coverage';
 import type { Finding } from '../../domain/scanner';
 import { Modal } from './Modal';
+import { t } from '../text';
 
 function AiCopyReview({ coverage, issues, replaced, findings }: { coverage: Coverage; issues: number; replaced: number; findings: Finding[] }) {
   const { bound, literals, unbound } = coverage;
   const serious = findings.filter(f => f.severity === 'critical' || f.severity === 'high');
   const headline = issues
-    ? 'Granskning krävs'
+    ? t.review.needsReview
     : serious.length
-      ? `${serious.length} misstänkta värden hittades`
+      ? t.review.suspicious(serious.length)
       : bound === 0
       ? literals === 0
-        ? 'Ingenting att skydda hittades i koden'
-        : 'Inga värden är skyddade'
-      : 'Inga kända problem hittades';
+        ? t.review.nothingToProtect
+        : t.review.nothingProtected
+      : t.review.clean;
   return (
     <>
       <p className={issues || serious.length || bound === 0 ? 'danger-text' : ''}><b>{headline}</b></p>
       <p>
-        <b>{bound} av {literals}</b> strängvärden är kopplade till bindings. {replaced} förekomster ersätts vid kopiering.
+        <b>{t.review.boundOf(bound, literals)}</b>{t.review.coverageTail(replaced)}
       </p>
       {bound === 0 && literals > 0 && (
-        <p>Inget värde är kopplat till en binding, så allt nedan skickas som det står.</p>
+        <p>{t.review.nothingBound}</p>
       )}
       {findings.length > 0 && (
         <ul className="unbound-values">
           {findings.slice(0, 8).map((finding, index) => (
             <li key={index}>
-              rad {finding.line} · {finding.ruleName} · <code>{finding.maskedExcerpt}</code>
+              {t.review.finding(finding.line, finding.ruleName)}<code>{finding.maskedExcerpt}</code>
             </li>
           ))}
-          {findings.length > 8 && <li>och {findings.length - 8} till</li>}
+          {findings.length > 8 && <li>{t.review.andMore(findings.length - 8)}</li>}
         </ul>
       )}
       {unbound.length > 0 && (
@@ -38,13 +39,10 @@ function AiCopyReview({ coverage, issues, replaced, findings }: { coverage: Cove
           {unbound.slice(0, 6).map((literal, index) => (
             <li key={index}><code>{literal.text.length > 60 ? literal.text.slice(0, 60) + '…' : literal.text}</code></li>
           ))}
-          {unbound.length > 6 && <li>och {unbound.length - 6} till</li>}
+          {unbound.length > 6 && <li>{t.review.andMore(unbound.length - 6)}</li>}
         </ul>
       )}
-      <p className="notice">
-        Kontrollen omfattar saknade bindings, stödd escaping, exakta kända privata värden och {findings.length > 0 ? 'de misstänkta värden som listas ovan' : 'en genomsökning efter misstänkta värden'}. Mönstren fångar det som liknar
-        hemligheter — inte allt som är känsligt i just din miljö. Läs igenom koden själv innan du delar den.
-      </p>
+      <p className="notice">{t.review.scopeNote(findings.length > 0 ? t.review.scopeListed : t.review.scopeScan)}</p>
     </>
   );
 }
@@ -72,23 +70,23 @@ export function CopyDialog({
   const held = mode === 'ai' && Boolean(seriousFindings) && !reviewed;
   const clean = coverage.bound > 0 && !seriousFindings;
 
-  return <Modal title={mode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={close}>
+  return <Modal title={mode === 'local' ? t.review.localTitle : t.review.aiTitle} close={close}>
     {mode === 'local' ? <>
-      <p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p>
-      <p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p>
+      <p>{t.review.localWarning}</p>
+      <p className="notice">{t.review.localClipboardNote}</p>
     </> : <AiCopyReview coverage={coverage} issues={issues} replaced={replaced} findings={findings} />}
 
     {mode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning">
       <input type="checkbox" checked={reviewed} onChange={e => onReviewed(e.target.checked)} />
-      Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.
+      {t.review.acknowledge(seriousFindings)}
     </label>}
 
     <div className="dialog-actions">
-      <button onClick={close}>Avbryt</button>
+      <button onClick={close}>{t.dialog.cancel}</button>
       {/* A file is as easy to hand to an AI as the clipboard is, so it waits on the same review. */}
-      <button disabled={held} onClick={onDownload}>Ladda ned som fil</button>
+      <button disabled={held} onClick={onDownload}>{t.review.download}</button>
       <button className={mode === 'local' ? 'danger' : clean ? 'primary' : ''} disabled={held} onClick={onCopy}>
-        {mode === 'local' ? 'Kopiera LOCAL med secrets' : clean ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}
+        {mode === 'local' ? t.review.copyLocalConfirm : clean ? t.review.copyAiReviewed : t.review.copyAnyway}
       </button>
     </div>
   </Modal>;

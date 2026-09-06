@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import type { Binding } from '../../types/models';
 import { ingest, type IngestDecision } from '../../domain/roundtrip';
 import { Modal } from './Modal';
+import { t } from '../text';
 
 const tierLabel: Record<IngestDecision['tier'], string> = {
-  1: 'Platshållare kvar',
-  2: 'Återställd',
-  3: 'Liknar — granska själv',
+  1: t.ingest.tier1,
+  2: t.ingest.tier2,
+  3: t.ingest.tier3,
 };
 
 /** Code goes out with placeholders and comes back changed. Without this the values have to be put
@@ -27,12 +28,12 @@ export function IngestDialog({
   const unknown = result?.decisions.filter((d) => d.tier === 1 && !d.accepted) ?? [];
 
   return (
-    <Modal title="Klistra in kod från AI" close={close}>
+    <Modal title={t.ingest.title} close={close}>
       <label>
-        <span>Klistra in svaret här</span>
+        <span>{t.ingest.pasteHere}</span>
         <textarea
           autoFocus
-          aria-label="Kod från AI"
+          aria-label={t.ingest.codeLabel}
           rows={8}
           value={incoming}
           spellCheck={false}
@@ -44,7 +45,7 @@ export function IngestDialog({
       {result && (
         <>
           <p>
-            <b>{applied}</b> platshållare på plats, <b>{suggestions.length}</b> att granska
+            {t.ingest.summary(applied, suggestions.length)}
             {unknown.length > 0 && `, ${unknown.length} utan binding`}.
           </p>
           {result.decisions.length > 0 && (
@@ -67,7 +68,7 @@ export function IngestDialog({
         </>
       )}
 
-      <p className="notice">Den öppna filens mall ersätts. Spara en version först om du vill kunna gå tillbaka.</p>
+      <p className="notice">{t.ingest.replacesTemplate}</p>
       <div className="dialog-actions">
         <button onClick={close}>Avbryt</button>
         <button className="primary" disabled={!result} onClick={() => result && apply(result.template)}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Project } from '../../types/models';
+import { t } from '../text';
 import { languages } from '../../types/models';
 import type { StorageProvider } from '../../storage/StorageProvider';
 import { projectMatches } from './ProjectBrowser';
@@ -84,24 +85,24 @@ export function ProjectFilters({
       <div className="search-wrap">
         <span>⌕</span>
         <input
-          aria-label="Sök i alla projekt"
-          placeholder="Sök namn, tagg eller filnamn…"
+          aria-label={t.projectList.search}
+          placeholder={t.projectList.searchHint}
           value={query}
           onChange={(e) => onQuery(e.target.value)}
         />
       </div>
       <div className="project-filters">
         <label>
-          Sortera
-          <select aria-label="Sortera" value={sort} onChange={(e) => onSort(e.target.value as SortKey)}>
-            <option value="updated">Senast ändrade</option>
-            <option value="created">Senast skapade</option>
-            <option value="name">Namn</option>
+          {t.projectList.sortBy}
+          <select aria-label={t.projectList.sortBy} value={sort} onChange={(e) => onSort(e.target.value as SortKey)}>
+            <option value="updated">{t.projectList.sortUpdated}</option>
+            <option value="created">{t.projectList.sortCreated}</option>
+            <option value="name">{t.projectList.sortName}</option>
           </select>
         </label>
         <label>
           Språk
-          <select aria-label="Filtrera på språk" value={language} onChange={(e) => onLanguage(e.target.value)}>
+          <select aria-label={t.projectList.filterLanguage} value={language} onChange={(e) => onLanguage(e.target.value)}>
             <option value="">Alla</option>
             {languages.map((l) => (
               <option key={l}>{l}</option>
@@ -110,7 +111,7 @@ export function ProjectFilters({
         </label>
         <label>
           Status
-          <select aria-label="Filtrera på status" value={status} onChange={(e) => onStatus(e.target.value)}>
+          <select aria-label={t.projectList.filterStatus} value={status} onChange={(e) => onStatus(e.target.value)}>
             <option value="">Alla</option>
             {Object.entries(statusLabel).map(([value, label]) => (
               <option key={value} value={value}>
@@ -140,7 +141,7 @@ export function ProjectCard({ project, facts, current, open }: { project: Projec
         <span className="language-pill">{project.language}</span>
       </div>
       <h3>{project.name}</h3>
-      <p>{project.description || `${project.files.length} ${project.files.length === 1 ? 'fil' : 'filer'}`}</p>
+      <p>{project.description || t.projectList.fileCount(project.files.length)}</p>
       {project.tags.length > 0 && (
         <div className="card-tags">
           {project.tags.slice(0, 4).map((tag) => (
@@ -156,7 +157,7 @@ export function ProjectCard({ project, facts, current, open }: { project: Projec
       </div>
       <div className="card-footer">
         <span>{new Date(project.updatedAt).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}</span>
-        <span>{current ? 'Pågående →' : 'Öppna →'}</span>
+        <span>{current ? t.projectList.current : t.projectList.open}</span>
       </div>
     </button>
   );

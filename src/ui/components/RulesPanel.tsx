@@ -2,9 +2,10 @@ import { useState } from 'react';
 import type { ScannerRule } from '../../types/models';
 import type { StorageProvider } from '../../storage/StorageProvider';
 import { compileRules, scan } from '../../domain/scanner';
+import { t } from '../text';
 
 const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 } as const;
-const severityLabel = { critical: 'Kritisk', high: 'Hög', medium: 'Medel', low: 'Låg' } as const;
+const severityLabel = t.severity;
 
 export function RulesPanel({
   storage,
@@ -38,13 +39,13 @@ export function RulesPanel({
       flags: 'gi',
       severity: 'medium',
       category: 'configuration',
-      explanation: 'Ett sökord du själv lagt till.',
+      explanation: t.rules.ownTerm,
       enabled: true,
       builtIn: false,
     });
     setTerm('');
     onChange();
-    notify('Sökordet är tillagt.');
+    notify(t.rules.termAdded);
   }
 
   return (
@@ -110,7 +111,7 @@ export function RulesPanel({
           }}
         />
         {/* Deliberately not a regular expression: see the comment in domain/scanner/rules.ts. */}
-        <small>Matchas ordagrant, oavsett stora eller små bokstäver. Reguljära uttryck stöds inte.</small>
+        <small>{t.rules.literalNote}</small>
       </label>
       <button disabled={!term.trim()} onClick={() => void addTerm()}>
         Lägg till sökord

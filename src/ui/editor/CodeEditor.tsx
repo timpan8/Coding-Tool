@@ -17,6 +17,7 @@ import { language as hcl } from 'monaco-editor/languages/definitions/hcl/hcl.js'
 import { language as sql } from 'monaco-editor/languages/definitions/sql/sql.js';
 import { editorColors, themeName } from '../theme';
 import type { EditorProps } from './props';
+import { t } from '../text';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 for (const [id, language] of Object.entries({ powershell, javascript, typescript, python, xml, yaml, shell, hcl, sql })) {
@@ -118,7 +119,7 @@ export function CodeEditor(props: EditorProps) {
             label: name,
             kind: monaco.languages.CompletionItemKind.Variable,
             insertText: `${name}}}`,
-            detail: callbacks.current.describePlaceholder?.(name)?.hasValue ? 'binding' : 'binding · värde saknas',
+            detail: callbacks.current.describePlaceholder?.(name)?.hasValue ? 'binding' : t.editorHover.bindingNoValue,
             range,
           })),
         };
@@ -136,8 +137,8 @@ export function CodeEditor(props: EditorProps) {
           const info = name ? callbacks.current.describePlaceholder?.(name) : undefined;
           if (!name) return null;
           const lines = info
-            ? [`**${name}** · ${info.category}`, info.aiReplacement ? `AI-värde: \`${info.aiReplacement}\`` : '', info.hasValue ? 'Privat värde är angivet.' : '⚠ Privat värde saknas.']
-            : [`**${name}**`, '⚠ Ingen binding med det här namnet.'];
+            ? [`**${name}** · ${info.category}`, info.aiReplacement ? `AI-värde: \`${info.aiReplacement}\`` : '', info.hasValue ? t.editorHover.valueSet : t.editorHover.valueMissing]
+            : [`**${name}**`, t.editorHover.noBinding];
           return { contents: lines.filter(Boolean).map(value => ({ value })) };
         },
       },
