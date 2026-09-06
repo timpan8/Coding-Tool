@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Binding, Project } from '../../types/models';
 import type { StorageProvider } from '../../storage/StorageProvider';
 import { resolveValue } from '../../domain/bindings';
+import { t } from '../text';
 
 export interface BindingUse {
   /** How many saved versions across the whole vault still contain the placeholder. */
@@ -27,15 +28,15 @@ export function useBindingUses(storage: StorageProvider, projects: Project[], ac
         }
       }
       const byId = new Map(projects.map((p) => [p.id, p.name]));
-      const versionOwner = new Map(all.versions.map((v) => [v.id, byId.get(v.projectId) ?? 'Okänt projekt']));
+      const versionOwner = new Map(all.versions.map((v) => [v.id, byId.get(v.projectId) ?? t.bindingsPage.ownerUnknown]));
       const next: Record<string, BindingUse> = {};
       for (const binding of all.bindings) {
         next[binding.id] = {
           versions: names.get(binding.name) ?? 0,
           owner:
-            binding.scope === 'global' ? 'Alla projekt'
-              : binding.scope === 'project' ? (byId.get(binding.scopeRef ?? '') ?? 'Raderat projekt')
-                : (versionOwner.get(binding.scopeRef ?? '') ?? 'Raderad version'),
+            binding.scope === 'global' ? t.bindingsPage.ownerGlobal
+              : binding.scope === 'project' ? (byId.get(binding.scopeRef ?? '') ?? t.bindingsPage.ownerDeletedProject)
+                : (versionOwner.get(binding.scopeRef ?? '') ?? t.bindingsPage.ownerDeletedVersion),
         };
       }
       setUses(next);
@@ -47,7 +48,7 @@ export function useBindingUses(storage: StorageProvider, projects: Project[], ac
   return uses;
 }
 
-const scopeLabel = { global: 'Global', project: 'Projekt', version: 'Version' } as const;
+const scopeLabel = { global: t.bindingsPage.scopeGlobal, project: t.bindingsPage.scopeProject, version: t.bindingsPage.scopeVersion } as const;
 
 /** Report F14. Bindings could only be reached through the project they belong to, so a global one —
  * the whole point of the global scope — was unreachable unless some project happened to use it, and
@@ -84,59 +85,56 @@ export function BindingsPage({
     <section className="bindings-page">
       <div className="dashboard-heading">
         <div>
-          <span className="eyebrow">DITT LOKALA VALV</span>
-          <h1>Alla bindings</h1>
-          <p>
-            Varje namn du har bundit, i vilket projekt det än hör hemma. Globala bindings finns bara
-            här.
-          </p>
+          <span className="eyebrow">{t.project.vaultEyebrow}</span>
+          <h1>{t.bindingsPage.title}</h1>
+          <p>{t.bindingsPage.lead}</p>
         </div>
         <button className="primary" onClick={onCreate}>
-          ＋ Ny binding
+          {t.bindingsPage.create}
         </button>
       </div>
 
       <div className="binding-filters">
         <label>
-          Sök binding
+          {t.bindingsPage.search}
           <input
-            aria-label="Sök binding"
+            aria-label={t.bindingsPage.search}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Namn eller beskrivning"
+            placeholder={t.bindingsPage.searchHint}
           />
         </label>
         <label>
-          Räckvidd
-          <select aria-label="Filtrera på räckvidd" value={scope} onChange={(e) => setScope(e.target.value)}>
-            <option value="">Alla</option>
-            <option value="global">Global</option>
-            <option value="project">Projekt</option>
-            <option value="version">Version</option>
+          {t.bindingsPage.scope}
+          <select aria-label={`Filtrera på ${t.bindingsPage.scope.toLowerCase()}`} value={scope} onChange={(e) => setScope(e.target.value)}>
+            <option value="">{t.bindingsPage.scopeAll}</option>
+            <option value="global">{t.bindingsPage.scopeGlobal}</option>
+            <option value="project">{t.bindingsPage.scopeProject}</option>
+            <option value="version">{t.bindingsPage.scopeVersion}</option>
           </select>
         </label>
         <span className="count">
-          {shown.length} av {bindings.length}
-          {withoutValue > 0 && ` · ${withoutValue} utan värde`}
+          {t.bindingsPage.count(shown.length, bindings.length)}
+          {withoutValue > 0 && t.bindingsPage.withoutValue(withoutValue)}
         </span>
       </div>
 
       {shown.length === 0 ? (
         <p className="empty-binding-list">
-          {bindings.length ? 'Inga bindings matchar filtret.' : 'Inga bindings ännu. Markera ett värde i editorn och tryck Ctrl+B.'}
+          {bindings.length ? t.bindingsPage.noMatch : t.bindingsPage.empty}
         </p>
       ) : (
         <table className="binding-table">
           <thead>
             <tr>
-              <th scope="col">Namn</th>
-              <th scope="col">Kategori</th>
-              <th scope="col">Räckvidd</th>
-              <th scope="col">Privat värde</th>
-              <th scope="col">Används i</th>
+              <th scope="col">{t.bindingsPage.columnName}</th>
+              <th scope="col">{t.bindingsPage.columnCategory}</th>
+              <th scope="col">{t.bindingsPage.columnScope}</th>
+              <th scope="col">{t.bindingsPage.columnValue}</th>
+              <th scope="col">{t.bindingsPage.columnUsage}</th>
               <th scope="col">
-                <span className="th-actions">Åtgärder</span>
+                <span className="th-actions">{t.bindingsPage.columnActions}</span>
               </th>
             </tr>
           </thead>
@@ -155,15 +153,15 @@ export function BindingsPage({
                     {scopeLabel[binding.scope]}
                     <small>{use?.owner ?? '—'}</small>
                   </td>
-                  <td className={hasValue ? '' : 'warn-text'}>{hasValue ? 'Angivet' : '⚠ Saknas'}</td>
-                  <td>{use ? `${use.versions} ${use.versions === 1 ? 'version' : 'versioner'}` : '—'}</td>
+                  <td className={hasValue ? '' : 'warn-text'}>{hasValue ? t.bindingsPage.valueSet : t.bindingsPage.valueMissing}</td>
+                  <td>{use ? t.bindingsPage.usedIn(use.versions) : '—'}</td>
                   <td>
                     <div className="row-actions">
                       <button className="text-button" onClick={() => onEdit(binding)}>
-                        Redigera {binding.name}
+                        {t.bindingsPage.edit(binding.name)}
                       </button>
                       <button className="text-button danger-text" onClick={() => onDelete(binding)}>
-                        Radera {binding.name}
+                        {t.bindingsPage.remove(binding.name)}
                       </button>
                     </div>
                   </td>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { t } from '../text';
 
 export interface UndoOffer {
   /** What was done, in the past tense: the bar reads "Projektet är raderat." */
@@ -43,20 +44,20 @@ export function useUndo(report: (message: string) => void): [(offer: UndoOffer) 
     running.current = true;
     const { restore } = offer;
     setOffer(null);
-    try { await restore(); report('Ångrat.'); }
-    catch { report('Det gick inte att ångra. Ingenting ändrades tillbaka.'); }
+    try { await restore(); report(t.app.undone); }
+    catch { report(t.app.undoFailed); }
   }
 
   const element = offer ? (
     <div className="undo-bar" role="status">
       <span>{offer.label}</span>
       <button className="primary" onClick={() => void undo()}>
-        Ångra
+        {t.undo.action}
       </button>
       <span className="undo-count" aria-hidden="true">
-        {left} s
+        {t.undo.seconds(left)}
       </span>
-      <button aria-label="Stäng ångra-remsan" onClick={() => setOffer(null)}>
+      <button aria-label={t.undo.close} onClick={() => setOffer(null)}>
         ×
       </button>
     </div>

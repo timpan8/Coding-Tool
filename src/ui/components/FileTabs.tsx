@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ProjectFile } from '../../types/models';
+import { t } from '../text';
 
 export function FileTabs({
   files,
@@ -22,13 +23,13 @@ export function FileTabs({
   const [draft, setDraft] = useState('');
 
   return (
-    <nav className="file-tabs" aria-label="Filer i projektet">
+    <nav className="file-tabs" aria-label={t.files.tabs}>
       {files.map((file) => (
         <span key={file.id} className={`file-tab ${file.id === activeId ? 'current' : ''}`}>
           {editing === file.id ? (
             <input
               autoFocus
-              aria-label="Filnamn"
+              aria-label={t.files.name}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={() => {
@@ -49,7 +50,7 @@ export function FileTabs({
                 setDraft(file.name);
                 setEditing(file.id);
               }}
-              title="Dubbelklicka för att byta namn"
+              title={t.files.renameHint}
             >
               {file.name}
             </button>
@@ -57,7 +58,7 @@ export function FileTabs({
           {files.length > 1 && (
             <button
               className="file-close"
-              aria-label={`Ta bort ${file.name}`}
+              aria-label={t.files.remove(file.name)}
               disabled={disabled}
               onClick={() => onRemove(file.id)}
             >
@@ -66,7 +67,7 @@ export function FileTabs({
           )}
         </span>
       ))}
-      <button className="file-add" aria-label="Lägg till fil" disabled={disabled} onClick={onAdd}>
+      <button className="file-add" aria-label={t.files.add} disabled={disabled} onClick={onAdd}>
         ＋
       </button>
     </nav>

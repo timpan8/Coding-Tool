@@ -4,6 +4,7 @@ import { formatBytes, requestPersistence, type StorageState } from '../../storag
 import { RulesPanel } from './RulesPanel';
 import { BackupPanel } from './BackupPanel';
 import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
+import { t } from '../text';
 
 /** Report K-a. This lived as one 3.5 kB line inside App.tsx, which is why every settings change made
  * an unreadable diff.
@@ -27,65 +28,65 @@ export function SettingsPage({
   confirm: (request: ConfirmRequest) => Promise<ConfirmResult>;
   showIntro: () => void;
 }) {
-  const persistence = !storageInfo ? 'Läser…'
-    : !storageInfo.supported ? 'Stöds inte av webbläsaren'
-      : storageInfo.persisted ? 'Ja · valvet vräks inte vid diskbrist'
-        : 'Nej · webbläsaren får radera valvet';
+  const persistence = !storageInfo ? t.settings.persistenceReading
+    : !storageInfo.supported ? t.settings.persistenceUnsupported
+      : storageInfo.persisted ? t.settings.persistenceYes
+        : t.settings.persistenceNo;
 
   return <article className="document">
-    <span className="eyebrow">DEN HÄR INSTALLATIONEN</span>
-    <h1>Inställningar</h1>
-    <p>Valvet delas inte mellan olika origin eller webbläsarprofiler.</p>
+    <span className="eyebrow">{t.settings.eyebrow}</span>
+    <h1>{t.settings.title}</h1>
+    <p>{t.settings.lead}</p>
 
     <dl>
-      <dt>Aktuellt origin</dt><dd>{location.origin}</dd>
-      <dt>App-sökväg</dt><dd>{location.pathname}</dd>
-      <dt>Enhets-ID</dt><dd>{settings?.deviceId}</dd>
-      <dt>Lagring</dt><dd>IndexedDB · lokal klartext</dd>
-      <dt>Beständig lagring</dt><dd>{persistence}</dd>
-      <dt>Utrymme</dt>
-      <dd>{storageInfo?.supported ? `${formatBytes(storageInfo.usedBytes)} av ${formatBytes(storageInfo.quotaBytes)}` : 'okänt'}</dd>
+      <dt>{t.settings.origin}</dt><dd>{location.origin}</dd>
+      <dt>{t.settings.path}</dt><dd>{location.pathname}</dd>
+      <dt>{t.settings.deviceId}</dt><dd>{settings?.deviceId}</dd>
+      <dt>{t.settings.storage}</dt><dd>{t.settings.storageValue}</dd>
+      <dt>{t.settings.persistence}</dt><dd>{persistence}</dd>
+      <dt>{t.settings.space}</dt>
+      <dd>{storageInfo?.supported ? t.settings.spaceUsed(formatBytes(storageInfo.usedBytes), formatBytes(storageInfo.quotaBytes)) : t.settings.spaceUnknown}</dd>
     </dl>
 
     {storageInfo && !storageInfo.persisted && <div className="persistence-warning" role="alert">
-      <strong>Valvet kan raderas av webbläsaren</strong>
-      <p>Utan beständig lagring får webbläsaren slänga valvet när enheten får ont om utrymme. Det finns ingen backup att återställa från.</p>
+      <strong>{t.settings.atRiskTitle}</strong>
+      <p>{t.settings.atRiskBody}</p>
       <button onClick={() => void requestPersistence().then(state => {
         onStorageInfo(state);
-        notify(state.persisted ? 'Beständig lagring beviljad.' : 'Webbläsaren nekade beständig lagring.');
-      })}>Begär beständig lagring</button>
+        notify(state.persisted ? t.settings.persistenceGranted : t.settings.persistenceDenied);
+      })}>{t.settings.requestPersistence}</button>
     </div>}
 
-    <label>Enhetsnamn<input value={deviceName} onChange={e => onDeviceName(e.target.value)} /></label>
+    <label>{t.settings.deviceName}<input value={deviceName} onChange={e => onDeviceName(e.target.value)} /></label>
 
     <label className="check">
       <input type="checkbox" checked={settings?.includeAiPromptBlock ?? true}
         onChange={e => void save({ includeAiPromptBlock: e.target.checked }).catch(() => {})} />
-      Lägg en instruktion överst i AI-kopian
+      {t.settings.includePrompt}
     </label>
 
-    {settings?.includeAiPromptBlock && <label>Instruktionens text
-      <textarea aria-label="Instruktion till AI" rows={3} defaultValue={settings.aiPromptText}
+    {settings?.includeAiPromptBlock && <label>{t.settings.promptText}
+      <textarea aria-label={t.settings.promptLabel} rows={3} defaultValue={settings.aiPromptText}
         onBlur={e => void save({ aiPromptText: e.target.value }).catch(() => {})} />
-      <small>Kopieras som en kommentar före koden, i det språk filen har. Gör det troligare att platshållarna kommer tillbaka orörda.</small>
+      <small>{t.settings.promptHint}</small>
     </label>}
 
-    <label>Rensa urklipp efter Copy Local
-      <select aria-label="Rensa urklipp efter Copy Local" value={settings?.clipboardAutoClearSeconds ?? 0}
+    <label>{t.settings.clearClipboard}
+      <select aria-label={t.settings.clearClipboard} value={settings?.clipboardAutoClearSeconds ?? 0}
         onChange={e => void save({ clipboardAutoClearSeconds: Number(e.target.value) }).catch(() => {})}>
-        <option value={0}>Aldrig</option>
-        <option value={30}>Efter 30 sekunder</option>
-        <option value={60}>Efter 1 minut</option>
-        <option value={300}>Efter 5 minuter</option>
+        <option value={0}>{t.settings.clearNever}</option>
+        <option value={30}>{t.settings.clear30}</option>
+        <option value={60}>{t.settings.clear60}</option>
+        <option value={300}>{t.settings.clear300}</option>
       </select>
-      <small>Skriver över urklippet när tiden gått. Nedräkningen visas och går att avbryta. Urklippshistorik och molnsynk ligger utanför appens kontroll.</small>
+      <small>{t.settings.clearHint}</small>
     </label>
 
     {/* Says "saved" only once the write has actually landed; save() rejects and reports its own
         failure otherwise. */}
-    <button className="primary" onClick={() => void save({ deviceName }).then(() => notify('Inställningar sparade lokalt')).catch(() => {})}>Spara inställningar</button>
-    <button onClick={showIntro}>Visa introduktionen igen</button>
-    <p className="notice">Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.</p>
+    <button className="primary" onClick={() => void save({ deviceName }).then(() => notify(t.app.settingsSaved)).catch(() => {})}>{t.settings.save}</button>
+    <button onClick={showIntro}>{t.settings.showIntro}</button>
+    <p className="notice">{t.settings.backupNote}</p>
 
     <RulesPanel storage={storage} rules={rules} notify={notify} onChange={onRules} />
     <BackupPanel storage={storage} notify={notify} confirm={confirm} />

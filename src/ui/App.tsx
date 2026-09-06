@@ -29,6 +29,7 @@ import { EditorToolbar, type Mode } from './components/EditorToolbar';
 import { ProfileManager, ProfilePicker } from './components/ProfilePicker';
 import { IngestDialog } from './components/IngestDialog';
 import { editorShortcuts, match, shortcuts } from './shortcuts';
+import { t } from './text';
 import { detectLanguage, languageForFile } from '../domain/detect';
 // Also lazy: it pulls in the same editor bundle, and version history is not on the first screen.
 const DiffEditor = lazy(() => import('./editor/DiffEditor').then(m => ({ default: m.DiffEditor })));
@@ -63,7 +64,7 @@ const samples: Partial<Record<LanguageId, string>> = {
 function ProjectName({ name, change }: { name: string; change: (name: string) => void }) {
   const [editing, setEditing] = useState(false), [text, setText] = useState(name);
   const cancelled = useRef(false);
-  if (!editing) return <button className="project-name" aria-label="Ändra projektnamn" onClick={() => { setText(name); cancelled.current = false; setEditing(true); }}>{name}<span>✎</span></button>;
+  if (!editing) return <button className="project-name" aria-label={t.workspace.renameProject} onClick={() => { setText(name); cancelled.current = false; setEditing(true); }}>{name}<span>✎</span></button>;
   function finish() { if (!cancelled.current) change(text); setEditing(false); }
   return <input className="project-name-input" aria-label="Projektnamn" autoFocus value={text} onFocus={e => e.target.select()} onChange={e => setText(e.target.value)}
     onBlur={finish} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } if (e.key === 'Escape') { cancelled.current = true; setEditing(false); } }} />;
@@ -135,10 +136,10 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [intro, setIntro] = useState(false);
 
   async function run(action: () => Promise<void>) {
-    if (busyRef.current) { warn('Något sparas just nu. Försök igen om ett ögonblick.'); return; }
+    if (busyRef.current) { warn(t.refusal.busy); return; }
     busyRef.current = true; setBusy(true);
     try { await action(); }
-    catch (e) { if (!controller.getSnapshot().error) setError(e instanceof Error ? e.message : 'Åtgärden kunde inte slutföras. Din text finns kvar.'); }
+    catch (e) { if (!controller.getSnapshot().error) setError(e instanceof Error ? e.message : t.refusal.actionFailed); }
     finally { busyRef.current = false; setBusy(false); }
   }
   function setLocation(hash: string, replace = false) {
@@ -150,7 +151,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     // reads as a broken link rather than as "not now".
     if (busyRef.current) {
       history.replaceState(null, '', routeRef.current);
-      warn('Sidbytet väntar tills den pågående åtgärden är klar. Försök igen om ett ögonblick.');
+      warn(t.refusal.navigating);
       return;
     }
     await run(async () => {
@@ -159,7 +160,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       if (id) { await controller.open(id); setMode('template'); setFocusName(''); setFocusLine(undefined); }
       else if (hash === '#/' && (routeRef.current !== '#/' || controller.getSnapshot().session.project)) {
         await controller.newCode(); setMode('template'); setFocusName(''); setFocusLine(undefined);
-      } else if (!['#/', '#/projects', '#/bindings', '#/settings', '#/security'].includes(hash)) throw new Error('Sidan finns inte. Öppna Mina projekt för att fortsätta.');
+      } else if (!['#/', '#/projects', '#/bindings', '#/settings', '#/security'].includes(hash)) throw new Error(t.refusal.unknownPage);
       setShowSecrets(false); setDrawer(false); setNotice('');
       setBindings(await storage.listBindings()); setLocation(hash, replace);
     });
@@ -195,7 +196,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).then(reg => {
       if (reg.waiting) setUpdateReady(reg);
       reg.addEventListener('updatefound', () => reg.installing?.addEventListener('statechange', () => { if (reg.waiting && navigator.serviceWorker.controller) setUpdateReady(reg); }));
-    }).catch(() => setNotice('Offline-cache kunde inte aktiveras. Behåll appen öppen.'));
+    }).catch(() => setNotice(t.app.offlineFailed));
   }, []);
 
   const resolvedTheme = resolveTheme(theme, systemDark);
@@ -218,23 +219,23 @@ export function App({ storage }: { storage: StorageProvider }) {
   const used = useMemo(() => usage(template), [template]);
   const activeBindings = bindings.filter(b => resolveBinding(b.name, bindings, options.projectId, options.versionId)?.id === b.id)
     .sort((a, b) => Number(Boolean(resolveValue(a, options.profileId))) - Number(Boolean(resolveValue(b, options.profileId))) || a.name.localeCompare(b.name));
-  const saveStatus = phase === 'loading' ? 'Öppnar lokalt valv…' : phase === 'error' ? 'Fel vid sparning' : phase === 'saved' ? 'Sparat lokalt' : 'Sparar lokalt…';
+  const saveStatus = phase === 'loading' ? t.save.loading : phase === 'error' ? t.save.failed : phase === 'saved' ? t.save.saved : t.save.saving;
   const currentId = controller.getLastProjectId();
   const filtered = sortProjects(filterProjects(projects, query, languageFilter, statusFilter), sort);
   const facts = useProjectFacts(storage, projects, route === '#/projects');
   const bindingUses = useBindingUses(storage, projects, route === '#/bindings');
   async function removeVersion(version: Version) {
     await run(async () => {
-      if (version.id === session.baseVersionId) throw new Error('Utkastet bygger på den här versionen. Återställ en annan först.');
-      if (!await confirm({ title: `Radera v${version.number}?`, danger: true, confirmLabel: 'Radera versionen',
-        body: <><p>{version.label ? `"${version.label}"` : 'Versionen'} tas bort ur historiken för alltid.</p><p>Utkastet du arbetar i påverkas inte.</p></> })) return;
+      if (version.id === session.baseVersionId) throw new Error(t.version.draftBasedOnIt);
+      if (!await confirm({ title: t.version.deleteTitle(version.number), danger: true, confirmLabel: t.version.deleteConfirm,
+        body: <><p>{version.label ? `"${version.label}"` : 'Versionen'} tas bort ur historiken för alltid.</p><p>{t.version.deleteDraftUnaffected}</p></> })) return;
       // The record itself is the way back. Version-scoped bindings go with it, so they are read
       // before the delete — afterwards there is nothing left to read.
       const scoped = (await storage.listBindings()).filter(b => b.scope === 'version' && b.scopeRef === version.id);
       await storage.deleteVersion(version.id);
       await controller.reloadVersions();
       setViewing(null);
-      offerUndo({ label: `v${version.number} är raderad.`, restore: async () => {
+      offerUndo({ label: t.version.deleted(version.number), restore: async () => {
         await storage.importAll({ versions: [version], bindings: scoped }, 'merge');
         await controller.reloadVersions();
         setBindings(await storage.listBindings());
@@ -245,8 +246,8 @@ export function App({ storage }: { storage: StorageProvider }) {
     await run(async () => {
       const [versions, all] = await Promise.all([storage.listVersions(id), storage.listBindings()]);
       const scoped = all.filter(b => b.scope === 'project' && b.scopeRef === id);
-      if (!await confirm({ title: `Radera ${name}?`, danger: true, confirmLabel: 'Radera projektet', typeToConfirm: 'RADERA',
-        body: <><p>Följande försvinner för alltid från den här datorn:</p><ul><li>{versions.length} sparade versioner</li><li>{scoped.length} bindings som hör till projektet, med sina privata värden</li><li>Det pågående utkastet</li></ul><p>Globala bindings påverkas inte. Exportera en backup först om du är osäker.</p></> })) return;
+      if (!await confirm({ title: t.project.deleteTitle(name), danger: true, confirmLabel: t.project.deleteConfirm, typeToConfirm: 'RADERA',
+        body: <><p>{t.project.deleteLead}</p><ul><li>{versions.length} sparade versioner</li><li>{scoped.length} bindings som hör till projektet, med sina privata värden</li><li>{t.project.deleteDraft}</li></ul><p>{t.project.deleteGlobalsSafe}</p></> })) return;
       const wasOpen = controller.getSnapshot().session.project?.id === id;
       // Read before the delete: afterwards there is nothing left to read.
       const captured = await storage.captureProject(id);
@@ -257,7 +258,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       await controller.refreshProjects();
       setBindings(await storage.listBindings());
       if (wasOpen) setLocation('#/', true);
-      offerUndo({ label: `${name} är raderat.`, restore: async () => {
+      offerUndo({ label: t.project.deleted(name), restore: async () => {
         await storage.importAll(captured, 'merge');
         await controller.refreshProjects();
         setBindings(await storage.listBindings());
@@ -270,7 +271,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   }
   function changeTheme(next: ThemeChoice) {
     setTheme(next); applyTheme(next);
-    if (settings) void storage.saveSettings({ ...settings, theme: next }).catch(() => setNotice('Temat gäller nu men kunde inte sparas.'));
+    if (settings) void storage.saveSettings({ ...settings, theme: next }).catch(() => setNotice(t.app.themeNotSaved));
   }
   function bindFinding(finding: Finding) {
     changeMode('template'); setFocusLine(finding.line);
@@ -295,9 +296,9 @@ export function App({ storage }: { storage: StorageProvider }) {
   function changeMode(next: Mode) { setMode(next); setShowSecrets(false); setFocusName(''); setFocusLine(undefined); }
   function createBinding(selection: Selection, finding?: Finding) {
     // Report U7. Ctrl+B in the Local view used to do nothing at all, with nothing said.
-    if (mode === 'local') { warn('Byt till Mall-vyn för att skapa en binding. Local är en skrivskyddad projektion.'); return; }
-    if (!selection.text) { warn('Markera värdet du vill binda först.'); return; }
-    if (/\{\{.*\}\}/.test(selection.text)) { warn('Markeringen innehåller redan en platshållare. Markera ett värde i stället.'); return; }
+    if (mode === 'local') { warn(t.refusal.bindingInLocal); return; }
+    if (!selection.text) { warn(t.refusal.bindingNoSelection); return; }
+    if (/\{\{.*\}\}/.test(selection.text)) { warn(t.refusal.bindingOnPlaceholder); return; }
     void run(async () => {
       await controller.flush();
       const current = controller.getSnapshot();
@@ -321,7 +322,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         escapeMode: 'auto', matchHints: { lastVariableNames: [], previousAiValues: [], aliases: [] }, createdAt: time, updatedAt: time, deviceId: current.settings.deviceId };
       if (mode === 'ai') {
         const start = template.indexOf(selection.text);
-        if (start < 0 || template.indexOf(selection.text, start + 1) >= 0) throw new Error('Markera värdet i Mall-vyn så att rätt förekomst kan identifieras.');
+        if (start < 0 || template.indexOf(selection.text, start + 1) >= 0) throw new Error(t.binding.selectInTemplate);
         selection = { ...selection, start, end: start + selection.text.length };
       }
       setBindingDialog({ binding, selection });
@@ -336,7 +337,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     const guess = detectLanguage(text);
     if (guess && guess !== language) {
       controller.changeLanguage(guess);
-      setNotice(`Språket sattes till ${guess}. Ändra i väljaren om det blev fel.`);
+      setNotice(t.workspace.languageSet(guess));
     }
   }
   async function openFiles(files: FileList | null) {
@@ -353,7 +354,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       // Renaming goes through the same edit path as the text, so it works before the project
       // exists too; the first save writes both. The name is what a drop carries that typing does not.
       await controller.renameFile(fileId, file.name);
-      setNotice(`${file.name} inläst. Inget skickas någonstans.`);
+      setNotice(t.workspace.fileRead(file.name));
     });
   }
   /** No selection, so nothing is replaced in the template: the placeholder is typed by hand or
@@ -363,7 +364,7 @@ export function App({ storage }: { storage: StorageProvider }) {
    * for — a value shared across projects has nowhere else to be created. */
   function newBinding() {
     const current = controller.getSnapshot();
-    if (!current.settings) { warn('Inställningarna är inte inlästa ännu. Försök igen om ett ögonblick.'); return; }
+    if (!current.settings) { warn(t.refusal.settingsNotReady); return; }
     const time = new Date().toISOString();
     const project = current.session.project;
     setBindingDialog({ binding: { id: crypto.randomUUID(), name: '', category: 'secret',
@@ -380,12 +381,12 @@ export function App({ storage }: { storage: StorageProvider }) {
     if (previous && previous.name !== binding.name) {
       const { occurrences } = await storage.renameBinding(binding.id, binding.name);
       await controller.reloadTemplates();
-      if (occurrences) setNotice(`${previous.name} heter nu ${binding.name}. ${occurrences} platshållare skrevs om.`);
+      if (occurrences) setNotice(t.binding.renamed(previous.name, binding.name, occurrences));
     }
     await storage.saveBinding({ ...binding, updatedAt: new Date().toISOString() }); setBindings(await storage.listBindings());
     if (selection) {
       const source = controller.getSnapshot().session.text;
-      if (source.slice(selection.start, selection.end) !== selection.text) throw new Error('Mallen har ändrats. Bindingen är sparad; markera rätt text igen.');
+      if (source.slice(selection.start, selection.end) !== selection.text) throw new Error(t.binding.templateChanged);
       const token = `{{${binding.name}}}`;
       const text = all ? source.split(/(\{\{[A-Z][A-Z0-9_]*\}\})/g).map((part, index) => index % 2 ? part : part.split(selection.text).join(token)).join('')
         : source.slice(0, selection.start) + token + source.slice(selection.end);
@@ -401,9 +402,9 @@ export function App({ storage }: { storage: StorageProvider }) {
       const locations = versions.filter(v => v.bindingUsage.some(u => u.bindingName === binding.name));
       const value = resolveValue(binding, options.profileId);
       const here = template.split(`{{${binding.name}}}`).length - 1;
-      const answer = await confirm({ title: `Radera ${binding.name}?`, danger: true, confirmLabel: 'Radera bindingen',
+      const answer = await confirm({ title: t.binding.deleteTitle(binding.name), danger: true, confirmLabel: t.binding.deleteConfirm,
         body: <><p>Bindingen används i {locations.length} sparade versioner av det här projektet{here ? `, och ${here} gånger i den öppna filen` : ''}.</p>
-          <p>{value ? 'Det privata värdet försvinner ur valvet.' : 'Bindingen har inget privat värde.'} Sparade versioner behåller sina platshållare.</p></>,
+          <p>{value ? t.binding.valueGone : t.binding.noValue} Sparade versioner behåller sina platshållare.</p></>,
         // Deleting used to leave {{NAME}} behind with nothing to resolve it, which blocks copying
         // until the user tracks down every one by hand.
         option: value && here ? { label: `Skriv tillbaka det privata värdet på ${here === 1 ? 'platsen' : `de ${here} platserna`} i den här filen`, defaultChecked: true } : undefined });
@@ -412,7 +413,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       const before = template;
       await storage.deleteBinding(binding.id); setBindings(await storage.listBindings());
       await controller.flush();
-      offerUndo({ label: `${binding.name} är raderad.`, restore: async () => {
+      offerUndo({ label: t.binding.deleted(binding.name), restore: async () => {
         await storage.importAll({ bindings: [binding] }, 'merge');
         setBindings(await storage.listBindings());
         // The value was written back into the template as part of the same action, so undoing one
@@ -423,9 +424,9 @@ export function App({ storage }: { storage: StorageProvider }) {
     });
   }
   async function applyVersion(version: Version, save = false) {
-    if (!await confirm({ title: `Använd v${version.number}?`, confirmLabel: 'Ersätt utkastet',
-      body: <><p>Det nuvarande arbetsutkastet ersätts av innehållet i v{version.number}.</p><p>Sparade versioner påverkas inte och går att gå tillbaka till.</p></> })) return;
-    await run(async () => { await controller.applyVersion(version); if (save) await controller.saveVersion(`Återgång till v${version.number}`); changeMode('template'); });
+    if (!await confirm({ title: `Använd v${version.number}?`, confirmLabel: t.version.replaceDraft,
+      body: <><p>Det nuvarande arbetsutkastet ersätts av innehållet i v{version.number}.</p><p>{t.version.replaceDraftKept}</p></> })) return;
+    await run(async () => { await controller.applyVersion(version); if (save) await controller.saveVersion(t.version.restoredTo(version.number)); changeMode('template'); });
   }
   /** Editor preferences live in settings, not in component state: they should survive a reload and
    * a project switch, which is the whole point of changing them. */
@@ -433,7 +434,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   async function changeEditor(patch: Partial<Settings>) {
     if (!settings) return;
     try { await storage.saveSettings({ ...settings, ...patch }); await controller.reloadSettings(); }
-    catch { warn('Inställningen gäller inte — den kunde inte sparas.'); throw new Error('save failed'); }
+    catch { warn(t.refusal.settingNotSaved); throw new Error('save failed'); }
   }
   /** Only the AI copy gets the instruction block, and only when something was actually substituted:
    * the text says private values have been replaced with placeholders, so putting it above code
@@ -448,21 +449,21 @@ export function App({ storage }: { storage: StorageProvider }) {
    * to an AI, so it must not be a way around the audit. */
   function downloadCopy(which: 'local' | 'ai') {
     const result = auditForCopy(template, bindings, { ...options, mode: which });
-    if (!result.canCopy) { warn('Nedladdning blockerad. Åtgärda problemen i panelen — de säger vad som saknas.'); return; }
+    if (!result.canCopy) { warn(t.refusal.downloadBlocked); return; }
     const name = session.files.find(f => f.id === session.activeFileId)?.name ?? 'kod.txt';
     download(`${which}-${name}`, withPrompt(result.text, which, result.used.length), 'text/plain');
     setCopyMode(null);
-    setNotice(which === 'local' ? 'Filen är nedladdad · den innehåller riktiga värden.' : 'Filen är nedladdad.');
+    setNotice(which === 'local' ? t.copy.downloadedLocal : t.copy.downloaded);
   }
   async function writeClipboard(text: string, which: 'local' | 'ai') {
     try {
       await navigator.clipboard.writeText(text); setCopyMode(null);
-      setNotice(which === 'local' ? 'LOCAL kopierad · riktiga värden i urklippet' : 'AI-kod kopierad');
+      setNotice(which === 'local' ? t.copy.copiedLocal : t.copy.copiedAi);
       const seconds = settings?.clipboardAutoClearSeconds ?? 0;
       // Only the local copy carries real values, so only it is worth clearing.
       if (which === 'local' && seconds > 0) { pendingClear.current = text; setCountdown(seconds); }
     }
-    catch { warn('Webbläsaren nekade urklippsåtkomst. Kontrollera sidans behörighet.'); }
+    catch { warn(t.refusal.clipboardDenied); }
   }
   useEffect(() => {
     if (countdown === null) return;
@@ -470,18 +471,18 @@ export function App({ storage }: { storage: StorageProvider }) {
     const text = pendingClear.current;
     pendingClear.current = null; setCountdown(null);
     if (text) void clearClipboard(text).then(outcome => setNotice(
-      outcome === 'cleared' ? 'Urklippet är rensat.'
-        : outcome === 'replaced-by-other' ? 'Urklippet innehåller något annat nu och lämnades orört.'
-          : 'Urklippet kunde inte rensas. Kopiera något ofarligt för att skriva över det.'));
+      outcome === 'cleared' ? t.copy.clipboardCleared
+        : outcome === 'replaced-by-other' ? t.copy.clipboardReplaced
+          : t.copy.clipboardStuck));
   }, [countdown]);
   async function copy(which: 'local' | 'ai') {
-    if (!workspaceVisible) { warn('Öppna en fil först. Det finns ingen kod att kopiera härifrån.'); return; }
-    if (!template.trim()) { warn('Filen är tom. Klistra in kod först.'); return; }
-    if (busyRef.current) { warn('Något sparas just nu. Försök igen om ett ögonblick.'); return; }
+    if (!workspaceVisible) { warn(t.refusal.noFile); return; }
+    if (!template.trim()) { warn(t.refusal.emptyFile); return; }
+    if (busyRef.current) { warn(t.refusal.busy); return; }
     // Re-audited here rather than reusing the memoised value: the gate must have run on the text
     // being copied, not on whatever it last saw.
     const result = auditForCopy(template, bindings, { ...options, mode: which });
-    if (!result.canCopy) { warn('Kopiering blockerad. Åtgärda problemen i panelen — de säger vad som saknas.'); return; }
+    if (!result.canCopy) { warn(t.refusal.copyBlocked); return; }
     if (which === 'ai' || result.secretRanges.length) { setReviewed(false); setCopyMode(which); return; }
     await writeClipboard(withPrompt(result.text, which, result.used.length), which);
   }
@@ -491,12 +492,12 @@ export function App({ storage }: { storage: StorageProvider }) {
   async function copySelection() {
     if (!selected || busyRef.current) return;
     const result = auditSelection(template, bindings, { ...options, mode: 'ai' }, selected);
-    if (!result.canCopy) { warn(`Markeringen kan inte kopieras: ${result.blocking[0].message}`); return; }
+    if (!result.canCopy) { warn(t.refusal.selectionBlocked(result.blocking[0].message)); return; }
     try {
       await navigator.clipboard.writeText(withPrompt(result.text, 'ai', result.used.length));
-      setNotice(`Markeringen kopierad · ${result.used.length} ${result.used.length === 1 ? 'värde' : 'värden'} utbytta.`);
+      setNotice(t.copy.selectionCopied(result.used.length));
     }
-    catch { warn('Webbläsaren nekade urklippsåtkomst. Kontrollera sidans behörighet.'); }
+    catch { warn(t.refusal.clipboardDenied); }
   }
   /** Recorded as seen when it is shown, not when it is closed. It has been seen either way, and
    * writing on close races a reload made moments afterwards — the introduction would come back for
@@ -506,7 +507,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     setIntro(true);
     void storage.saveSettings({ ...settings, introSeen: true }).then(() => controller.reloadSettings()).catch(() => {});
   }, [settings, storage, controller]);
-  function openDrawer() { setDrawer(true); void controller.refreshProjects().catch(() => setError('Projektlistan kunde inte läsas. Din kod finns kvar.')); }
+  function openDrawer() { setDrawer(true); void controller.refreshProjects().catch(() => setError(t.refusal.projectListFailed)); }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (document.querySelector('dialog[open]')) return;
@@ -520,28 +521,28 @@ export function App({ storage }: { storage: StorageProvider }) {
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   });
 
-  return <div className="app-shell code-first"><a className="skip-link" href="#huvudinnehall">Hoppa till innehållet</a><div className="main-shell">
+  return <div className="app-shell code-first"><a className="skip-link" href="#huvudinnehall">{t.nav.skip}</a><div className="main-shell">
     <header className="topbar"><a className="brand" href="#/" onClick={e => { e.preventDefault(); void navigate('#/'); }}><span className="brand-icon">{'</>'}</span><span>AI Code Vault</span></a>
-      <nav className="top-navigation" aria-label="Huvudnavigation"><button disabled={busy} onClick={() => void navigate('#/')}>＋ Ny kod</button><button disabled={busy} onClick={openDrawer}>Mina projekt <kbd>Ctrl P</kbd></button><button onClick={() => setShowShortcuts(true)} aria-label="Visa kortkommandon">Genvägar</button><button disabled={busy} onClick={() => void navigate('#/bindings')}>Bindings</button><button onClick={() => void navigate('#/security')}>Säkerhet</button><button onClick={() => void navigate('#/settings')}>Inställningar</button></nav>
+      <nav className="top-navigation" aria-label={t.nav.main}><button disabled={busy} onClick={() => void navigate('#/')}>{t.nav.newCode}</button><button disabled={busy} onClick={openDrawer}>{t.nav.projects} <kbd>Ctrl P</kbd></button><button onClick={() => setShowShortcuts(true)} aria-label={t.nav.showShortcuts}>{t.nav.shortcuts}</button><button disabled={busy} onClick={() => void navigate('#/bindings')}>{t.nav.bindings}</button><button onClick={() => void navigate('#/security')}>{t.nav.security}</button><button onClick={() => void navigate('#/settings')}>{t.nav.settings}</button></nav>
       <ProfilePicker profiles={profiles} activeId={settings?.activeProfileId ?? null} onManage={() => setManagingProfiles(true)}
         onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} /><label className="theme-choice">Tema<select aria-label="Tema" value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">System</option><option value="light">Ljust</option><option value="dark">Mörkt</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
-    {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>Försök spara igen</button></div>}
-    {countdown !== null && <div className="clipboard-countdown" role="status">Urklippet rensas om {countdown} s<button onClick={() => { pendingClear.current = null; setCountdown(null); setNotice('Urklippet lämnas kvar.'); }}>Avbryt</button></div>}
-    {notice && <div className={`inline-notice ${noticeTone}`} role="status">{notice}<button aria-label="Stäng meddelande" onClick={() => setNotice('')}>×</button></div>}
-    {updateReady && <div className="notice">Uppdatering tillgänglig <button onClick={() => void run(async () => { await controller.flush(); navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true }); updateReady.waiting?.postMessage({ type: 'ACTIVATE' }); })}>Ladda om</button></div>}
+    {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>{t.dialog.retrySave}</button></div>}
+    {countdown !== null && <div className="clipboard-countdown" role="status">{t.copy.clearingIn(countdown)}<button onClick={() => { pendingClear.current = null; setCountdown(null); setNotice(t.copy.clipboardKept); }}>Avbryt</button></div>}
+    {notice && <div className={`inline-notice ${noticeTone}`} role="status">{notice}<button aria-label={t.dialog.closeNotice} onClick={() => setNotice('')}>×</button></div>}
+    {updateReady && <div className="notice">{t.app.updateAvailable} <button onClick={() => void run(async () => { await controller.flush(); navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true }); updateReady.waiting?.postMessage({ type: 'ACTIVATE' }); })}>Ladda om</button></div>}
     {/* Report U9. inert on the whole main froze the page during every write, including the parts a
         write cannot corrupt: reading a document, a filter, the version list. It is now on the
         editing surface alone, and the busy state is visible in the header. Anything the rest can
         start still goes through run(), which refuses politely while a write is in flight. */}
     <main id="huvudinnehall" aria-busy={busy}>
-      <div className="workspace" hidden={!workspaceVisible} inert={busy}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : 'BÖRJA DIREKT'}</span>
+      <div className="workspace" hidden={!workspaceVisible} inert={busy}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : t.app.startNow}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
-        <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => { languageChosen.current.add(session.activeFileId); controller.changeLanguage(e.target.value as LanguageId); }}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? `${session.files.length} ${session.files.length === 1 ? 'fil' : 'filer'}` : 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
-      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
+        <div className="file-info"><label>{t.workspace.language} <select aria-label={t.workspace.language} value={language} onChange={e => { languageChosen.current.add(session.activeFileId); controller.changeLanguage(e.target.value as LanguageId); }}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? `${session.files.length} ${session.files.length === 1 ? 'fil' : 'filer'}` : t.workspace.newProjectHint}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
+      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>{t.workspace.backToCurrent}</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
         <div className="work-grid" onDragOver={e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDropping(true); } }}
           onDragLeave={e => { if (e.currentTarget === e.target) setDropping(false); }}
           onDrop={e => { e.preventDefault(); setDropping(false); void openFiles(e.dataTransfer.files); }}>
-          {dropping && <div className="drop-hint" aria-hidden="true">Släpp filen för att läsa in den</div>}<section className={`editor-panel mode-${mode}`}>
+          {dropping && <div className="drop-hint" aria-hidden="true">{t.workspace.dropHint}</div>}<section className={`editor-panel mode-${mode}`}>
           <FileTabs files={session.files} activeId={session.activeFileId} disabled={busy}
             onSelect={id => { controller.selectFile(id); changeMode('template'); }}
             onAdd={() => void run(async () => { await controller.addFile(); changeMode('template'); })}
@@ -550,28 +551,28 @@ export function App({ storage }: { storage: StorageProvider }) {
               const file = session.files.find(f => f.id === id);
               if (!file) return;
               const hasText = (session.texts[id] ?? '').trim().length > 0;
-              if (hasText && !await confirm({ title: `Ta bort ${file.name}?`, danger: true, confirmLabel: 'Ta bort filen',
-                body: <><p>Filens innehåll försvinner ur arbetsutkastet.</p><p>Sparade versioner behåller sin kopia, så den går att få tillbaka därifrån.</p></> })) return;
+              if (hasText && !await confirm({ title: t.project.removeFileTitle(file.name), danger: true, confirmLabel: t.project.removeFileConfirm,
+                body: <><p>{t.project.removeFileBody}</p><p>{t.project.removeFileKept}</p></> })) return;
               await controller.removeFile(id);
             })} />
           <EditorToolbar mode={mode} onMode={changeMode} canIngest={Boolean(project)} onIngest={() => setIngesting(true)}
             hasText={Boolean(template.trim())} localIssues={local.issues} aiIssues={ai.issues} blockedCount={issues.length}
             canCopySelection={mode === 'template' && Boolean(selected)} onCopy={which => void copy(which)}
             onCopySelection={() => void copySelection()} />
-          <div className="view-banner" key={mode}><strong>{mode === 'template' ? '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN' : mode === 'local' ? '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN' : '◇ AI — SANERAD'}</strong><span>{mode === 'template' ? 'Redigerbar källa' : 'Skrivskyddad projektion'}</span></div>
-          {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj värden' : 'Visa värden'}</button></div>}
+          <div className="view-banner" key={mode}><strong>{mode === 'template' ? t.workspace.bannerTemplate : mode === 'local' ? t.workspace.bannerLocal : t.workspace.bannerAi}</strong><span>{mode === 'template' ? t.workspace.editableSource : t.workspace.readOnlyProjection}</span></div>
+          {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>{t.workspace.editAsTemplate}</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? t.workspace.hideValues : t.workspace.showValues}</button></div>}
           <div className="editor-body" id="kodvy" role="tabpanel" aria-labelledby={`vy-${mode}`}>{!template && mode === 'template' && <div className="paste-prompt"><strong>Klistra in din kod här</strong><span>Projektet skapas automatiskt och sparas lokalt.</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>eller prova med exempelkod</button>}</div>}
             <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { noteLanguage(text); controller.changeText(text); }} onBinding={createBinding}
               onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }}
               fontSize={fontSize} wordWrap={wrap} onSelectionChange={setSelected} onFocused={() => setFocusName('')} />
           </div><div className="editor-footer"><span>{visible.split('\n').length} rader · {used.length} bindings</span>
-            <div className="editor-tools" role="group" aria-label="Editorinställningar">
-              <button aria-label="Mindre text" title="Mindre text" disabled={fontSize <= 10} onClick={() => void changeEditor({ editorFontSize: fontSize - 1 }).catch(() => {})}>A−</button>
+            <div className="editor-tools" role="group" aria-label={t.workspace.editorSettings}>
+              <button aria-label={t.workspace.smallerText} title={t.workspace.smallerText} disabled={fontSize <= 10} onClick={() => void changeEditor({ editorFontSize: fontSize - 1 }).catch(() => {})}>A−</button>
               <span aria-live="polite">{fontSize} px</span>
-              <button aria-label="Större text" title="Större text" disabled={fontSize >= 24} onClick={() => void changeEditor({ editorFontSize: fontSize + 1 }).catch(() => {})}>A+</button>
-              <button aria-pressed={wrap} onClick={() => void changeEditor({ editorWordWrap: !wrap }).catch(() => {})}>Radbrytning {wrap ? 'på' : 'av'}</button>
+              <button aria-label={t.workspace.largerText} title={t.workspace.largerText} disabled={fontSize >= 24} onClick={() => void changeEditor({ editorFontSize: fontSize + 1 }).catch(() => {})}>A+</button>
+              <button aria-pressed={wrap} onClick={() => void changeEditor({ editorWordWrap: !wrap }).catch(() => {})}>{t.workspace.wordWrap(wrap)}</button>
             </div>
-            <span>{mode === 'local' ? 'Använd endast i din lokala kodmiljö' : 'Utkast sparas automatiskt · ingen kod körs'}</span></div>
+            <span>{mode === 'local' ? t.workspace.localFooter : t.workspace.draftFooter}</span></div>
         </section><aside className="binding-panel"><BindingPanel rows={toRows(activeBindings, used, options.profileId)} canCreate={Boolean(project)}
             onFocus={b => { setMode('template'); setFocusName(b.name); }}
             onEdit={b => setBindingDialog({ binding: b })}
@@ -585,14 +586,14 @@ export function App({ storage }: { storage: StorageProvider }) {
             onCompare={v => setViewing({ version: v, compareTo: versions[versions.indexOf(v) + 1] ?? null })}
             onRestore={(v, asNew) => void applyVersion(v, asNew)}
             onDelete={v => void removeVersion(v)} />
-          <div className="m1-note"><b>Vad som ännu inte finns</b><p>Kod som kommer tillbaka från en AI matchas inte om mot dina värden automatiskt. Granskningsreglerna fångar det som liknar hemligheter, inte allt som är känsligt hos dig.</p></div>
+          <div className="m1-note"><b>{t.app.notYetTitle}</b><p>{t.app.notYetBody}</p></div>
         </aside></div>
       </div>
       <div className="overview-scroll" ref={overview} hidden={route !== '#/projects'} onScroll={e => { if (route === '#/projects') overviewScroll.current = e.currentTarget.scrollTop; }}><section className="dashboard">
-        <div className="dashboard-heading"><div><span className="eyebrow">DITT LOKALA VALV</span><h1>Alla projekt</h1><p>Ditt pågående arbete ligger kvar medan du letar.</p></div><div className="heading-actions">{currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}<button className="primary" onClick={() => void navigate('#/')}>＋ Ny kod</button></div></div>
+        <div className="dashboard-heading"><div><span className="eyebrow">DITT LOKALA VALV</span><h1>Alla projekt</h1><p>Ditt pågående arbete ligger kvar medan du letar.</p></div><div className="heading-actions">{currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>{t.workspace.backToCurrent}</button>}<button className="primary" onClick={() => void navigate('#/')}>{t.nav.newCode}</button></div></div>
         <ProjectFilters query={query} onQuery={setQuery} sort={sort} onSort={setSort} language={languageFilter} onLanguage={setLanguageFilter} status={statusFilter} onStatus={setStatusFilter} count={filtered.length} />
         <div className="project-cards">{filtered.map(p => <ProjectCard key={p.id} project={p} facts={facts[p.id]} current={p.id === currentId} open={() => void navigate(`#/project/${p.id}`)} />)}</div>
-        {!filtered.length && <p className="empty-project-list">{projects.length ? 'Inga projekt matchar sökningen.' : 'Inga projekt ännu. Välj Ny kod och klistra in för att börja.'}</p>}
+        {!filtered.length && <p className="empty-project-list">{projects.length ? t.project.noMatch : t.project.empty}</p>}
       </section></div>
       <div className="overview-scroll" hidden={route !== '#/bindings'}><BindingsPage bindings={bindings} uses={bindingUses} profileId={options.profileId}
         onEdit={b => setBindingDialog({ binding: b })} onDelete={b => void removeBinding(b)} onCreate={newBinding} /></div>
@@ -623,27 +624,27 @@ export function App({ storage }: { storage: StorageProvider }) {
       }} />}
     {viewing && <Modal title={viewing.compareTo ? `v${viewing.compareTo.number} → v${viewing.version.number}` : `v${viewing.version.number}${viewing.version.label ? ` · ${viewing.version.label}` : ''}`} close={() => setViewing(null)}>
       <div className="version-view">
-        <Suspense fallback={<p className="muted">Laddar jämförelsen…</p>}><DiffEditor language={language} theme={resolvedTheme}
+        <Suspense fallback={<p className="muted">{t.version.loadingDiff}</p>}><DiffEditor language={language} theme={resolvedTheme}
           original={viewing.compareTo?.templates[session.activeFileId] ?? (viewing.compareTo ? '' : viewing.version.templates[session.activeFileId] ?? '')}
           modified={viewing.version.templates[session.activeFileId] ?? ''} /></Suspense>
       </div>
       <p className="notice">Skrivskyddad mall som den såg ut när versionen sparades. Ditt utkast är orört{viewing.version.files && viewing.version.files.length > 1 ? `. Visar ${session.files.find(f => f.id === session.activeFileId)?.name} av ${viewing.version.files.length} filer` : ''}.</p>
-      <div className="dialog-actions"><button onClick={() => setViewing(null)}>Stäng</button><button className="primary" onClick={() => { const v = viewing.version; setViewing(null); void applyVersion(v); }}>Återställ den här versionen</button></div>
+      <div className="dialog-actions"><button onClick={() => setViewing(null)}>Stäng</button><button className="primary" onClick={() => { const v = viewing.version; setViewing(null); void applyVersion(v); }}>{t.version.restoreThis}</button></div>
     </Modal>}
     {details && project && <ProjectDetails project={project} close={() => setDetails(false)} save={async patch => {
       await storage.saveProject({ ...project, ...patch, updatedAt: new Date().toISOString() });
       await controller.reloadProject();
-      setNotice('Projektuppgifterna är sparade.');
+      setNotice(t.project.detailsSaved);
     }} />}
-    {showShortcuts && <Modal title="Kortkommandon" close={() => setShowShortcuts(false)}>
+    {showShortcuts && <Modal title={t.app.shortcutsTitle} close={() => setShowShortcuts(false)}>
       <table className="shortcut-table"><tbody>{shortcuts.map(s => <tr key={s.id}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}</tbody></table>
-      <h3>I editorn</h3>
+      <h3>{t.app.inTheEditor}</h3>
       <table className="shortcut-table"><tbody>{editorShortcuts.map(s => <tr key={s.label}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}</tbody></table>
       <div className="dialog-actions"><button className="primary" onClick={() => setShowShortcuts(false)}>Stäng</button></div>
     </Modal>}
     {ingesting && <IngestDialog bindings={bindings} close={() => setIngesting(false)} apply={next => {
       controller.changeText(next); setIngesting(false); changeMode('template');
-      setNotice('Mallen är ersatt. Granska innan du sparar en version.');
+      setNotice(t.version.templateReplaced);
     }} />}
     {managingProfiles && <ProfileManager profiles={profiles} close={() => setManagingProfiles(false)}
       onCreate={async name => { const time = new Date().toISOString();
@@ -654,8 +655,8 @@ export function App({ storage }: { storage: StorageProvider }) {
         setProfiles(await storage.listProfiles()); }}
       onDelete={async profile => {
         const withValues = bindings.filter(b => profile.id in b.values).length;
-        if (!await confirm({ title: `Ta bort ${profile.name}?`, danger: true, confirmLabel: 'Ta bort profilen',
-          body: <><p>{withValues} bindings har ett eget värde för den här profilen. De värdena raderas.</p><p>Standardvärdena påverkas inte.</p></> })) return;
+        if (!await confirm({ title: t.project.removeProfileTitle(profile.name), danger: true, confirmLabel: t.project.removeProfileConfirm,
+          body: <><p>{withValues} bindings har ett eget värde för den här profilen. De värdena raderas.</p><p>{t.binding.defaultsUnaffected}</p></> })) return;
         await storage.deleteProfile(profile.id);
         setProfiles(await storage.listProfiles()); setBindings(await storage.listBindings()); await controller.reloadSettings();
       }} />}
@@ -663,6 +664,6 @@ export function App({ storage }: { storage: StorageProvider }) {
     {confirmDialog}
     {undoBar}
     {intro && <Intro close={() => setIntro(false)} />}
-    {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
+    {error && <Modal title={t.dialog.attention} close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
   </div>;
 }
