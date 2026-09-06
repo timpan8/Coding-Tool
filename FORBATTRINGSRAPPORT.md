@@ -324,8 +324,13 @@ kommer) är alla oåterkalleliga. Ett "Ångra"-meddelande som ligger kvar i 10 s
 bekräftelsedialog och trevligare att använda.
 
 **U18 · Editorn saknar vanliga reglage.** Radbrytning, teckenstorlek, minikarta och radnummer är hårdkodade
-(`CodeEditor.tsx:42-47`). Ersätt/sök-och-ersätt saknas eftersom bara `findController` importeras
-(`CodeEditor.tsx:4`) — Ctrl+H gör alltså ingenting.
+(`CodeEditor.tsx:42-47`).
+
+> **Rättelse (verifierat i webbläsare).** Rapporten påstod först att Ctrl+H inte gör någonting eftersom
+> bara `findController` importeras. Det stämmer inte: `findController.js` registrerar även
+> `StartFindReplaceAction`, och Ctrl+H öppnar mycket riktigt sökrutan med ersättningsfältet utfällt.
+> Bristen var att ingenting pekade på att funktionen fanns. Åtgärdat genom att kortkommandolistan
+> nu har ett eget avsnitt för editorns egna kommandon.
 
 **U19 · Ingen delvis kopiering.** Man kan inte markera ett stycke och kopiera bara det i sanerad form. Det är ett vanligt behov
 när man frågar en AI om en enskild funktion.

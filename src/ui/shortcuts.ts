@@ -19,6 +19,17 @@ export const shortcuts: Shortcut[] = [
   { id: 'help', keys: ['Ctrl+/', '?'], label: 'Visa genvägar' },
 ];
 
+/** The editor's own bindings. Listed rather than matched: Monaco registers these itself, and the
+ * app must not intercept them. They were undiscoverable, which is what made the report record
+ * Ctrl+H as missing — the widget it opens is there, nothing pointed at it. The plain editor on a
+ * narrow screen has neither, so the overview says which are the editor's. */
+export const editorShortcuts: { keys: string[]; label: string; note?: string }[] = [
+  { keys: ['Ctrl+B'], label: 'Skapa binding', note: 'Markera ett värde i editorn först.' },
+  { keys: ['Ctrl+F'], label: 'Sök i koden', note: 'Editorns egen sökruta, inte webbläsarens.' },
+  { keys: ['Ctrl+H'], label: 'Sök och ersätt' },
+  { keys: ['{{'], label: 'Föreslå platshållarnamn', note: 'Skriv två klammer så listas dina bindings.' },
+];
+
 /** Matches a keyboard event against a shortcut. Kept away from the components so the bindings can
  * be read, listed and tested in one place. */
 export function match(event: KeyboardEvent, id: Shortcut['id']): boolean {

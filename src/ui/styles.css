@@ -634,6 +634,32 @@ main {
   font-size: 0.65rem;
   color: var(--text-subtle);
 }
+.editor-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.editor-tools button {
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  line-height: 1.6;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.editor-tools button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.editor-tools button[aria-pressed="true"] {
+  background: var(--accent-surface);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.editor-tools button:disabled {
+  opacity: 0.45;
+}
 .binding-chip {
   background: var(--accent-surface-strong);
   color: var(--accent-text) !important;

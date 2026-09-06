@@ -550,6 +550,37 @@ test('recognises the language of pasted code and can write the result to a file'
   expect(written).not.toContain('Hunter2!');
 });
 
+// Report U18. Font size and wrap were hardcoded; find and replace worked but nothing said so.
+test('keeps editor preferences and points at the editor commands', async ({ page }) => {
+  await type(page, '$a = "one"\n');
+  const tools = page.getByRole('group', { name: 'Editorinställningar' });
+  await expect(tools).toContainText('14 px');
+  await tools.getByRole('button', { name: 'Större text' }).click();
+  await expect(tools).toContainText('15 px');
+  // The editor itself, not just the label: the option has to reach Monaco.
+  await expect(page.locator('.monaco-editor .view-line').first()).toHaveCSS('font-size', '15px');
+  const wrap = tools.getByRole('button', { name: /Radbrytning/ });
+  await expect(wrap).toHaveAttribute('aria-pressed', 'true');
+  await wrap.click();
+  await expect(wrap).toHaveAttribute('aria-pressed', 'false');
+
+  // Settings, not component state: they survive a reload.
+  await page.reload();
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await expect(page.getByRole('group', { name: 'Editorinställningar' })).toContainText('15 px');
+  await expect(page.locator('.monaco-editor .view-line').first()).toHaveCSS('font-size', '15px');
+  await expect(page.getByRole('group', { name: 'Editorinställningar' }).getByRole('button', { name: /Radbrytning/ }))
+    .toHaveAttribute('aria-pressed', 'false');
+
+  // Ctrl+H does work; it was undiscoverable. The overview now names it.
+  await page.keyboard.press('Control+/');
+  await expect(page.locator('dialog[open]')).toContainText('Sök och ersätt');
+  await page.getByRole('button', { name: 'Stäng', exact: true }).click();
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+h');
+  await expect(page.locator('.monaco-editor .find-widget')).toHaveClass(/replaceToggled/);
+});
+
 // A file is as easy to paste into a chat as the clipboard is, so it goes through the same gate.
 test('holds the download behind the same review as the clipboard', async ({ page }) => {
   await type(page, '$db = "AKIAIOSFODNN7EXAMPLE"\n');

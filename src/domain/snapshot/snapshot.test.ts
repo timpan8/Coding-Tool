@@ -17,6 +17,8 @@ const settings = {
   maskSecretsInUi: true,
   theme: 'system' as const,
   aiPromptText: 'Behåll platshållarna.',
+  editorFontSize: 14,
+  editorWordWrap: true,
 };
 
 function workspace(): WorkspaceSnapshot {

@@ -111,6 +111,8 @@ export const settingsSchema = z.object({
   maskSecretsInUi: z.boolean(),
   theme: z.enum(['system', 'light', 'dark']).default('system'),
   aiPromptText: z.string().default(''),
+  editorFontSize: z.number().int().min(10).max(24).default(14),
+  editorWordWrap: z.boolean().default(true),
 });
 
 /** Everything needed to rebuild the vault. */

@@ -8,7 +8,7 @@ import type { EditorProps } from './props';
  * selection handles and its own scrolling fights the page's. It supports the parts of the interface
  * that carry meaning — text, read-only, selection for Ctrl+B — and quietly ignores decorations,
  * hovers and completion, which have nowhere to go here. */
-export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, focusLine, onLine }: EditorProps) {
+export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, focusLine, onLine, fontSize, wordWrap }: EditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -42,6 +42,8 @@ export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, f
       ref={ref}
       className="plain-editor"
       aria-label="Kodredigerare"
+      style={{ fontSize: `${fontSize ?? 14}px`, lineHeight: 1.65, whiteSpace: wordWrap === false ? 'pre' : 'pre-wrap' }}
+      wrap={wordWrap === false ? 'off' : 'soft'}
       spellCheck={false}
       autoCapitalize="off"
       autoCorrect="off"

@@ -28,4 +28,6 @@ export interface EditorProps {
   onLine?: (line: number) => void;
   theme?: ResolvedTheme;
   substitutions?: { start: number; end: number; name: string }[];
+  fontSize?: number;
+  wordWrap?: boolean;
 }

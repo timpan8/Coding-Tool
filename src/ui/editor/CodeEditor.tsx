@@ -41,8 +41,9 @@ export function CodeEditor(props: EditorProps) {
     activeKey.current = callbacks.current.documentKey ?? 'default';
     documents.current.set(activeKey.current, { model, view: null });
     const instance = monaco.editor.create(host.current!, { model, theme: themeName(callbacks.current.theme ?? 'light'), automaticLayout: true,
-      readOnly: callbacks.current.readOnly, minimap: { enabled: false }, fontSize: 14, lineHeight: 23,
-      scrollBeyondLastLine: false, wordWrap: 'on', padding: { top: 16 }, contextmenu: true,
+      readOnly: callbacks.current.readOnly, minimap: { enabled: false }, fontSize: callbacks.current.fontSize ?? 14,
+      lineHeight: Math.round((callbacks.current.fontSize ?? 14) * 1.65),
+      scrollBeyondLastLine: false, wordWrap: callbacks.current.wordWrap === false ? 'off' : 'on', padding: { top: 16 }, contextmenu: true,
       links: false, hover: { enabled: 'on', delay: 250 }, unicodeHighlight: { ambiguousCharacters: false },
       quickSuggestions: false, parameterHints: { enabled: false }, renderValidationDecorations: 'off',
       ariaLabel: 'Kodredigerare', accessibilitySupport: 'auto' });
@@ -160,6 +161,12 @@ export function CodeEditor(props: EditorProps) {
     }
     if (model.getLanguageId() !== props.language) monaco.editor.setModelLanguage(model, props.language);
   }, [props.value, props.language, props.readOnly, props.documentKey, props.active]);
+  // Its own effect: the model-sync effect below does not depend on these, so folding them in there
+  // would have meant a preference only took hold the next time the text or the file changed.
+  useEffect(() => {
+    editor.current?.updateOptions({ fontSize: props.fontSize ?? 14, lineHeight: Math.round((props.fontSize ?? 14) * 1.65),
+      wordWrap: props.wordWrap === false ? 'off' : 'on' });
+  }, [props.fontSize, props.wordWrap]);
   useEffect(() => { monaco.editor.setTheme(themeName(props.theme ?? 'light')); }, [props.theme]);
   useEffect(() => { decorateRef.current?.(); }, [props.substitutions, props.value]);
   useEffect(() => { if (props.active) { editor.current?.layout(); if (props.autoFocus) editor.current?.focus(); } }, [props.active, props.autoFocus]);

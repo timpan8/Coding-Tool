@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { Binding, LanguageId, Version } from '../types/models';
+import type { Binding, LanguageId, Settings, Version } from '../types/models';
 import { languages } from '../types/models';
 import type { StorageProvider } from '../storage/StorageProvider';
 import { resolveBinding, resolveValue, suggestBinding, defaults } from '../domain/bindings';
@@ -25,7 +25,7 @@ import { ProjectDetails } from './components/ProjectDetails';
 import { BindingPanel, toRows } from './components/BindingPanel';
 import { ProfileManager, ProfilePicker } from './components/ProfilePicker';
 import { IngestDialog } from './components/IngestDialog';
-import { match, shortcuts } from './shortcuts';
+import { editorShortcuts, match, shortcuts } from './shortcuts';
 import { detectLanguage, languageForFile } from '../domain/detect';
 // Also lazy: it pulls in the same editor bundle, and version history is not on the first screen.
 const DiffEditor = lazy(() => import('./editor/DiffEditor').then(m => ({ default: m.DiffEditor })));
@@ -164,6 +164,7 @@ export function App({ storage }: { storage: StorageProvider }) {
    * one of those, and the memory is per file because the language is. */
   const languageChosen = useRef(new Set<string>());
   const workspaceVisible = route === '#/' || route.startsWith('#/project/');
+  const fontSize = settings?.editorFontSize ?? 14, wrap = settings?.editorWordWrap ?? true;
 
   async function run(action: () => Promise<void>) {
     if (busyRef.current) return;
@@ -421,6 +422,14 @@ export function App({ storage }: { storage: StorageProvider }) {
       body: <><p>Det nuvarande arbetsutkastet ersätts av innehållet i v{version.number}.</p><p>Sparade versioner påverkas inte och går att gå tillbaka till.</p></> })) return;
     await run(async () => { await controller.applyVersion(version); if (save) await controller.saveVersion(`Återgång till v${version.number}`); changeMode('template'); });
   }
+  /** Editor preferences live in settings, not in component state: they should survive a reload and
+   * a project switch, which is the whole point of changing them. */
+  function changeEditor(patch: Partial<Settings>) {
+    if (!settings) return;
+    void storage.saveSettings({ ...settings, ...patch })
+      .then(() => controller.reloadSettings())
+      .catch(() => setNotice('Inställningen gäller inte — den kunde inte sparas.'));
+  }
   /** Only the AI copy gets the instruction block; the local copy goes into an editor. */
   function withPrompt(text: string, which: 'local' | 'ai') {
     if (which !== 'ai' || !settings?.includeAiPromptBlock || !settings.aiPromptText.trim()) return text;
@@ -515,8 +524,16 @@ export function App({ storage }: { storage: StorageProvider }) {
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj värden' : 'Visa värden'}</button></div>}
           <div className="editor-body" id="kodvy" role="tabpanel" aria-labelledby={`vy-${mode}`}>{!template && mode === 'template' && <div className="paste-prompt"><strong>Klistra in din kod här</strong><span>Projektet skapas automatiskt och sparas lokalt.</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>eller prova med exempelkod</button>}</div>}
             <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { noteLanguage(text); controller.changeText(text); }} onBinding={createBinding}
-              onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }} />
-          </div><div className="editor-footer"><span>{visible.split('\n').length} rader · {used.length} bindings</span><span>{mode === 'local' ? 'Använd endast i din lokala kodmiljö' : 'Utkast sparas automatiskt · ingen kod körs'}</span></div>
+              onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }}
+              fontSize={settings?.editorFontSize ?? 14} wordWrap={settings?.editorWordWrap ?? true} />
+          </div><div className="editor-footer"><span>{visible.split('\n').length} rader · {used.length} bindings</span>
+            <div className="editor-tools" role="group" aria-label="Editorinställningar">
+              <button aria-label="Mindre text" title="Mindre text" disabled={fontSize <= 10} onClick={() => changeEditor({ editorFontSize: fontSize - 1 })}>A−</button>
+              <span aria-live="polite">{fontSize} px</span>
+              <button aria-label="Större text" title="Större text" disabled={fontSize >= 24} onClick={() => changeEditor({ editorFontSize: fontSize + 1 })}>A+</button>
+              <button aria-pressed={wrap} onClick={() => changeEditor({ editorWordWrap: !wrap })}>Radbrytning {wrap ? 'på' : 'av'}</button>
+            </div>
+            <span>{mode === 'local' ? 'Använd endast i din lokala kodmiljö' : 'Utkast sparas automatiskt · ingen kod körs'}</span></div>
         </section><aside className="binding-panel"><BindingPanel rows={toRows(activeBindings, used, options.profileId)} canCreate={Boolean(project)}
             onFocus={b => { setMode('template'); setFocusName(b.name); }}
             onEdit={b => setBindingDialog({ binding: b })}
@@ -572,7 +589,9 @@ export function App({ storage }: { storage: StorageProvider }) {
       setNotice('Projektuppgifterna är sparade.');
     }} />}
     {showShortcuts && <Modal title="Kortkommandon" close={() => setShowShortcuts(false)}>
-      <table className="shortcut-table"><tbody>{shortcuts.map(s => <tr key={s.id}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}<tr><th scope="row">Skapa binding</th><td><kbd>Ctrl+B</kbd><small>Markera ett värde i editorn först.</small></td></tr></tbody></table>
+      <table className="shortcut-table"><tbody>{shortcuts.map(s => <tr key={s.id}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}</tbody></table>
+      <h3>I editorn</h3>
+      <table className="shortcut-table"><tbody>{editorShortcuts.map(s => <tr key={s.label}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}</tbody></table>
       <div className="dialog-actions"><button className="primary" onClick={() => setShowShortcuts(false)}>Stäng</button></div>
     </Modal>}
     {ingesting && <IngestDialog bindings={bindings} close={() => setIngesting(false)} apply={next => {
