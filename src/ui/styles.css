@@ -1056,8 +1056,11 @@ dialog p {
   .version-item > button:first-child {
     white-space: nowrap;
   }
+  /* This used to be display:none, which hid Visa, Jämför, Återställ and Radera on every width
+     below 1251px — the accordion opened onto nothing on every phone and tablet. .version-actions
+     already wraps, so dropping the indent is enough to fit them. */
   .version-item .text-button {
-    display: none;
+    margin-left: 0;
   }
   .editor-panel {
     height: calc(100vh - 290px);

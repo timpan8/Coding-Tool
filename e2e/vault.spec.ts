@@ -281,11 +281,25 @@ test('labels versions, compares them and deletes one', async ({ page }) => {
   await expect(page.locator('.version-history')).toContainText('andra');
 
   // Looking at a version must not touch the draft, which was the only way to see one before.
+  // A preview is one version, not a comparison: it used to render in the diff widget with the same
+  // text in both panes, so this asserts the content rather than the widget.
   await page.locator('.version-item').filter({ hasText: 'första' }).getByRole('button').first().click();
   await page.locator('.version-actions').getByRole('button', { name: 'Visa' }).click();
-  await expect(page.locator('.diff-editor')).toBeVisible();
+  await expect(page.locator('dialog[open] .version-view')).toContainText('$a = "one"');
+  await expect(page.locator('dialog[open] .version-view')).not.toContainText('$b');
+  await expect(page.locator('dialog[open] .diff-editor')).toHaveCount(0);
   await page.locator('dialog[open]').getByRole('button', { name: 'Stäng', exact: true }).click();
   await expect(page.locator('.editor-body')).toContainText('$b');
+
+  // Comparing is where the diff belongs, and each pane says which version it is.
+  await page.locator('.version-item').filter({ hasText: 'andra' }).getByRole('button').first().click();
+  await page.locator('.version-actions').getByRole('button', { name: 'Jämför med v1' }).click();
+  await expect(page.locator('dialog[open] .diff-editor')).toBeVisible();
+  await expect(page.locator('dialog[open] .version-panes')).toContainText('v1 · tidigare');
+  await expect(page.locator('dialog[open] .version-delta')).toContainText('ändrad');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Stäng', exact: true }).click();
+  // The row toggles, so collapse it again: the next section opens it itself.
+  await page.locator('.version-item').filter({ hasText: 'andra' }).getByRole('button').first().click();
 
   // A version the draft is built on cannot be deleted out from under it.
   await page.locator('.version-item').filter({ hasText: 'andra' }).getByRole('button').first().click();

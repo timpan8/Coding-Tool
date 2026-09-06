@@ -116,7 +116,24 @@ export const sv = {
     replaceDraftKept: 'Sparade versioner påverkas inte och går att gå tillbaka till.',
     restoredTo: (n: number) => `Återgång till v${n}`,
     restoreThis: 'Återställ den här versionen',
+    restoreNumbered: (n: number) => `Återställ v${n}`,
     loadingDiff: 'Laddar jämförelsen…',
+    /** The pane labels. Without them the only clue to which side is older is the arrow in the
+     * title, and reading a restore the wrong way round is exactly the mistake worth preventing. */
+    paneBefore: (n: number) => `v${n} · tidigare`,
+    paneAfter: (n: number) => `v${n} · den här`,
+    readOnlyView: (n: number) => `v${n} · skrivskyddad`,
+    changedLines: (n: number) => (n === 1 ? '1 ändrad rad' : `${n} ändrade rader`),
+    identical: 'Ingen skillnad i den här filen',
+    /** Said when the version predates the file the workspace happens to have open. The viewer shows
+     * a file the version actually contains instead of two empty panes. */
+    fileNotInVersion: (name: string, n: number) => `${name} fanns inte i v${n}.`,
+    showingFile: (name: string) => `Visar ${name}`,
+    fileMissingBefore: (n: number) => `Filen fanns inte i v${n} — allt räknas som tillagt.`,
+    ofFiles: (n: number) => `${n} filer i versionen`,
+    emptyInVersion: 'Filen var tom i den här versionen.',
+    pickFile: 'Fil i versionen',
+    readOnlyNote: 'Skrivskyddad mall som den såg ut när versionen sparades. Ditt utkast är orört.',
     templateReplaced: 'Mallen är ersatt. Granska innan du sparar en version.',
   },
   project: {

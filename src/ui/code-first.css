@@ -655,12 +655,67 @@
   gap: 10px;
   padding: 4px 10px 10px;
 }
+/* Height comes from the content, capped: a six-line diff used to sit in a fixed 480px box with
+   two thirds of it blank, and a long one still needs a ceiling to leave room for the actions. */
 .version-view {
-  height: min(60vh, 480px);
-  margin-bottom: 14px;
+  height: min(60vh, var(--version-view-height, 480px));
+  margin-bottom: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
+}
+.version-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.version-file-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0;
+}
+.version-file-pick select {
+  width: auto;
+  min-width: 140px;
+  padding: 6px 10px;
+}
+.version-file-name {
+  font-family: Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--text-strong);
+}
+.version-delta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+/* Which side is which. The arrow in the dialog title is the only other clue, and reading a
+   restore the wrong way round is the mistake worth spending two labels to prevent. */
+.version-panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin-bottom: 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.version-panes span:last-child {
+  padding-left: 12px;
+}
+.version-scope {
+  font-size: 0.75rem;
+  margin: 0 0 14px;
 }
 .diff-editor {
   width: 100%;

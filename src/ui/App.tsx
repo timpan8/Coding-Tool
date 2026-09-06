@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Binding, LanguageId, Settings, Version } from '../types/models';
 import { languages } from '../types/models';
 import type { StorageProvider } from '../storage/StorageProvider';
@@ -20,6 +20,7 @@ import { collectIssues, IssuePanel, type LocatedIssue } from './components/Issue
 import { FindingsPanel, useDismissals, useScanner } from './components/FindingsPanel';
 import { FileTabs } from './components/FileTabs';
 import { VersionPanel } from './components/VersionPanel';
+import { VersionViewer } from './components/VersionViewer';
 import { ProjectDetails } from './components/ProjectDetails';
 import { BindingPanel, toRows } from './components/BindingPanel';
 import { BindingsPage, useBindingUses } from './components/BindingsPage';
@@ -31,8 +32,6 @@ import { IngestDialog } from './components/IngestDialog';
 import { editorShortcuts, match, shortcuts } from './shortcuts';
 import { t } from './text';
 import { detectLanguage, languageForFile } from '../domain/detect';
-// Also lazy: it pulls in the same editor bundle, and version history is not on the first screen.
-const DiffEditor = lazy(() => import('./editor/DiffEditor').then(m => ({ default: m.DiffEditor })));
 import { scan, type Finding } from '../domain/scanner';
 import type { Profile, ScannerRule } from '../types/models';
 import { Security } from './pages/Security';
@@ -628,15 +627,9 @@ export function App({ storage }: { storage: StorageProvider }) {
         const result = auditForCopy(template, bindings, { ...options, mode: copyMode });
         if (result.canCopy) void writeClipboard(withPrompt(result.text, copyMode, result.used.length), copyMode);
       }} />}
-    {viewing && <Modal title={viewing.compareTo ? `v${viewing.compareTo.number} → v${viewing.version.number}` : `v${viewing.version.number}${viewing.version.label ? ` · ${viewing.version.label}` : ''}`} close={() => setViewing(null)}>
-      <div className="version-view">
-        <Suspense fallback={<p className="muted">{t.version.loadingDiff}</p>}><DiffEditor language={language} theme={resolvedTheme}
-          original={viewing.compareTo?.templates[session.activeFileId] ?? (viewing.compareTo ? '' : viewing.version.templates[session.activeFileId] ?? '')}
-          modified={viewing.version.templates[session.activeFileId] ?? ''} /></Suspense>
-      </div>
-      <p className="notice">Skrivskyddad mall som den såg ut när versionen sparades. Ditt utkast är orört{viewing.version.files && viewing.version.files.length > 1 ? `. Visar ${session.files.find(f => f.id === session.activeFileId)?.name} av ${viewing.version.files.length} filer` : ''}.</p>
-      <div className="dialog-actions"><button onClick={() => setViewing(null)}>{t.dialog.close}</button><button className="primary" onClick={() => { const v = viewing.version; setViewing(null); void applyVersion(v); }}>{t.version.restoreThis}</button></div>
-    </Modal>}
+    {viewing && <VersionViewer version={viewing.version} compareTo={viewing.compareTo} activeFileId={session.activeFileId}
+      currentFiles={session.files} language={language} theme={resolvedTheme} close={() => setViewing(null)}
+      restore={() => { const v = viewing.version; setViewing(null); void applyVersion(v); }} />}
     {details && project && <ProjectDetails project={project} close={() => setDetails(false)} save={async patch => {
       await storage.saveProject({ ...project, ...patch, updatedAt: new Date().toISOString() });
       await controller.reloadProject();
