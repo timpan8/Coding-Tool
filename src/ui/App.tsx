@@ -468,7 +468,7 @@ export function App({ storage }: { storage: StorageProvider }) {
             onCompare={v => setViewing({ version: v, compareTo: versions[versions.indexOf(v) + 1] ?? null })}
             onRestore={(v, asNew) => void applyVersion(v, asNew)}
             onDelete={v => void removeVersion(v)} />
-          <div className="m1-note"><b>Vad som ännu inte finns</b><p>Kod som kommer tillbaka från en AI matchas inte om mot dina värden automatiskt, och ett projekt rymmer bara en fil. Granskningsreglerna fångar det som liknar hemligheter, inte allt som är känsligt hos dig.</p></div>
+          <div className="m1-note"><b>Vad som ännu inte finns</b><p>Kod som kommer tillbaka från en AI matchas inte om mot dina värden automatiskt. Granskningsreglerna fångar det som liknar hemligheter, inte allt som är känsligt hos dig.</p></div>
         </aside></div>
       </div>
       <div className="overview-scroll" ref={overview} hidden={route !== '#/projects'} onScroll={e => { if (route === '#/projects') overviewScroll.current = e.currentTarget.scrollTop; }}><section className="dashboard">
