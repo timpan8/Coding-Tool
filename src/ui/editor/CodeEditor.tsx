@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import '../../../node_modules/monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon.css';
 import * as monaco from 'monaco-editor/editor/editor.api.js';
 import 'monaco-editor/editor/contrib/find/browser/findController.js';
@@ -65,7 +65,13 @@ export function CodeEditor(props: EditorProps) {
   const activeKey = useRef('');
   const callbacks = useRef(props);
   const decorateRef = useRef<(() => void) | null>(null);
-  callbacks.current = props;
+  // Monaco's listeners are registered once and live for the editor's lifetime, so they read the
+  // current props through this ref rather than being re-registered on every render. Written in a
+  // layout effect rather than during render: it runs before anything can read it, and a render that
+  // React throws away no longer leaves the ref pointing at props that were never committed.
+  useLayoutEffect(() => {
+    callbacks.current = props;
+  });
   useEffect(() => {
     const model = monaco.editor.createModel(callbacks.current.value, callbacks.current.language);
     activeKey.current = callbacks.current.documentKey ?? 'default';
@@ -163,7 +169,10 @@ export function CodeEditor(props: EditorProps) {
     decorateRef.current = decorate;
     decorate();
     if (callbacks.current.autoFocus) instance.focus();
-    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); selected.dispose(); mouse.dispose(); hover.dispose(); completion.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
+    // The map is captured here rather than read through the ref at teardown: the ref could in
+    // principle point elsewhere by then, and these are the models this effect created.
+    const models = documents.current;
+    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); selected.dispose(); mouse.dispose(); hover.dispose(); completion.dispose(); instance.dispose(); models.forEach(d => d.model.dispose()); models.clear(); editor.current = null; };
   }, []);
   useEffect(() => {
     const instance = editor.current;

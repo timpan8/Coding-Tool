@@ -46,7 +46,7 @@ export function detectLanguage(code: string): LanguageId | undefined {
   // A Dockerfile has to start with FROM, which nothing else does.
   if (/^\s*FROM\s+\S+/im.test(text) && /^\s*(RUN|ENV|COPY|ADD|WORKDIR|CMD|ENTRYPOINT|ARG|EXPOSE)\s/im.test(text)) return 'dockerfile';
   // A TOML table header is unambiguous; a bare key=value pair is not, and is left to dotenv below.
-  if (/^\s*\[[A-Za-z_][\w.\-]*\]\s*$/m.test(text) && /^\s*[\w.\-]+\s*=/m.test(text)) return 'toml';
+  if (/^\s*\[[A-Za-z_][\w.-]*\]\s*$/m.test(text) && /^\s*[\w.-]+\s*=/m.test(text)) return 'toml';
   if (/^\s*package\s+[\w.]+\s*$/m.test(text) && /^\s*func\s+\w*\s*\(/m.test(text)) return 'go';
   if (/^\s*(using\s+[\w.]+;|namespace\s+[\w.]+)/m.test(text)) return 'csharp';
   if (/^\s*(package\s+[\w.]+;|import\s+java\.)/m.test(text)) return 'java';
