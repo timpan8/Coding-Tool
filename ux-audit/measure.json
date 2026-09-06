@@ -1,0 +1,2881 @@
+{
+ "overflow": {
+  "390": {
+   "#/": {
+    "docScrollW": 390,
+    "innerW": 390,
+    "bodyOverflowsX": false,
+    "navScrollW": 487,
+    "navClientW": 358,
+    "navOverflows": true,
+    "navOverflowStyle": "auto",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 93,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 187,
+      "w": 93,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 264,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 336,
+      "w": 73,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 408,
+      "w": 72,
+      "h": 33,
+      "clippedByViewport": true
+     },
+     {
+      "text": "Inställningar",
+      "right": 503,
+      "w": 94,
+      "h": 33,
+      "clippedByViewport": true
+     }
+    ]
+   },
+   "#/projects": {
+    "docScrollW": 390,
+    "innerW": 390,
+    "bodyOverflowsX": false,
+    "navScrollW": 487,
+    "navClientW": 358,
+    "navOverflows": true,
+    "navOverflowStyle": "auto",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 93,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 187,
+      "w": 93,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 264,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 336,
+      "w": 73,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 408,
+      "w": 72,
+      "h": 33,
+      "clippedByViewport": true
+     },
+     {
+      "text": "Inställningar",
+      "right": 503,
+      "w": 94,
+      "h": 33,
+      "clippedByViewport": true
+     }
+    ]
+   },
+   "#/bindings": {
+    "docScrollW": 390,
+    "innerW": 390,
+    "bodyOverflowsX": false,
+    "navScrollW": 487,
+    "navClientW": 358,
+    "navOverflows": true,
+    "navOverflowStyle": "auto",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 93,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 187,
+      "w": 93,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 264,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 336,
+      "w": 73,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 408,
+      "w": 72,
+      "h": 33,
+      "clippedByViewport": true
+     },
+     {
+      "text": "Inställningar",
+      "right": 503,
+      "w": 94,
+      "h": 33,
+      "clippedByViewport": true
+     }
+    ]
+   },
+   "#/settings": {
+    "docScrollW": 390,
+    "innerW": 390,
+    "bodyOverflowsX": false,
+    "navScrollW": 487,
+    "navClientW": 358,
+    "navOverflows": true,
+    "navOverflowStyle": "auto",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 93,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 187,
+      "w": 93,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 264,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 336,
+      "w": 73,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 408,
+      "w": 72,
+      "h": 33,
+      "clippedByViewport": true
+     },
+     {
+      "text": "Inställningar",
+      "right": 503,
+      "w": 94,
+      "h": 33,
+      "clippedByViewport": true
+     }
+    ]
+   },
+   "#/security": {
+    "docScrollW": 390,
+    "innerW": 390,
+    "bodyOverflowsX": false,
+    "navScrollW": 487,
+    "navClientW": 358,
+    "navOverflows": true,
+    "navOverflowStyle": "auto",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 93,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 187,
+      "w": 93,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 264,
+      "w": 77,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 336,
+      "w": 73,
+      "h": 33,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 408,
+      "w": 72,
+      "h": 33,
+      "clippedByViewport": true
+     },
+     {
+      "text": "Inställningar",
+      "right": 503,
+      "w": 94,
+      "h": 33,
+      "clippedByViewport": true
+     }
+    ]
+   }
+  },
+  "768": {
+   "#/": {
+    "docScrollW": 1122,
+    "innerW": 768,
+    "bodyOverflowsX": true,
+    "navScrollW": 468,
+    "navClientW": 468,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 308,
+      "w": 45,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 383,
+      "w": 71,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 468,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 549,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 629,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 731,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   },
+   "#/projects": {
+    "docScrollW": 1122,
+    "innerW": 768,
+    "bodyOverflowsX": true,
+    "navScrollW": 468,
+    "navClientW": 468,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 308,
+      "w": 45,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 383,
+      "w": 71,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 468,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 549,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 629,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 731,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   },
+   "#/bindings": {
+    "docScrollW": 1122,
+    "innerW": 768,
+    "bodyOverflowsX": true,
+    "navScrollW": 468,
+    "navClientW": 468,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 308,
+      "w": 45,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 383,
+      "w": 71,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 468,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 549,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 629,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 731,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   },
+   "#/settings": {
+    "docScrollW": 1122,
+    "innerW": 768,
+    "bodyOverflowsX": true,
+    "navScrollW": 468,
+    "navClientW": 468,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 308,
+      "w": 45,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 383,
+      "w": 71,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 468,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 549,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 629,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 731,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   },
+   "#/security": {
+    "docScrollW": 1122,
+    "innerW": 768,
+    "bodyOverflowsX": true,
+    "navScrollW": 468,
+    "navClientW": 468,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 308,
+      "w": 45,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 383,
+      "w": 71,
+      "h": 74,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 468,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 549,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 629,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 731,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   }
+  },
+  "1440": {
+   "#/": {
+    "docScrollW": 1440,
+    "innerW": 1440,
+    "bodyOverflowsX": false,
+    "navScrollW": 784,
+    "navClientW": 784,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 280,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 434,
+      "w": 150,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 519,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 600,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 680,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 782,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   },
+   "#/projects": {
+    "docScrollW": 1440,
+    "innerW": 1440,
+    "bodyOverflowsX": false,
+    "navScrollW": 784,
+    "navClientW": 784,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 280,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 434,
+      "w": 150,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 519,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 600,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 680,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 782,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   },
+   "#/bindings": {
+    "docScrollW": 1440,
+    "innerW": 1440,
+    "bodyOverflowsX": false,
+    "navScrollW": 784,
+    "navClientW": 784,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 280,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 434,
+      "w": 150,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 519,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 600,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 680,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 782,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   },
+   "#/settings": {
+    "docScrollW": 1440,
+    "innerW": 1440,
+    "bodyOverflowsX": false,
+    "navScrollW": 784,
+    "navClientW": 784,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 280,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 434,
+      "w": 150,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 519,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 600,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 680,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 782,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   },
+   "#/security": {
+    "docScrollW": 1440,
+    "innerW": 1440,
+    "bodyOverflowsX": false,
+    "navScrollW": 784,
+    "navClientW": 784,
+    "navOverflows": false,
+    "navOverflowStyle": "visible",
+    "navItems": [
+     {
+      "text": "＋ Ny kod",
+      "right": 280,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Mina projekt Ctrl P",
+      "right": 434,
+      "w": 150,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Genvägar",
+      "right": 519,
+      "w": 81,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Bindings",
+      "right": 600,
+      "w": 77,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Säkerhet",
+      "right": 680,
+      "w": 76,
+      "h": 35,
+      "clippedByViewport": false
+     },
+     {
+      "text": "Inställningar",
+      "right": 782,
+      "w": 98,
+      "h": 35,
+      "clippedByViewport": false
+     }
+    ]
+   }
+  }
+ },
+ "tapTargets": {
+  "390": {
+   "#/": [
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mindre text",
+     "w": 28,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Större text",
+     "w": 28,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "text-button",
+     "label": "＋ Ny",
+     "w": 36,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "AI",
+     "w": 34,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "file-add",
+     "label": "Lägg till fil",
+     "w": 34,
+     "h": 31
+    },
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 35,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "active",
+     "label": "Mall",
+     "w": 45,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Local",
+     "w": 53,
+     "h": 28
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 72,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 73,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Copy Local",
+     "w": 78,
+     "h": 31
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "script.ps1",
+     "w": 81,
+     "h": 34
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Radbrytning på",
+     "w": 75,
+     "h": 37
+    },
+    {
+     "tag": "button",
+     "cls": "ai-copy",
+     "label": "Copy for AI ↗",
+     "w": 90,
+     "h": 31
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Språk",
+     "w": 112,
+     "h": 26
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 93,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 94,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Klistra in från AI ↙",
+     "w": 116,
+     "h": 31
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "primary",
+     "label": "Spara version",
+     "w": 121,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "text-button",
+     "label": "eller prova med exempelkod",
+     "w": 260,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    },
+    {
+     "tag": "summary",
+     "cls": "",
+     "label": "Sparade versioner 0",
+     "w": 344,
+     "h": 20
+    }
+   ],
+   "#/projects": [
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 35,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 72,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 73,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 93,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 94,
+     "h": 33
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Filtrera på språk",
+     "w": 108,
+     "h": 31
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Filtrera på status",
+     "w": 111,
+     "h": 31
+    },
+    {
+     "tag": "button",
+     "cls": "primary",
+     "label": "＋ Ny kod",
+     "w": 93,
+     "h": 39
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Sortera",
+     "w": 139,
+     "h": 31
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "Sök i alla projekt",
+     "w": 306,
+     "h": 41
+    }
+   ],
+   "#/bindings": [
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 35,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 72,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 73,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 93,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 94,
+     "h": 33
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Filtrera på räckvidd",
+     "w": 87,
+     "h": 36
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "Sök binding",
+     "w": 179,
+     "h": 39
+    }
+   ],
+   "#/settings": [
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 35,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 72,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 73,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 93,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 94,
+     "h": 33
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Lägg till sökord",
+     "w": 132,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "danger",
+     "label": "Rensa hela valvet",
+     "w": 146,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "primary",
+     "label": "Spara inställningar",
+     "w": 154,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "primary",
+     "label": "Exportera hela valvet",
+     "w": 169,
+     "h": 39
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Begär beständig lagring",
+     "w": 188,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa introduktionen igen",
+     "w": 191,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Exportera bara privata värden",
+     "w": 226,
+     "h": 39
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Rensa urklipp efter Copy Local",
+     "w": 354,
+     "h": 40
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 354,
+     "h": 40
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 354,
+     "h": 43
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 354,
+     "h": 43
+    }
+   ],
+   "#/security": [
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 35,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 72,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 73,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 77,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 93,
+     "h": 33
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 94,
+     "h": 33
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    }
+   ]
+  },
+  "1440": {
+   "#/": [
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mindre text",
+     "w": 28,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Större text",
+     "w": 28,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "text-button",
+     "label": "＋ Ny",
+     "w": 36,
+     "h": 21
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "AI",
+     "w": 34,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "file-add",
+     "label": "Lägg till fil",
+     "w": 34,
+     "h": 31
+    },
+    {
+     "tag": "button",
+     "cls": "active",
+     "label": "Mall",
+     "w": 45,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Local",
+     "w": 53,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Radbrytning på",
+     "w": 90,
+     "h": 21
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Copy Local",
+     "w": 78,
+     "h": 31
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 76,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "script.ps1",
+     "w": 81,
+     "h": 34
+    },
+    {
+     "tag": "button",
+     "cls": "ai-copy",
+     "label": "Copy for AI ↗",
+     "w": 90,
+     "h": 31
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Språk",
+     "w": 112,
+     "h": 26
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 98,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Klistra in från AI ↙",
+     "w": 116,
+     "h": 31
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "primary",
+     "label": "Spara version",
+     "w": 121,
+     "h": 39
+    },
+    {
+     "tag": "summary",
+     "cls": "",
+     "label": "Sparade versioner 0",
+     "w": 238,
+     "h": 20
+    },
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 147,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 150,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "text-button",
+     "label": "eller prova med exempelkod",
+     "w": 260,
+     "h": 21
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    }
+   ],
+   "#/projects": [
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 76,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Filtrera på språk",
+     "w": 108,
+     "h": 31
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 98,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Filtrera på status",
+     "w": 111,
+     "h": 31
+    },
+    {
+     "tag": "button",
+     "cls": "primary",
+     "label": "＋ Ny kod",
+     "w": 93,
+     "h": 39
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Sortera",
+     "w": 139,
+     "h": 31
+    },
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 147,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 150,
+     "h": 35
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "Sök i alla projekt",
+     "w": 1216,
+     "h": 41
+    }
+   ],
+   "#/bindings": [
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 76,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Filtrera på räckvidd",
+     "w": 87,
+     "h": 36
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 98,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "primary",
+     "label": "＋ Ny binding",
+     "w": 118,
+     "h": 39
+    },
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 147,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 150,
+     "h": 35
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "Sök binding",
+     "w": 179,
+     "h": 39
+    }
+   ],
+   "#/settings": [
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 13,
+     "h": 13
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 76,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 98,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 147,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Lägg till sökord",
+     "w": 132,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 150,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "danger",
+     "label": "Rensa hela valvet",
+     "w": 146,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "primary",
+     "label": "Spara inställningar",
+     "w": 154,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "primary",
+     "label": "Exportera hela valvet",
+     "w": 169,
+     "h": 39
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Begär beständig lagring",
+     "w": 188,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa introduktionen igen",
+     "w": 191,
+     "h": 39
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Exportera bara privata värden",
+     "w": 226,
+     "h": 39
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Rensa urklipp efter Copy Local",
+     "w": 450,
+     "h": 40
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 450,
+     "h": 40
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 450,
+     "h": 43
+    },
+    {
+     "tag": "input",
+     "cls": "",
+     "label": "",
+     "w": 450,
+     "h": 43
+    }
+   ],
+   "#/security": [
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Tema",
+     "w": 81,
+     "h": 28
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Säkerhet",
+     "w": 76,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Bindings",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "＋ Ny kod",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Visa kortkommandon",
+     "w": 81,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Inställningar",
+     "w": 98,
+     "h": 35
+    },
+    {
+     "tag": "select",
+     "cls": "",
+     "label": "Aktiv profil",
+     "w": 140,
+     "h": 28
+    },
+    {
+     "tag": "a",
+     "cls": "brand",
+     "label": "</>AI Code Vault",
+     "w": 147,
+     "h": 35
+    },
+    {
+     "tag": "button",
+     "cls": "",
+     "label": "Mina projekt Ctrl P",
+     "w": 150,
+     "h": 35
+    },
+    {
+     "tag": "a",
+     "cls": "skip-link",
+     "label": "Hoppa till innehållet",
+     "w": 165,
+     "h": 41
+    }
+   ]
+  }
+ },
+ "focus": {
+  "#/": [
+   {
+    "tag": "a",
+    "cls": "skip-link",
+    "label": "Hoppa till innehållet",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": false
+   },
+   {
+    "tag": "a",
+    "cls": "brand",
+    "label": "</>AI Code Vault",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "＋ Ny kod",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "Mina projekt Ctrl P",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "Visa kortkommandon",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "Bindings",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "Säkerhet",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "Inställningar",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "select",
+    "cls": "",
+    "label": "Aktiv profil",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "select",
+    "cls": "",
+    "label": "Tema",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "select",
+    "cls": "",
+    "label": "Språk",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "script.ps1",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "file-add",
+    "label": "Lägg till fil",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "active",
+    "label": "Mall",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "rgba(16, 35, 51, 0.094) 0px 1px 4px 0px",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "Local",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "AI",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "text-button",
+    "label": "eller prova med exempelkod",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "div",
+    "cls": "native-edit-context",
+    "label": "Kodredigerare",
+    "outlineWidth": "1px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(0, 144, 241)",
+    "boxShadow": "none",
+    "inViewport": true
+   }
+  ],
+  "#/settings": [
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "Begär beständig lagring",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "textarea",
+    "cls": "",
+    "label": "Instruktion till AI",
+    "outlineWidth": "1px",
+    "outlineStyle": "auto",
+    "outlineColor": "rgb(16, 16, 16)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "select",
+    "cls": "",
+    "label": "Rensa urklipp efter Copy Local",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "primary",
+    "label": "Spara inställningar",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "Visa introduktionen igen",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "textarea",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "1px",
+    "outlineStyle": "auto",
+    "outlineColor": "rgb(16, 16, 16)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "primary",
+    "label": "Exportera hela valvet",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "label": "Exportera bara privata värden",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "label": "",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "button",
+    "cls": "danger",
+    "label": "Rensa hela valvet",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": true
+   },
+   {
+    "tag": "a",
+    "cls": "skip-link",
+    "label": "Hoppa till innehållet",
+    "outlineWidth": "3px",
+    "outlineStyle": "solid",
+    "outlineColor": "rgb(76, 185, 223)",
+    "boxShadow": "none",
+    "inViewport": false
+   }
+  ]
+ },
+ "semantics": {
+  "#/": {
+   "headings": [
+    "H1 Klistra in din kod",
+    "H2 Bindings"
+   ],
+   "h1count": 1,
+   "landmarks": [
+    "HEADER",
+    "NAV:Huvudnavigation",
+    "MAIN",
+    "NAV:Filer i projektet",
+    "ASIDE",
+    "FOOTER"
+   ],
+   "ariaCurrent": [
+    "script.ps1"
+   ],
+   "title": "AI Code Vault",
+   "lang": "sv",
+   "imagesNoAlt": 0,
+   "unlabelledControls": [
+    "TEXTAREA.ime-text-area"
+   ],
+   "emptyNameButtons": 0
+  },
+  "#/projects": {
+   "headings": [
+    "H1 Alla projekt"
+   ],
+   "h1count": 1,
+   "landmarks": [
+    "HEADER",
+    "NAV:Huvudnavigation",
+    "MAIN",
+    "FOOTER"
+   ],
+   "ariaCurrent": [
+    "script.ps1"
+   ],
+   "title": "AI Code Vault",
+   "lang": "sv",
+   "imagesNoAlt": 0,
+   "unlabelledControls": [],
+   "emptyNameButtons": 0
+  },
+  "#/bindings": {
+   "headings": [
+    "H1 Alla bindings"
+   ],
+   "h1count": 1,
+   "landmarks": [
+    "HEADER",
+    "NAV:Huvudnavigation",
+    "MAIN",
+    "FOOTER"
+   ],
+   "ariaCurrent": [
+    "script.ps1"
+   ],
+   "title": "AI Code Vault",
+   "lang": "sv",
+   "imagesNoAlt": 0,
+   "unlabelledControls": [],
+   "emptyNameButtons": 0
+  },
+  "#/settings": {
+   "headings": [
+    "H1 Inställningar",
+    "H2 Granskningsregler",
+    "H2 Backup",
+    "H2 Återställ",
+    "H2 Rensa"
+   ],
+   "h1count": 1,
+   "landmarks": [
+    "HEADER",
+    "NAV:Huvudnavigation",
+    "MAIN",
+    "FOOTER"
+   ],
+   "ariaCurrent": [
+    "script.ps1"
+   ],
+   "title": "AI Code Vault",
+   "lang": "sv",
+   "imagesNoAlt": 0,
+   "unlabelledControls": [],
+   "emptyNameButtons": 0
+  },
+  "#/security": {
+   "headings": [
+    "H1 Dina värden stannar i webbläsarens lokala valv.",
+    "H2 Det här är verktyget byggt för",
+    "H2 Det här skyddar verktyget inte mot",
+    "H2 Begränsade kontroller, ingen garanti",
+    "H2 Lagring och offline"
+   ],
+   "h1count": 1,
+   "landmarks": [
+    "HEADER",
+    "NAV:Huvudnavigation",
+    "MAIN",
+    "FOOTER"
+   ],
+   "ariaCurrent": [
+    "script.ps1"
+   ],
+   "title": "AI Code Vault",
+   "lang": "sv",
+   "imagesNoAlt": 0,
+   "unlabelledControls": [],
+   "emptyNameButtons": 0
+  }
+ }
+}

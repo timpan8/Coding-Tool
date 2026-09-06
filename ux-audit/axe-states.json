@@ -1,0 +1,156 @@
+[
+ {
+  "label": "light/1440 workspace+findings",
+  "violations": []
+ },
+ {
+  "label": "light/1440 copy dialog AI",
+  "violations": []
+ },
+ {
+  "label": "light/1440 ingest dialog",
+  "violations": []
+ },
+ {
+  "label": "light/1440 save-version dialog",
+  "violations": []
+ },
+ {
+  "label": "light/1440 project drawer",
+  "violations": []
+ },
+ {
+  "label": "light/1440 confirm delete project",
+  "violations": []
+ },
+ {
+  "label": "light/1440 project details",
+  "violations": []
+ },
+ {
+  "label": "light/1440 settings expanded",
+  "violations": []
+ },
+ {
+  "label": "light/390 workspace+findings",
+  "violations": []
+ },
+ {
+  "label": "light/390 copy dialog AI",
+  "violations": []
+ },
+ {
+  "label": "light/390 ingest dialog",
+  "violations": []
+ },
+ {
+  "label": "light/390 save-version dialog",
+  "violations": []
+ },
+ {
+  "label": "light/390 project drawer",
+  "violations": []
+ },
+ {
+  "label": "light/390 confirm delete project",
+  "violations": []
+ },
+ {
+  "label": "light/390 project details",
+  "violations": []
+ },
+ {
+  "label": "light/390 settings expanded",
+  "violations": []
+ },
+ {
+  "label": "dark/1440 workspace+findings",
+  "violations": []
+ },
+ {
+  "label": "dark/1440 copy dialog AI",
+  "violations": []
+ },
+ {
+  "label": "dark/1440 ingest dialog",
+  "violations": []
+ },
+ {
+  "label": "dark/1440 save-version dialog",
+  "violations": []
+ },
+ {
+  "label": "dark/1440 project drawer",
+  "violations": []
+ },
+ {
+  "label": "dark/1440 confirm delete project",
+  "violations": []
+ },
+ {
+  "label": "dark/1440 project details",
+  "violations": []
+ },
+ {
+  "label": "dark/1440 settings expanded",
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 1,
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "nodes": [
+     {
+      "target": ".danger",
+      "summary": "Fix any of the following: Element has insufficient color contrast of 4.28 (foreground color: #04140f, background color: #c05a3c, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "label": "dark/390 workspace+findings",
+  "violations": []
+ },
+ {
+  "label": "dark/390 copy dialog AI",
+  "violations": []
+ },
+ {
+  "label": "dark/390 ingest dialog",
+  "violations": []
+ },
+ {
+  "label": "dark/390 save-version dialog",
+  "violations": []
+ },
+ {
+  "label": "dark/390 project drawer",
+  "violations": []
+ },
+ {
+  "label": "dark/390 confirm delete project",
+  "violations": []
+ },
+ {
+  "label": "dark/390 project details",
+  "violations": []
+ },
+ {
+  "label": "dark/390 settings expanded",
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 1,
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "nodes": [
+     {
+      "target": ".danger",
+      "summary": "Fix any of the following: Element has insufficient color contrast of 4.28 (foreground color: #04140f, background color: #c05a3c, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+     }
+    ]
+   }
+  ]
+ }
+]
