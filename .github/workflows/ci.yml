@@ -28,3 +28,24 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # CodeVault lives in codevault/ with its own toolchain (npm, ESLint, Vitest, Playwright).
+  codevault:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: codevault
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: codevault/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm run check-deps
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

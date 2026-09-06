@@ -4,3 +4,5 @@
 *.mjs
 dist/
 pnpm-lock.yaml
+# CodeVault is a separate app with its own toolchain (npm, ESLint, Vitest); see codevault/README.md.
+codevault/
