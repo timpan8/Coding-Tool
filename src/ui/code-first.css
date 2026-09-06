@@ -174,9 +174,9 @@
   align-items: center;
   gap: 15px;
   padding: 10px 30px;
-  border-bottom: 1px solid var(--danger-border);
-  background: var(--danger-surface);
-  color: var(--danger-text);
+  border-bottom: 1px solid var(--accent-border);
+  background: var(--accent-surface);
+  color: var(--accent-text);
   font-size: 0.8rem;
 }
 .persistence-error p {
@@ -184,10 +184,12 @@
   flex: 1;
   color: var(--danger-text);
 }
-.inline-notice {
-  background: var(--accent-surface);
-  color: var(--accent-text);
-  border-color: var(--accent-border);
+/* A refusal or a failed convenience, as opposed to something that worked. Report U6: these used to
+   be full-screen modals. */
+.inline-notice.warn {
+  border-bottom-color: var(--warn-border);
+  background: var(--warn-surface);
+  color: var(--text);
 }
 .inline-notice button {
   margin-left: auto;

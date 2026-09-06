@@ -53,8 +53,8 @@ export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, f
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
           e.preventDefault();
-          const range = selection();
-          if (range) onBinding?.(range);
+          // An empty selection is reported too, so the workspace can say why nothing happened.
+          onBinding?.(selection() ?? { text: '', start: 0, end: 0, lineBefore: '', line: 1 });
         }
       }}
       onSelect={(e) => {

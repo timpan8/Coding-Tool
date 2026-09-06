@@ -148,9 +148,16 @@ export function App({ storage }: { storage: StorageProvider }) {
   const { project, text: template, language, versions } = session;
   const [route, setRoute] = useState(location.hash || '#/'), routeRef = useRef(route);
   const [bindings, setBindings] = useState<Binding[]>([]), [mode, setMode] = useState<Mode>('template');
-  const [drawer, setDrawer] = useState(false), [query, setQuery] = useState('');
+  const [drawer, setDrawer] = useState(false), [query, setQuery] = useState(''), [drawerQuery, setDrawerQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('updated'), [languageFilter, setLanguageFilter] = useState(''), [statusFilter, setStatusFilter] = useState('');
-  const [busy, setBusy] = useState(false), busyRef = useRef(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false), busyRef = useRef(false), [error, setError] = useState('');
+  const [notice, setNoticeText] = useState(''), [noticeTone, setNoticeTone] = useState<'info' | 'warn'>('info');
+  /** Report U6. Every failure used to be a full-screen modal titled "Åtgärden behöver
+   * uppmärksamhet", including ones the user can simply try again. The modal is for something that
+   * needs a decision; a refusal or a failed convenience belongs in the strip. */
+  const setNotice = (text: string) => { setNoticeText(text); setNoticeTone('info'); };
+  const warn = (text: string) => { setNoticeText(text); setNoticeTone('warn'); };
+
   const [bindingDialog, setBindingDialog] = useState<{ binding: Binding; selection?: Selection } | null>(null);
   const [showSecrets, setShowSecrets] = useState(false), [focusName, setFocusName] = useState(''), [focusLine, setFocusLine] = useState<number>();
   const [viewing, setViewing] = useState<{ version: Version; compareTo: Version | null } | null>(null), [labelling, setLabelling] = useState(false), [details, setDetails] = useState(false);
@@ -176,7 +183,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [intro, setIntro] = useState(false);
 
   async function run(action: () => Promise<void>) {
-    if (busyRef.current) return;
+    if (busyRef.current) { warn('Något sparas just nu. Försök igen om ett ögonblick.'); return; }
     busyRef.current = true; setBusy(true);
     try { await action(); }
     catch (e) { if (!controller.getSnapshot().error) setError(e instanceof Error ? e.message : 'Åtgärden kunde inte slutföras. Din text finns kvar.'); }
@@ -191,7 +198,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     // reads as a broken link rather than as "not now".
     if (busyRef.current) {
       history.replaceState(null, '', routeRef.current);
-      setNotice('Sidbytet väntar tills den pågående åtgärden är klar. Försök igen om ett ögonblick.');
+      warn('Sidbytet väntar tills den pågående åtgärden är klar. Försök igen om ett ögonblick.');
       return;
     }
     await run(async () => {
@@ -335,7 +342,10 @@ export function App({ storage }: { storage: StorageProvider }) {
   }
   function changeMode(next: Mode) { setMode(next); setShowSecrets(false); setFocusName(''); setFocusLine(undefined); }
   function createBinding(selection: Selection, finding?: Finding) {
-    if (mode === 'local' || !selection.text || /\{\{.*\}\}/.test(selection.text)) return;
+    // Report U7. Ctrl+B in the Local view used to do nothing at all, with nothing said.
+    if (mode === 'local') { warn('Byt till Mall-vyn för att skapa en binding. Local är en skrivskyddad projektion.'); return; }
+    if (!selection.text) { warn('Markera värdet du vill binda först.'); return; }
+    if (/\{\{.*\}\}/.test(selection.text)) { warn('Markeringen innehåller redan en platshållare. Markera ett värde i stället.'); return; }
     void run(async () => {
       await controller.flush();
       const current = controller.getSnapshot();
@@ -401,7 +411,7 @@ export function App({ storage }: { storage: StorageProvider }) {
    * for — a value shared across projects has nowhere else to be created. */
   function newBinding() {
     const current = controller.getSnapshot();
-    if (!current.settings) { setError('Inställningarna är inte inlästa ännu. Försök igen om ett ögonblick.'); return; }
+    if (!current.settings) { warn('Inställningarna är inte inlästa ännu. Försök igen om ett ögonblick.'); return; }
     const time = new Date().toISOString();
     const project = current.session.project;
     setBindingDialog({ binding: { id: crypto.randomUUID(), name: '', category: 'secret',
@@ -486,7 +496,7 @@ export function App({ storage }: { storage: StorageProvider }) {
    * to an AI, so it must not be a way around the audit. */
   function downloadCopy(which: 'local' | 'ai') {
     const result = auditForCopy(template, bindings, { ...options, mode: which });
-    if (!result.canCopy) { setError('Nedladdning blockerad. Åtgärda problemen i panelen.'); return; }
+    if (!result.canCopy) { warn('Nedladdning blockerad. Åtgärda problemen i panelen — de säger vad som saknas.'); return; }
     const name = session.files.find(f => f.id === session.activeFileId)?.name ?? 'kod.txt';
     download(`${which}-${name}`, withPrompt(result.text, which, result.used.length), 'text/plain');
     setCopyMode(null);
@@ -500,7 +510,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       // Only the local copy carries real values, so only it is worth clearing.
       if (which === 'local' && seconds > 0) { pendingClear.current = text; setCountdown(seconds); }
     }
-    catch { setError('Webbläsaren nekade urklippsåtkomst. Kontrollera sidans behörighet.'); }
+    catch { warn('Webbläsaren nekade urklippsåtkomst. Kontrollera sidans behörighet.'); }
   }
   useEffect(() => {
     if (countdown === null) return;
@@ -513,11 +523,13 @@ export function App({ storage }: { storage: StorageProvider }) {
           : 'Urklippet kunde inte rensas. Kopiera något ofarligt för att skriva över det.'));
   }, [countdown]);
   async function copy(which: 'local' | 'ai') {
-    if (!workspaceVisible || !template.trim() || busyRef.current) return;
+    if (!workspaceVisible) { warn('Öppna en fil först. Det finns ingen kod att kopiera härifrån.'); return; }
+    if (!template.trim()) { warn('Filen är tom. Klistra in kod först.'); return; }
+    if (busyRef.current) { warn('Något sparas just nu. Försök igen om ett ögonblick.'); return; }
     // Re-audited here rather than reusing the memoised value: the gate must have run on the text
     // being copied, not on whatever it last saw.
     const result = auditForCopy(template, bindings, { ...options, mode: which });
-    if (!result.canCopy) { setError('Kopiering blockerad. Åtgärda problemen i panelen.'); return; }
+    if (!result.canCopy) { warn('Kopiering blockerad. Åtgärda problemen i panelen — de säger vad som saknas.'); return; }
     if (which === 'ai' || result.secretRanges.length) { setReviewed(false); setCopyMode(which); return; }
     await writeClipboard(withPrompt(result.text, which, result.used.length), which);
   }
@@ -527,12 +539,12 @@ export function App({ storage }: { storage: StorageProvider }) {
   async function copySelection() {
     if (!selected || busyRef.current) return;
     const result = auditSelection(template, bindings, { ...options, mode: 'ai' }, selected);
-    if (!result.canCopy) { setError(`Markeringen kan inte kopieras: ${result.blocking[0].message}`); return; }
+    if (!result.canCopy) { warn(`Markeringen kan inte kopieras: ${result.blocking[0].message}`); return; }
     try {
       await navigator.clipboard.writeText(withPrompt(result.text, 'ai', result.used.length));
       setNotice(`Markeringen kopierad · ${result.used.length} ${result.used.length === 1 ? 'värde' : 'värden'} utbytta.`);
     }
-    catch { setError('Webbläsaren nekade urklippsåtkomst. Kontrollera sidans behörighet.'); }
+    catch { warn('Webbläsaren nekade urklippsåtkomst. Kontrollera sidans behörighet.'); }
   }
   /** Recorded as seen when it is shown, not when it is closed. It has been seen either way, and
    * writing on close races a reload made moments afterwards — the introduction would come back for
@@ -563,10 +575,14 @@ export function App({ storage }: { storage: StorageProvider }) {
         onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} /><label className="theme-choice">Tema<select aria-label="Tema" value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">System</option><option value="light">Ljust</option><option value="dark">Mörkt</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>Försök spara igen</button></div>}
     {countdown !== null && <div className="clipboard-countdown" role="status">Urklippet rensas om {countdown} s<button onClick={() => { pendingClear.current = null; setCountdown(null); setNotice('Urklippet lämnas kvar.'); }}>Avbryt</button></div>}
-    {notice && <div className="inline-notice" role="status">{notice}<button aria-label="Stäng meddelande" onClick={() => setNotice('')}>×</button></div>}
+    {notice && <div className={`inline-notice ${noticeTone}`} role="status">{notice}<button aria-label="Stäng meddelande" onClick={() => setNotice('')}>×</button></div>}
     {updateReady && <div className="notice">Uppdatering tillgänglig <button onClick={() => void run(async () => { await controller.flush(); navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true }); updateReady.waiting?.postMessage({ type: 'ACTIVATE' }); })}>Ladda om</button></div>}
-    <main id="huvudinnehall" inert={busy}>
-      <div className="workspace" hidden={!workspaceVisible}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : 'BÖRJA DIREKT'}</span>
+    {/* Report U9. inert on the whole main froze the page during every write, including the parts a
+        write cannot corrupt: reading a document, a filter, the version list. It is now on the
+        editing surface alone, and the busy state is visible in the header. Anything the rest can
+        start still goes through run(), which refuses politely while a write is in flight. */}
+    <main id="huvudinnehall" aria-busy={busy}>
+      <div className="workspace" hidden={!workspaceVisible} inert={busy}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : 'BÖRJA DIREKT'}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
         <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => { languageChosen.current.add(session.activeFileId); controller.changeLanguage(e.target.value as LanguageId); }}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? `${session.files.length} ${session.files.length === 1 ? 'fil' : 'filer'}` : 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
       </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
@@ -632,7 +648,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <label>Rensa urklipp efter Copy Local<select aria-label="Rensa urklipp efter Copy Local" value={settings?.clipboardAutoClearSeconds ?? 0} onChange={e => void run(async () => { if (settings) await storage.saveSettings({ ...settings, clipboardAutoClearSeconds: Number(e.target.value) }); await controller.reloadSettings(); })}><option value={0}>Aldrig</option><option value={30}>Efter 30 sekunder</option><option value={60}>Efter 1 minut</option><option value={300}>Efter 5 minuter</option></select><small>Skriver över urklippet när tiden gått. Nedräkningen visas och går att avbryta. Urklippshistorik och molnsynk ligger utanför appens kontroll.</small></label><button className="primary" onClick={() => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, deviceName }); setNotice('Inställningar sparade lokalt'); } })}>Spara inställningar</button><button onClick={() => setIntro(true)}>Visa introduktionen igen</button><p className="notice">Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.</p><RulesPanel storage={storage} rules={rules} notify={setNotice} onChange={() => void storage.listScannerRules().then(setRules)} /><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></article>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>Lokalt valv · M1</span></footer>
   </div>
-    {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
+    {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={drawerQuery} onQuery={setDrawerQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
     {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} profiles={profiles} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0}
       preview={bindingDialog.selection && (() => {
         const s = bindingDialog.selection!;

@@ -278,23 +278,23 @@ till första fokuserbara elementet — `×`. Enter stänger då dialogen i stäl
 `confirm()` går inte att formge, kan blockeras av webbläsaren och saknar möjlighet till "fråga inte igen".
 Åtgärd: använd den befintliga `Modal`-komponenten för alla bekräftelser.
 
-**U6 · Alla fel blir en modal.** `App.tsx:205` visar varje fel som en heltäckande dialog med rubriken "Åtgärden behöver
+**U6 · Alla fel blir en modal.** *(Åtgärdat.)* `App.tsx:205` visar varje fel som en heltäckande dialog med rubriken "Åtgärden behöver
 uppmärksamhet". För återvinnbara fel (urklipp nekat, projektlistan kunde inte läsas) är det för tungt.
 Åtgärd: skilj på blockerande fel (modal) och information (den befintliga `inline-notice`-remsan).
 
-**U7 · Klick försvinner tyst.** `run()` (`App.tsx:43-49`) returnerar utan återkoppling om något redan pågår.
+**U7 · Klick försvinner tyst.** *(Åtgärdat. Den tysta returen för Ctrl+B låg dessutom i editorn, inte i `App.tsx` — Monaco rapporterade aldrig en tom markering, så appen hade ingenting att svara på.)* `run()` (`App.tsx:43-49`) returnerar utan återkoppling om något redan pågår.
 `copy()` (rad 147) och `createBinding()` (rad 101) gör detsamma. I Local-vyn gör Ctrl+B ingenting alls, utan förklaring.
 Åtgärd: ge alltid ett svar — inaktiverat läge med förklaring, eller ett kort meddelande ("Byt till Mall-vyn för att skapa en
 binding").
 
-**U8 · Navigering blockeras tyst under sparning.** `navigate()` (`App.tsx:54-55`) återställer hashen utan att säga något om en
+**U8 · Navigering blockeras tyst under sparning.** *(Åtgärdat.)* `navigate()` (`App.tsx:54-55`) återställer hashen utan att säga något om en
 skrivning pågår. Användaren klickar på en länk och ingenting händer.
 
-**U9 · Hela gränssnittet fryser vid varje åtgärd.** `<main inert={busy}>` (`App.tsx:171`) stänger av all interaktion i
+**U9 · Hela gränssnittet fryser vid varje åtgärd.** *(Åtgärdat: `inert` sitter nu på redigeringsytan, och `aria-busy` på `<main>`.)* `<main inert={busy}>` (`App.tsx:171`) stänger av all interaktion i
 huvudytan under varje `run()`-anrop. Det är rätt tänkt men för brett — sätt `inert` på det som faktiskt påverkas, eller visa en
 tydlig upptagen-indikation så att frysningen blir begriplig.
 
-**U10 · Sökfältet delas mellan två vyer.** Samma `query`-tillstånd (`App.tsx:33`) används både i snabbpanelen och på
+**U10 · Sökfältet delas mellan två vyer.** *(Åtgärdat.)* Samma `query`-tillstånd (`App.tsx:33`) används både i snabbpanelen och på
 "Alla projekt". Skriver man i den ena ändras den andra. Håll dem åtskilda.
 
 **U11 · Inget visar vad som faktiskt byttes ut.** `RenderResult.secretRanges` beräknas i `render()` men används enbart för att

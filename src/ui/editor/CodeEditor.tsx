@@ -73,11 +73,13 @@ export function CodeEditor(props: EditorProps) {
       }
       decorations.set(model.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } })));
     };
+    // Report U7. An empty selection used to return here, so Ctrl+B did nothing and said nothing.
+    // The editor reports what the selection is; deciding what to say about it is the app's job.
     const binding = () => {
       const model = instance.getModel()!;
       const selected = instance.getSelection();
-      if (!selected || selected.isEmpty()) return;
-      callbacks.current.onBinding?.({ text: model.getValueInRange(selected), start: model.getOffsetAt(selected.getStartPosition()),
+      if (!selected) { callbacks.current.onBinding?.({ text: '', start: 0, end: 0, lineBefore: '', line: 1 }); return; }
+      callbacks.current.onBinding?.({ text: selected.isEmpty() ? '' : model.getValueInRange(selected), start: model.getOffsetAt(selected.getStartPosition()),
         end: model.getOffsetAt(selected.getEndPosition()), lineBefore: model.getLineContent(selected.startLineNumber).slice(0, selected.startColumn - 1), line: selected.startLineNumber });
     };
     const action = instance.addAction({ id: 'create-binding', label: 'Skapa binding', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB], contextMenuGroupId: 'vault', run: binding });

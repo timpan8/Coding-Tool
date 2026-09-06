@@ -25,6 +25,14 @@ async function bind(page: Page, word: string, privateValue: string, category?: s
   await expect(page.locator('dialog[open]')).toHaveCount(0);
 }
 
+async function clipboard(page: Page) {
+  // readText() rejects when the document is not focused, which is a timing-dependent way for a
+  // clipboard assertion to fail for reasons that have nothing to do with the clipboard.
+  await page.bringToFront();
+  await page.locator('body').click({ position: { x: 2, y: 2 } }).catch(() => {});
+  return page.evaluate(() => navigator.clipboard.readText());
+}
+
 test.beforeEach(async ({ page }) => {
   await open(page);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
@@ -63,10 +71,13 @@ test('explains why a copy button is disabled', async ({ page }) => {
 test('lets the caret be placed inside a placeholder', async ({ page }) => {
   await type(page, '$p = "Hunter2"\n');
   await bind(page, 'Hunter2', 'Hunter2', 'secret');
-  await page.getByText('{{', { exact: false }).first().click();
+  // Scoped to the editor: '{{' also appears in the settings page's AI instruction, which is in the
+  // DOM but hidden, and an unscoped match picked it up whenever it rendered first.
+  const placeholder = page.locator('.monaco-editor').getByText('{{', { exact: false }).first();
+  await placeholder.click();
   await expect(page.locator('dialog[open]')).toHaveCount(0);
   // The deliberate gesture still opens it.
-  await page.getByText('{{', { exact: false }).first().dblclick();
+  await placeholder.dblclick();
   await expect(page.locator('dialog[open]')).toHaveCount(1);
 });
 
@@ -187,12 +198,12 @@ test('counts down and clears the clipboard after a local copy', async ({ page, c
   await page.getByRole('button', { name: 'Kopiera LOCAL med secrets' }).click();
 
   await expect(page.locator('.clipboard-countdown')).toContainText('Urklippet rensas om');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('Hunter2');
+  expect(await clipboard(page)).toContain('Hunter2');
 
   // Cancelling leaves it alone, which is the whole point of showing the countdown.
   await page.locator('.clipboard-countdown').getByRole('button', { name: 'Avbryt' }).click();
   await expect(page.locator('.clipboard-countdown')).toHaveCount(0);
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('Hunter2');
+  expect(await clipboard(page)).toContain('Hunter2');
 });
 
 // Report F1. The rules exist to be adjusted: a value that is an example in one project is a real
@@ -602,6 +613,50 @@ test('still reveals a placeholder when its binding is clicked', async ({ page })
   await expect(page.locator('.monaco-editor .selected-text').first()).toBeVisible();
 });
 
+// Report U6, U7 and U10. Actions that were refused did nothing and said nothing, and every failure
+// that was reported at all arrived as a full-screen modal.
+test('says why an action was refused instead of doing nothing', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+
+  // Ctrl+B in the Local view was the clearest case: nothing happened, with nothing said.
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Control+b');
+  const strip = page.locator('.inline-notice');
+  await expect(strip).toContainText('Byt till Mall-vyn');
+  // A refusal is not a modal: the page stays usable.
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await expect(strip).toHaveClass(/warn/);
+
+  await page.getByRole('tab', { name: 'Mall' }).click();
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.press('Control+b');
+  await expect(strip).toContainText('Markera värdet');
+});
+
+// Report U10. One search box behind two views: typing in the drawer changed the overview's filter.
+test('keeps the two project searches apart', async ({ page }) => {
+  await type(page, '$a = "one"\n');
+  await page.getByRole('button', { name: 'Ändra projektnamn' }).click();
+  await page.getByLabel('Projektnamn').fill('Alfa');
+  await page.getByLabel('Projektnamn').press('Enter');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+
+  await page.getByRole('button', { name: 'Mina projekt' }).click();
+  await page.getByLabel('Sök projekt').fill('hittar-ingenting');
+  await expect(page.locator('.drawer-projects')).toContainText('Inga projekt matchar');
+  await page.getByRole('button', { name: 'Stäng projektpanelen' }).click();
+
+  // The overview's own field is untouched, so the project is still listed there.
+  await page.getByRole('button', { name: 'Bindings' }).click();
+  await page.evaluate(() => (location.hash = '#/projects'));
+  await expect(page.getByLabel('Sök i alla projekt')).toHaveValue('');
+  await expect(page.locator('.project-card')).toHaveCount(1);
+});
+
 // Report F14. Bindings were reachable only through the project they belong to, which left a global
 // binding — the whole point of the global scope — unreachable unless some project happened to use
 // it, and a value from a deleted project invisible rather than gone.
@@ -756,7 +811,7 @@ test('copies a selection in sanitised form without the rest of the file', async 
   await button.click();
   await expect(page.locator('.inline-notice')).toContainText('Markeringen kopierad');
   await context.grantPermissions(['clipboard-read']);
-  const clipped = await page.evaluate(() => navigator.clipboard.readText());
+  const clipped = await clipboard(page);
   // No placeholders in this fragment, so no instruction block claiming there are any.
   expect(clipped).toBe('second');
 
@@ -766,7 +821,7 @@ test('copies a selection in sanitised form without the rest of the file', async 
   await page.keyboard.press('Shift+End');
   await page.getByRole('button', { name: 'Kopiera markering ↗' }).click();
   await expect(page.locator('.inline-notice')).toContainText('1 värde utbytta');
-  const second = await page.evaluate(() => navigator.clipboard.readText());
+  const second = await clipboard(page);
   expect(second).toContain('<PASSWORD>');
   expect(second).toContain('Behåll dem exakt');
   expect(second).not.toContain('Hunter2');
