@@ -91,13 +91,34 @@ export function CodeEditor(props: EditorProps) {
     // Three layers in one collection: the substitutions of a projection, or the placeholder chips
     // of the template, and on top of either the spans the review panel is pointing at. They used to
     // be either/or, which left nowhere for a third kind of mark to go.
+    // A placeholder reads as a pill: the braces dimmed, the name on a category-coloured ground, and
+    // the AI value injected after it as a badge. Monaco cannot replace text with a widget in an
+    // editable model, and injected text is the next best thing — it is not in the model, so the
+    // caret, the undo stack and every offset stay what they were. In a projection the substituted
+    // value carries the binding's name the same way.
+    const badge = (content: string, data: { name: string; start: number; end: number }, missing = false): monaco.editor.InjectedTextOptions => ({
+      content: ` ${content} `, inlineClassName: missing ? 'chip-badge chip-badge-missing' : 'chip-badge', attachedData: data, cursorStops: monaco.editor.InjectedTextCursorStops.None,
+    });
     const decorate = () => {
       const model = instance.getModel()!;
       const at = (span: { start: number; end: number }) => monaco.Range.fromPositions(model.getPositionAt(span.start), model.getPositionAt(span.end));
       const substitutions = callbacks.current.substitutions ?? [];
-      const items: monaco.editor.IModelDeltaDecoration[] = substitutions.length
-        ? substitutions.map(range => ({ range: at(range), options: { inlineClassName: 'substituted-value', hoverMessage: { value: `Utbytt: **${range.name}**` } } }))
-        : model.findMatches('\\{\\{[A-Z][A-Z0-9_]{1,63}\\}\\}', false, true, false, null, false).map(match => ({ range: match.range, options: { inlineClassName: 'binding-chip' } }));
+      const items: monaco.editor.IModelDeltaDecoration[] = [];
+      if (substitutions.length) {
+        for (const range of substitutions) {
+          items.push({ range: at(range), options: { inlineClassName: 'substituted-value', hoverMessage: { value: `Utbytt: **${range.name}**` }, after: badge(range.name, { name: range.name, start: range.start, end: range.end }) } });
+        }
+      } else {
+        for (const match of model.findMatches('\\{\\{([A-Z][A-Z0-9_]{1,63})\\}\\}', false, true, false, null, true)) {
+          const name = match.matches?.[1] ?? '';
+          const info = callbacks.current.describePlaceholder?.(name);
+          const start = model.getOffsetAt(match.range.getStartPosition()), end = model.getOffsetAt(match.range.getEndPosition());
+          const category = info?.category ?? 'missing';
+          items.push({ range: match.range, options: { inlineClassName: `binding-chip chip-cat-${category}`, after: badge(info ? info.aiReplacement : '?', { name, start, end }, !info) } });
+          items.push({ range: new monaco.Range(match.range.startLineNumber, match.range.startColumn, match.range.startLineNumber, match.range.startColumn + 2), options: { inlineClassName: 'chip-brace' } });
+          items.push({ range: new monaco.Range(match.range.endLineNumber, match.range.endColumn - 2, match.range.endLineNumber, match.range.endColumn), options: { inlineClassName: 'chip-brace' } });
+        }
+      }
       for (const span of callbacks.current.highlights ?? []) {
         items.push({ range: at(span), options: { inlineClassName: span.tone === 'active' ? 'candidate-active' : 'candidate-highlight' } });
       }
@@ -129,6 +150,19 @@ export function CodeEditor(props: EditorProps) {
     // Opening the editor on a single click made it impossible to put the caret inside a placeholder,
     // and threw up a modal on a stray click while typing. A double click is the deliberate gesture.
     const mouse = instance.onMouseUp(e => {
+      // A click on the badge opens the card; it is injected text, so it carries its own data and
+      // never moves the caret. The double click on the name is still the way to the full dialog.
+      // The mouse-target factory puts the injected text beside `mightBeForeignElement` on the
+      // detail; only the latter is in the public typing, so the field is read through a narrow
+      // cast. (The target's `element` is the lines container, not the badge span — the spans take
+      // no pointer events — so the hit test is the only way to know a badge was clicked.) A Monaco
+      // that stops setting the field makes the click do nothing rather than open the wrong card.
+      const detail = e.target.type === monaco.editor.MouseTargetType.CONTENT_TEXT ? e.target.detail as { injectedText?: { options: { attachedData?: unknown } } | null } : null;
+      const data = detail?.injectedText?.options.attachedData as { name: string; start: number; end: number } | undefined;
+      if (data && e.event.browserEvent.detail === 1) {
+        callbacks.current.onChip?.({ ...data, x: e.event.browserEvent.clientX, y: e.event.browserEvent.clientY });
+        return;
+      }
       if (e.event.browserEvent.detail !== 2 || !e.target.position) return;
       const name = placeholderAt(e.target.position);
       if (name) callbacks.current.onPlaceholder?.(name);
@@ -221,7 +255,7 @@ export function CodeEditor(props: EditorProps) {
       wordWrap: props.wordWrap === false ? 'off' : 'on' });
   }, [props.fontSize, props.wordWrap]);
   useEffect(() => { monaco.editor.setTheme(themeName(props.theme ?? 'light')); }, [props.theme]);
-  useEffect(() => { decorateRef.current?.(); }, [props.substitutions, props.value, props.highlights]);
+  useEffect(() => { decorateRef.current?.(); }, [props.substitutions, props.value, props.highlights, props.placeholderNames, props.describePlaceholder]);
   useEffect(() => { if (props.active) { editor.current?.layout(); if (props.autoFocus) editor.current?.focus(); } }, [props.active, props.autoFocus]);
   // props.value is a dependency because the placeholder may not be in the model yet when the name
   // is requested — creating a binding sets both in the same commit. That made every later keystroke

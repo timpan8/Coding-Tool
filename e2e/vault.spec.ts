@@ -37,6 +37,16 @@ async function bind(page: Page, word: string, privateValue: string, category?: s
   await expect(page.locator('dialog[open]')).toHaveCount(0);
 }
 
+/** The editor's text as the model holds it: the rendered lines in order, without the badges a
+ * pill injects after a placeholder (they are not in the model) and with Monaco's no-break spaces
+ * turned back into spaces. */
+async function modelText(page: Page) {
+  return page.locator('.view-lines').evaluate(el => Array.from(el.querySelectorAll<HTMLElement>('.view-line'))
+    .sort((a, b) => parseFloat(a.style.top) - parseFloat(b.style.top))
+    .map(line => { const copy = line.cloneNode(true) as HTMLElement; copy.querySelectorAll('.chip-badge').forEach(n => n.remove()); return copy.textContent ?? ''; })
+    .join('\n').replace(/ /g, ' '));
+}
+
 async function clipboard(page: Page) {
   // readText() rejects when the document is not focused, which is a timing-dependent way for a
   // clipboard assertion to fail for reasons that have nothing to do with the clipboard.
@@ -895,7 +905,9 @@ test('puts placeholders back into code that comes home from an AI', async ({ pag
 
   await expect(page.locator('.editor-body')).toContainText('$host = "{{');
   await expect(page.locator('.editor-body')).toContainText('$port = 1433');
-  await expect(page.locator('.editor-body')).not.toContainText('server.example.test');
+  // The pill's badge shows the AI value beside the placeholder; the literal itself is gone.
+  await expect(page.locator('.editor-body')).not.toContainText('"server.example.test"');
+  expect(await modelText(page)).not.toContain('server.example.test');
 
   // And the private value is behind the placeholder again, not lost.
   await page.getByRole('tab', { name: 'Local' }).click();
@@ -979,8 +991,7 @@ test('does not eat the placeholder when you keep typing after creating a binding
   await page.keyboard.press('Control+End');
   await page.keyboard.type('$q = "plain value here"\n');
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
-  // Monaco renders no-break spaces, so the text is normalised before it is compared.
-  const text = (await page.locator('.view-lines').innerText()).replace(/\u00a0/g, ' ');
+  const text = await modelText(page);
   expect(text).toContain('$p = "{{P_VALUE}}"');
   expect(text).toContain('$q = "plain value here"');
 });
@@ -1332,7 +1343,9 @@ test('reviews the values a pasted script carries and binds the ticked ones in on
   // Different stand-ins for the two usernames, a full name for the full server name.
   await page.getByRole('tab', { name: 'AI' }).click();
   await expect(page.locator('.editor-body')).toContainText('<PASSWORD>');
-  await expect(page.locator('.editor-body')).toContainText('example.user"');
+  // Each substituted value carries its binding's name as a badge, so the text is not adjacent
+  // to the closing quote any more; the word boundary tells example.user from example.user2.
+  await expect(page.locator('.editor-body')).toContainText(/example\.user\b/);
   await expect(page.locator('.editor-body')).toContainText('example.user2');
   await expect(page.locator('.editor-body')).toContainText('server.example.test');
   // And Local gives the file back as it was pasted.
@@ -1382,4 +1395,84 @@ test('sanitises pasted text against the vault without saving anything', async ({
   // Nothing else was saved: still the one project from the start.
   await page.evaluate(() => (location.hash = '#/projects'));
   await expect(page.locator('.project-card')).toHaveCount(1);
+});
+
+// PR 3. A placeholder reads as a pill: braces dimmed, the name on a category-coloured ground and
+// the AI value as a badge after it. The badge opens a card; the real value shows only on request
+// and hides again by itself.
+test('reads a placeholder as a pill and opens its card from the badge', async ({ page }) => {
+  await type(page, '$password = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await expect(page.locator('.monaco-editor .binding-chip').first()).toBeVisible();
+  const badge = page.locator('.monaco-editor .chip-badge').first();
+  await expect(badge).toHaveText(/<PASSWORD>/);
+  await badge.click();
+  const card = page.getByRole('dialog', { name: 'PASSWORD' });
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Hemlighet');
+  await expect(card).toContainText('rad 1');
+  await expect(card).toContainText('<PASSWORD>');
+  await expect(card).not.toContainText('Hunter2');
+  await card.getByRole('button', { name: 'Visa riktigt värde' }).click();
+  await expect(card).toContainText('Hunter2');
+  await expect(card).toContainText('döljs om');
+  await page.keyboard.press('Escape');
+  await expect(card).toHaveCount(0);
+
+  // In a projection the substituted value carries the name instead, and the card has no unbind.
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.locator('.monaco-editor .chip-badge').first()).toHaveText(/PASSWORD/);
+  await page.locator('.monaco-editor .chip-badge').first().click();
+  await expect(page.getByRole('dialog', { name: 'PASSWORD' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'PASSWORD' }).getByRole('button', { name: 'Ta bort platshållaren' })).toHaveCount(0);
+});
+
+// Removing one placeholder from its card writes the value back in that one place — the binding
+// and its other occurrences stay — and the undo bar takes it back.
+test('writes the value back for one placeholder from its card, with undo', async ({ page }) => {
+  await type(page, '$password = "Hunter2"\n$backup = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret', true);
+  await expect(page.locator('.monaco-editor .chip-badge')).toHaveCount(2);
+  await page.locator('.monaco-editor .view-line', { hasText: '$backup' }).locator('.chip-badge').click();
+  await page.getByRole('dialog', { name: 'PASSWORD' }).getByRole('button', { name: 'Ta bort platshållaren' }).click();
+  await expect(page.locator('.toast', { hasText: 'är borttagen' })).toBeVisible();
+  await expect(page.locator('.monaco-editor .chip-badge')).toHaveCount(1);
+  expect(await modelText(page)).toContain('$password = "{{PASSWORD}}"\n$backup = "Hunter2"');
+  await page.getByRole('button', { name: 'Ångra', exact: true }).click();
+  await expect(page.locator('.monaco-editor .chip-badge')).toHaveCount(2);
+  expect(await modelText(page)).not.toContain('Hunter2');
+});
+
+// The badge is injected text, not model text: the caret steps over it and typing right after the
+// pill lands after the placeholder, with the placeholder intact.
+test('keeps a placeholder intact when typing right after its pill', async ({ page }) => {
+  await type(page, '$password = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.press('End');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.type('X');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  expect(await modelText(page)).toContain('$password = "{{PASSWORD}}X"');
+  await expect(page.locator('.monaco-editor .chip-badge')).toHaveCount(1);
+});
+
+// A version saved without a label gets its line diff against the version the draft builds on,
+// so two saves on the same day are told apart; the first one gets the size of the file.
+test('labels an unlabelled version with its line diff', async ({ page }) => {
+  await type(page, '$a = 1\n');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('dialog[open]')).toContainText('"2 rader"');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('.version-item').first()).toContainText('2 rader');
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('$b = 2\n$c = 3\n');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('dialog[open]')).toContainText('"+2 −0"');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('.version-item').first()).toContainText('+2 −0');
+  await expect(page.locator('.version-item').first().locator('.version-stats')).toContainText('+2 −0');
 });

@@ -123,6 +123,8 @@ export const sv = {
   },
   version: {
     labelHint: 'Valfritt, men gör historiken läsbar. Datum och antal ändrade rader visas ändå.',
+    autoLabelHint: (label: string) => `Lämnas fältet tomt blir etiketten "${label}".`,
+    firstLabel: (lines: number) => `${lines} rader`,
     draftBasedOnIt: 'Utkastet bygger på den här versionen. Återställ en annan först.',
     deleteTitle: (n: number) => `Radera v${n}?`,
     deleteConfirm: 'Radera versionen',
@@ -590,6 +592,18 @@ export const sv = {
     replaced: (name: string, count: number) =>
       `${count} ${count === 1 ? 'förekomst' : 'förekomster'} av värdet bakom ${name} byttes mot platshållaren.`,
     replaceUndo: (name: string) => `Värdet bakom ${name} är utbytt mot platshållaren.`,
+  },
+  common: {
+    line: (n: number) => `rad ${n}`,
+  },
+  chip: {
+    reveal: 'Visa riktigt värde',
+    hidesIn: (s: number) => `döljs om ${s} s`,
+    noValue: 'Privat värde saknas.',
+    edit: 'Redigera',
+    unbind: 'Ta bort platshållaren',
+    unbound: (name: string) => `Platshållaren {{${name}}} är borttagen och värdet står i filen igen.`,
+    unboundUndo: (name: string) => `{{${name}}} är borttagen ur filen.`,
   },
   editorHover: {
     bindingNoValue: 'binding · värde saknas',

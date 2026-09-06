@@ -1,22 +1,14 @@
 import { useState } from 'react';
 import type { Version } from '../../types/models';
+import { changedLineCount, diffTemplates, formatStats } from '../../domain/diff';
 import { t } from '../text';
 
 const when = (iso: string) => new Date(iso).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' });
 
-/** Rough measure of how much changed, so two saves on the same day are told apart by something
- * other than their timestamp. */
+/** How much changed, so two saves on the same day are told apart by something other than their
+ * timestamp. An exact line diff: an insertion no longer counts every line below it. */
 export function changedLines(before: Record<string, string>, after: Record<string, string>): number {
-  const ids = new Set([...Object.keys(before), ...Object.keys(after)]);
-  let changed = 0;
-  for (const id of ids) {
-    const a = (before[id] ?? '').split('\n');
-    const b = (after[id] ?? '').split('\n');
-    const shared = Math.min(a.length, b.length);
-    for (let i = 0; i < shared; i++) if (a[i] !== b[i]) changed++;
-    changed += Math.abs(a.length - b.length);
-  }
-  return changed;
+  return changedLineCount(diffTemplates(before, after));
 }
 
 export function VersionPanel({
@@ -46,7 +38,7 @@ export function VersionPanel({
       </div>
       {versions.map((version, index) => {
         const previous = versions[index + 1];
-        const delta = previous ? changedLines(previous.templates, version.templates) : null;
+        const stats = previous ? diffTemplates(previous.templates, version.templates) : null;
         return (
           <div className={`version-item ${version.id === baseVersionId ? 'current' : ''}`} key={version.id}>
             <button
@@ -59,7 +51,7 @@ export function VersionPanel({
                 {version.label || 'Utan etikett'}
                 <small>
                   {when(version.createdAt)}
-                  {delta !== null && ` · ${delta} ändrade rader`}
+                  {stats && <span className="version-stats"> · {formatStats(stats)}</span>}
                   {version.id === baseVersionId && t.versionPanel.draftBasedOnThis}
                 </small>
               </span>

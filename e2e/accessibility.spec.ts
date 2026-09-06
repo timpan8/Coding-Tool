@@ -47,6 +47,25 @@ test('the armed real copy, its checklist and a toast stay clean', async ({ page 
   expect(await audit(page)).toEqual([]);
 });
 
+test('the pill card stays clean, revealed value and all', async ({ page }) => {
+  await open(page);
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.locator('.code-editor').click();
+  await page.keyboard.type('$password = "Hunter2"\n');
+  await page.getByText('Hunter2', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+  await page.getByLabel('Kategori').selectOption('secret');
+  await page.getByLabel('Privat värde · standard').fill('Hunter2');
+  await page.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await page.locator('.monaco-editor .chip-badge').first().click();
+  const card = page.getByRole('dialog', { name: 'PASSWORD' });
+  await expect(card).toBeVisible();
+  await card.getByRole('button', { name: 'Visa riktigt värde' }).click();
+  await expect(card).toContainText('döljs om');
+  expect(await audit(page)).toEqual([]);
+});
+
 test('the sanitise page has no accessibility violations', async ({ page }) => {
   await open(page, '#/sanitize');
   await expect(page.locator('.sanitize-page')).toBeVisible();

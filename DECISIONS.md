@@ -251,3 +251,28 @@ byts mot sina AI-värden, blocklistan tillämpas, resten granskas av samma regle
 genom samma exaktvärdeskontroll som ett projekt, och ett värde som ändå står kvar stoppar den. Att
 binda därifrån ger en global binding, eftersom ett värde mött i ett felmeddelande inte hör till
 något projekt.
+
+## Piller i editorn och diff-statistik som versionsnot
+
+**Pillret är tre dekorationer och en injicerad text, inte en widget.** Monaco kan inte byta ut
+text mot ett element i en redigerbar modell utan att markören, ångra-stacken och varje offset
+ändrar betydelse. Klamrarna dämpas, namnet får kategorins färg som bakgrund och AI-värdet står
+efter som injicerad text — den finns inte i modellen, så `getOffsetAt` och `Ctrl+B` räknar som
+förut, och markören stannar aldrig i den (`cursorStops: None`). I Local- och AI-vyn bär det
+utbytta värdet i stället bindingens namn på samma sätt, så en projektion läser vad ett värde är
+utan att någon behöver hålla muspekaren stilla.
+
+**Kortet visar det riktiga värdet på begäran och i en minut.** Värdet finns redan i Local-vyn på
+samma maskin; det kortet lägger till är att det syns bredvid platshållaren utan att vyn byts.
+Det går inte att markera, så en visning blir aldrig en kopia av misstag, och det döljs igen efter
+60 sekunder eller när kortet stängs. "Ta bort platshållaren" skriver tillbaka värdet på just den
+platsen, inte överallt — det är vad radering av bindingen gör — och erbjuder ångra. Kortet är
+bundet till texten det öppnades i: en ändring eller ett vybyte gör spannet till en gissning, och
+då försvinner kortet hellre än pekar fel.
+
+**Etiketten som ingen skrev är raddiffen.** En version utan etikett hette "Utan etikett", och två
+sparningar samma dag gick inte att skilja åt. Nu får en tom etikett `+n −m` mot versionen
+utkastet bygger på, räknat med en rad-LCS så en insättning högst upp inte kallar varje rad under
+ändrad; den första versionen får filens storlek. Dialogen säger vad som skrivs om fältet lämnas
+tomt, så det aldrig kommer som en överraskning i historiken. Samma tal står vid varje version i
+listan.
