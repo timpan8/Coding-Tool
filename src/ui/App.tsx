@@ -5,7 +5,7 @@ import type { StorageProvider } from '../storage/StorageProvider';
 import { resolveBinding, resolveValue, suggestBinding, defaults } from '../domain/bindings';
 import { expandToLiteral } from '../domain/bindings/literal';
 import { render, usage } from '../domain/render';
-import { auditForCopy, promptBlock } from '../domain/render/audit';
+import { auditForCopy, auditSelection, promptBlock } from '../domain/render/audit';
 import { buildValueIndex } from '../domain/render/leak';
 import { type Coverage } from '../domain/render/coverage';
 import { WorkspaceController } from './WorkspaceController';
@@ -165,6 +165,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const languageChosen = useRef(new Set<string>());
   const workspaceVisible = route === '#/' || route.startsWith('#/project/');
   const fontSize = settings?.editorFontSize ?? 14, wrap = settings?.editorWordWrap ?? true;
+  const [selected, setSelected] = useState<Selection | null>(null);
 
   async function run(action: () => Promise<void>) {
     if (busyRef.current) return;
@@ -430,9 +431,12 @@ export function App({ storage }: { storage: StorageProvider }) {
       .then(() => controller.reloadSettings())
       .catch(() => setNotice('Inställningen gäller inte — den kunde inte sparas.'));
   }
-  /** Only the AI copy gets the instruction block; the local copy goes into an editor. */
-  function withPrompt(text: string, which: 'local' | 'ai') {
-    if (which !== 'ai' || !settings?.includeAiPromptBlock || !settings.aiPromptText.trim()) return text;
+  /** Only the AI copy gets the instruction block, and only when something was actually substituted:
+   * the text says private values have been replaced with placeholders, so putting it above code
+   * that has none states something untrue in the copied artifact. The local copy goes into an
+   * editor and gets nothing. */
+  function withPrompt(text: string, which: 'local' | 'ai', replaced: number) {
+    if (which !== 'ai' || !replaced || !settings?.includeAiPromptBlock || !settings.aiPromptText.trim()) return text;
     const block = promptBlock(settings.aiPromptText, language);
     return block ? `${block}\n\n${text}` : text;
   }
@@ -442,7 +446,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     const result = auditForCopy(template, bindings, { ...options, mode: which });
     if (!result.canCopy) { setError('Nedladdning blockerad. Åtgärda problemen i panelen.'); return; }
     const name = session.files.find(f => f.id === session.activeFileId)?.name ?? 'kod.txt';
-    download(`${which}-${name}`, withPrompt(result.text, which), 'text/plain');
+    download(`${which}-${name}`, withPrompt(result.text, which, result.used.length), 'text/plain');
     setCopyMode(null);
     setNotice(which === 'local' ? 'Filen är nedladdad · den innehåller riktiga värden.' : 'Filen är nedladdad.');
   }
@@ -473,7 +477,20 @@ export function App({ storage }: { storage: StorageProvider }) {
     const result = auditForCopy(template, bindings, { ...options, mode: which });
     if (!result.canCopy) { setError('Kopiering blockerad. Åtgärda problemen i panelen.'); return; }
     if (which === 'ai' || result.secretRanges.length) { setReviewed(false); setCopyMode(which); return; }
-    await writeClipboard(withPrompt(result.text, which), which);
+    await writeClipboard(withPrompt(result.text, which, result.used.length), which);
+  }
+  /** Report U19. Asking an AI about one function should not mean handing over the whole file. The
+   * selection is audited on its own, so a missing binding elsewhere does not block it, but the
+   * exact-value check still runs on precisely what goes to the clipboard. */
+  async function copySelection() {
+    if (!selected || busyRef.current) return;
+    const result = auditSelection(template, bindings, { ...options, mode: 'ai' }, selected);
+    if (!result.canCopy) { setError(`Markeringen kan inte kopieras: ${result.blocking[0].message}`); return; }
+    try {
+      await navigator.clipboard.writeText(withPrompt(result.text, 'ai', result.used.length));
+      setNotice(`Markeringen kopierad · ${result.used.length} ${result.used.length === 1 ? 'värde' : 'värden'} utbytta.`);
+    }
+    catch { setError('Webbläsaren nekade urklippsåtkomst. Kontrollera sidans behörighet.'); }
   }
   function openDrawer() { setDrawer(true); void controller.refreshProjects().catch(() => setError('Projektlistan kunde inte läsas. Din kod finns kvar.')); }
   useEffect(() => {
@@ -519,13 +536,13 @@ export function App({ storage }: { storage: StorageProvider }) {
                 body: <><p>Filens innehåll försvinner ur arbetsutkastet.</p><p>Sparade versioner behåller sin kopia, så den går att få tillbaka därifrån.</p></> })) return;
               await controller.removeFile(id);
             })} />
-          <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} id={`vy-${m}`} role="tab" aria-selected={mode === m} aria-controls="kodvy" className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions"><button disabled={!project} onClick={() => setIngesting(true)}>Klistra in från AI ↙</button>{Boolean(issues.length) && <span id="copy-blocked" className="copy-blocked">{issues.length} problem hindrar kopiering — se panelen</span>}<button disabled={!template.trim() || Boolean(local.issues.length)} aria-describedby={local.issues.length ? 'copy-blocked' : undefined} title={local.issues.length ? `Blockerad: ${local.issues.length} problem i Local-vyn` : undefined} onClick={() => void copy('local')}>Copy Local</button><button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} aria-describedby={ai.issues.length ? 'copy-blocked' : undefined} title={ai.issues.length ? `Blockerad: ${ai.issues.length} problem i AI-vyn` : undefined} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
+          <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} id={`vy-${m}`} role="tab" aria-selected={mode === m} aria-controls="kodvy" className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions"><button disabled={!project} onClick={() => setIngesting(true)}>Klistra in från AI ↙</button>{Boolean(issues.length) && <span id="copy-blocked" className="copy-blocked">{issues.length} problem hindrar kopiering — se panelen</span>}<button disabled={!template.trim() || Boolean(local.issues.length)} aria-describedby={local.issues.length ? 'copy-blocked' : undefined} title={local.issues.length ? `Blockerad: ${local.issues.length} problem i Local-vyn` : undefined} onClick={() => void copy('local')}>Copy Local</button>{mode === 'template' && selected && <button className="copy-selection" onClick={() => void copySelection()}>Kopiera markering ↗</button>}<button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} aria-describedby={ai.issues.length ? 'copy-blocked' : undefined} title={ai.issues.length ? `Blockerad: ${ai.issues.length} problem i AI-vyn` : undefined} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
           <div className="view-banner" key={mode}><strong>{mode === 'template' ? '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN' : mode === 'local' ? '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN' : '◇ AI — SANERAD'}</strong><span>{mode === 'template' ? 'Redigerbar källa' : 'Skrivskyddad projektion'}</span></div>
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj värden' : 'Visa värden'}</button></div>}
           <div className="editor-body" id="kodvy" role="tabpanel" aria-labelledby={`vy-${mode}`}>{!template && mode === 'template' && <div className="paste-prompt"><strong>Klistra in din kod här</strong><span>Projektet skapas automatiskt och sparas lokalt.</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>eller prova med exempelkod</button>}</div>}
             <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { noteLanguage(text); controller.changeText(text); }} onBinding={createBinding}
-              onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }} onFocused={() => setFocusName('')}
-              fontSize={settings?.editorFontSize ?? 14} wordWrap={settings?.editorWordWrap ?? true} />
+              onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }}
+              fontSize={fontSize} wordWrap={wrap} onSelectionChange={setSelected} onFocused={() => setFocusName('')} />
           </div><div className="editor-footer"><span>{visible.split('\n').length} rader · {used.length} bindings</span>
             <div className="editor-tools" role="group" aria-label="Editorinställningar">
               <button aria-label="Mindre text" title="Mindre text" disabled={fontSize <= 10} onClick={() => changeEditor({ editorFontSize: fontSize - 1 })}>A−</button>
@@ -573,7 +590,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         return { before: line, after: line.slice(0, s.start - lineStart) + `{{${bindingDialog.binding.name}}}` + line.slice(s.end - lineStart) };
       })() || undefined}
       save={storeBinding} close={() => setBindingDialog(null)} />}
-    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} findings={copyFindings} />}{copyMode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.</label>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => downloadCopy(copyMode)}>Ladda ned som fil</button><button className={copyMode === 'local' ? 'danger' : cover.bound && !seriousFindings ? 'primary' : ''} disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(withPrompt(result.text, copyMode), copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound && !seriousFindings ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
+    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} findings={copyFindings} />}{copyMode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.</label>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => downloadCopy(copyMode)}>Ladda ned som fil</button><button className={copyMode === 'local' ? 'danger' : cover.bound && !seriousFindings ? 'primary' : ''} disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(withPrompt(result.text, copyMode, result.used.length), copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound && !seriousFindings ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
     {viewing && <Modal title={viewing.compareTo ? `v${viewing.compareTo.number} → v${viewing.version.number}` : `v${viewing.version.number}${viewing.version.label ? ` · ${viewing.version.label}` : ''}`} close={() => setViewing(null)}>
       <div className="version-view">
         <Suspense fallback={<p className="muted">Laddar jämförelsen…</p>}><DiffEditor language={language} theme={resolvedTheme}

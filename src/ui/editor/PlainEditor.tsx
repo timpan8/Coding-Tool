@@ -8,7 +8,7 @@ import type { EditorProps } from './props';
  * selection handles and its own scrolling fights the page's. It supports the parts of the interface
  * that carry meaning — text, read-only, selection for Ctrl+B — and quietly ignores decorations,
  * hovers and completion, which have nowhere to go here. */
-export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, focusLine, onLine, fontSize, wordWrap }: EditorProps) {
+export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, focusLine, onLine, fontSize, wordWrap, onSelectionChange }: EditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -25,16 +25,16 @@ export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, f
 
   function selection() {
     const area = ref.current;
-    if (!area || area.selectionStart === area.selectionEnd) return;
+    if (!area || area.selectionStart === area.selectionEnd) return null;
     const start = area.selectionStart;
     const before = area.value.slice(0, start);
-    onBinding?.({
+    return {
       text: area.value.slice(start, area.selectionEnd),
       start,
       end: area.selectionEnd,
       lineBefore: before.slice(before.lastIndexOf('\n') + 1),
       line: before.split('\n').length,
-    });
+    };
   }
 
   return (
@@ -53,12 +53,14 @@ export function PlainEditor({ value, readOnly, autoFocus, onChange, onBinding, f
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
           e.preventDefault();
-          selection();
+          const range = selection();
+          if (range) onBinding?.(range);
         }
       }}
       onSelect={(e) => {
         const area = e.currentTarget;
         onLine?.(area.value.slice(0, area.selectionStart).split('\n').length);
+        onSelectionChange?.(selection());
       }}
     />
   );

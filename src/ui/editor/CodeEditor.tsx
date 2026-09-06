@@ -72,6 +72,12 @@ export function CodeEditor(props: EditorProps) {
     const change = instance.onDidChangeModelContent(() => { decorate(); if (!updating.current && !instance.getOption(monaco.editor.EditorOption.readOnly)) callbacks.current.onChange?.(instance.getValue()); });
     const modelChange = instance.onDidChangeModel(decorate);
     const line = instance.onDidChangeCursorPosition(e => callbacks.current.onLine?.(e.position.lineNumber));
+    const selected = instance.onDidChangeCursorSelection(() => {
+      const model = instance.getModel(), range = instance.getSelection();
+      if (!model || !range || range.isEmpty()) { callbacks.current.onSelectionChange?.(null); return; }
+      callbacks.current.onSelectionChange?.({ text: model.getValueInRange(range), start: model.getOffsetAt(range.getStartPosition()),
+        end: model.getOffsetAt(range.getEndPosition()), lineBefore: model.getLineContent(range.startLineNumber).slice(0, range.startColumn - 1), line: range.startLineNumber });
+    });
     const placeholderAt = (position: monaco.Position) => {
       const matches = instance.getModel()!.findMatches('\\{\\{([A-Z][A-Z0-9_]{1,63})\\}\\}', false, true, false, null, true);
       return matches.find(m => m.range.containsPosition(position))?.matches?.[1];
@@ -125,7 +131,7 @@ export function CodeEditor(props: EditorProps) {
     decorateRef.current = decorate;
     decorate();
     if (callbacks.current.autoFocus) instance.focus();
-    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); mouse.dispose(); hover.dispose(); completion.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
+    return () => { action.dispose(); change.dispose(); modelChange.dispose(); line.dispose(); selected.dispose(); mouse.dispose(); hover.dispose(); completion.dispose(); instance.dispose(); documents.current.forEach(d => d.model.dispose()); documents.current.clear(); editor.current = null; };
   }, []);
   useEffect(() => {
     const instance = editor.current;

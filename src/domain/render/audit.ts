@@ -54,3 +54,70 @@ export function auditForCopy(template: string, bindings: Binding[], options: Ren
     canCopy: blocking.length === 0,
   };
 }
+
+/** Maps an offset in the template onto the rendered text.
+ *
+ * Only successfully escaped placeholders shift anything: one that failed keeps its literal
+ * `{{NAME}}` and so has the same length in both. An offset that lands inside a placeholder snaps to
+ * its edge, because half a placeholder is not something anyone meant to select. */
+function mapOffset(subs: RenderResult['substitutions'], offset: number, edge: 'start' | 'end'): number {
+  let delta = 0;
+  for (const s of subs) {
+    if (s.source.end <= offset) delta += s.end - s.start - (s.source.end - s.source.start);
+    else if (s.source.start < offset) return edge === 'start' ? s.start : s.end;
+    else break;
+  }
+  return offset + delta;
+}
+
+export interface SelectionAudit extends CopyAudit {
+  /** The rendered text of the selection alone. */
+  text: string;
+}
+
+/** Report U19: copying one function rather than the whole file.
+ *
+ * The whole template is rendered first, never the fragment on its own — escaping depends on the
+ * surrounding source, and a fragment that starts inside a string literal would be lexed wrongly.
+ * Only then is the result cut down to the selection.
+ *
+ * The gate is applied to what is actually copied: the exact-value check runs on the slice, and an
+ * unresolved placeholder outside the selection does not block it. Invariant 4 still holds, because
+ * the slice is the output. */
+export function auditSelection(
+  template: string,
+  bindings: Binding[],
+  options: RenderOptions,
+  range: { start: number; end: number },
+  index?: ValueIndex,
+): SelectionAudit {
+  const whole = render(template, bindings, options);
+  const from = mapOffset(whole.substitutions, Math.max(0, Math.min(range.start, template.length)), 'start');
+  const to = mapOffset(whole.substitutions, Math.max(0, Math.min(range.end, template.length)), 'end');
+  const text = whole.text.slice(from, to);
+
+  const inside = <T extends { start: number; end: number }>(r: T) => r.start >= from && r.end <= to;
+  const shift = <T extends { start: number; end: number }>(r: T) => ({ ...r, start: r.start - from, end: r.end - from });
+  const substitutions = whole.substitutions.filter(inside).map(shift);
+  const leaks = options.mode === 'ai' ? findLeaks(text, index ?? buildValueIndex(bindings)) : [];
+  const leakIssues: RenderIssue[] = leaks.map((hit) => ({
+    name: hit.bindingName,
+    start: hit.start,
+    kind: 'leak',
+    message: 'Ett känt privat värde står i klartext i markeringen. Kopiering till AI är blockerad tills det är borta.',
+  }));
+  // Only problems inside the selection can block it; one further down the file is not being copied.
+  const own = whole.issues.filter((issue) => issue.start >= range.start && issue.start < range.end);
+  const blocking = [...own, ...leakIssues];
+  return {
+    text,
+    issues: blocking,
+    used: substitutions.map((s) => s.name),
+    secretRanges: whole.secretRanges.filter(inside).map(shift),
+    substitutions,
+    leaks,
+    coverage: coverage(template.slice(range.start, range.end), options.language),
+    blocking,
+    canCopy: blocking.length === 0,
+  };
+}

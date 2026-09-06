@@ -578,6 +578,39 @@ test('still reveals a placeholder when its binding is clicked', async ({ page })
   await expect(page.locator('.monaco-editor .selected-text').first()).toBeVisible();
 });
 
+// Report U19. Asking an AI about one function should not mean handing over the whole file.
+test('copies a selection in sanitised form without the rest of the file', async ({ page, context }) => {
+  await type(page, '$p = "Hunter2"\nWrite-Host "second line"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  // A hole further down blocks a whole-file copy but must not block the selection.
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('$q = "{{NO_SUCH_BINDING}}"\n');
+  await expect(page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ })).toBeDisabled();
+
+  await page.getByText('second line').first().dblclick();
+  const button = page.getByRole('button', { name: 'Kopiera markering ↗' });
+  await expect(button).toBeVisible();
+  await button.click();
+  await expect(page.locator('.inline-notice')).toContainText('Markeringen kopierad');
+  await context.grantPermissions(['clipboard-read']);
+  const clipped = await page.evaluate(() => navigator.clipboard.readText());
+  // No placeholders in this fragment, so no instruction block claiming there are any.
+  expect(clipped).toBe('second');
+
+  // A fragment that does carry one is sanitised and gets the instruction.
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.press('Shift+End');
+  await page.getByRole('button', { name: 'Kopiera markering ↗' }).click();
+  await expect(page.locator('.inline-notice')).toContainText('1 värde utbytta');
+  const second = await page.evaluate(() => navigator.clipboard.readText());
+  expect(second).toContain('<PASSWORD>');
+  expect(second).toContain('Behåll dem exakt');
+  expect(second).not.toContain('Hunter2');
+  expect(second).not.toContain('NO_SUCH_BINDING');
+});
+
 // Report U18. Font size and wrap were hardcoded; find and replace worked but nothing said so.
 test('keeps editor preferences and points at the editor commands', async ({ page }) => {
   await type(page, '$a = "one"\n');

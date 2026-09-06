@@ -30,6 +30,9 @@ export interface EditorProps {
   substitutions?: { start: number; end: number; name: string }[];
   fontSize?: number;
   wordWrap?: boolean;
+  /** Fires whenever the selection changes, with null when it is empty. Lets the workspace offer to
+   * copy a selection without reaching into the editor. */
+  onSelectionChange?: (selection: Selection | null) => void;
   /** Fires once `focusName` has actually been revealed, so the caller can clear the request.
    * `focusName` is a command, not state: left standing it would be re-applied on every edit. */
   onFocused?: () => void;
