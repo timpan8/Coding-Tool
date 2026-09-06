@@ -108,6 +108,9 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await page.getByLabel('Projektnamn').fill('Backup-provet');
   await page.getByLabel('Projektnamn').press('Enter');
   await page.getByRole('button', { name: 'Spara version' }).click();
+  await page.getByLabel('Versionsetikett').fill('inför backup');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 
   await page.evaluate(() => (location.hash = '#/settings'));
@@ -242,4 +245,43 @@ test('keeps several files in a project, each with its own text and language', as
   await page.reload();
   await expect(page.getByRole('tab', { name: 'script.ps1' })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'del2.py' })).toBeVisible();
+});
+
+// Report F22-F25. Every version was saved without a label, so the list read the same line all the
+// way down with a date and no time; there was no way to look at one without replacing the draft,
+// no comparison, and no way to remove one.
+test('labels versions, compares them and deletes one', async ({ page }) => {
+  await type(page, '$a = "one"\n');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await page.getByLabel('Versionsetikett').fill('första');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('.version-history')).toContainText('första');
+
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('$b = "two"\n');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await page.getByLabel('Versionsetikett').fill('andra');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('.version-history')).toContainText('andra');
+
+  // Looking at a version must not touch the draft, which was the only way to see one before.
+  await page.locator('.version-item').filter({ hasText: 'första' }).getByRole('button').first().click();
+  await page.locator('.version-actions').getByRole('button', { name: 'Visa' }).click();
+  await expect(page.locator('.diff-editor')).toBeVisible();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Stäng', exact: true }).click();
+  await expect(page.locator('.editor-body')).toContainText('$b');
+
+  // A version the draft is built on cannot be deleted out from under it.
+  await page.locator('.version-item').filter({ hasText: 'andra' }).getByRole('button').first().click();
+  await page.locator('.version-actions').getByRole('button', { name: 'Radera' }).click();
+  await expect(page.locator('dialog[open]')).toContainText('Återställ en annan först');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Stäng', exact: true }).click();
+
+  await page.locator('.version-item').filter({ hasText: 'första' }).getByRole('button').first().click();
+  await page.locator('.version-actions').getByRole('button', { name: 'Radera' }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Radera versionen' }).click();
+  await expect(page.locator('.version-history')).not.toContainText('första');
+  await expect(page.locator('.version-history')).toContainText('andra');
 });

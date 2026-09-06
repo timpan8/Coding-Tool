@@ -18,6 +18,8 @@ import { useConfirm } from './components/ConfirmDialog';
 import { collectIssues, IssuePanel, type LocatedIssue } from './components/IssuePanel';
 import { FindingsPanel, useDismissals, useScanner } from './components/FindingsPanel';
 import { FileTabs } from './components/FileTabs';
+import { VersionPanel } from './components/VersionPanel';
+import { DiffEditor } from './editor/DiffEditor';
 import { scan, type Finding } from '../domain/scanner';
 import type { ScannerRule } from '../types/models';
 import { Security } from './pages/Security';
@@ -87,6 +89,27 @@ function AiCopyReview({ coverage, issues, replaced, findings }: { coverage: Cove
   );
 }
 
+/** Every version was previously saved with no label, so the history read "Sparad version" all the
+ * way down and two saves on the same day were impossible to tell apart. */
+function SaveVersionDialog({ next, save, close }: { next: number; save: (label: string) => void; close: () => void }) {
+  const [label, setLabel] = useState('');
+  return (
+    <Modal title={`Spara v${next}`} close={close}>
+      <label>
+        Vad utmärker den här versionen?
+        <input autoFocus aria-label="Versionsetikett" value={label} onChange={e => setLabel(e.target.value)}
+          placeholder="t.ex. innan omskrivningen av inloggningen"
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(label); } }} />
+        <small>Valfritt, men gör historiken läsbar. Datum och antal ändrade rader visas ändå.</small>
+      </label>
+      <div className="dialog-actions">
+        <button onClick={close}>Avbryt</button>
+        <button className="primary" onClick={() => save(label)}>Spara version</button>
+      </div>
+    </Modal>
+  );
+}
+
 export function App({ storage }: { storage: StorageProvider }) {
   const [controller] = useState(() => new WorkspaceController(storage));
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
@@ -98,6 +121,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [busy, setBusy] = useState(false), busyRef = useRef(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [bindingDialog, setBindingDialog] = useState<{ binding: Binding; selection?: Selection } | null>(null);
   const [showSecrets, setShowSecrets] = useState(false), [focusName, setFocusName] = useState(''), [focusLine, setFocusLine] = useState<number>();
+  const [viewing, setViewing] = useState<{ version: Version; compareTo: Version | null } | null>(null), [labelling, setLabelling] = useState(false);
   const [copyMode, setCopyMode] = useState<'local' | 'ai' | null>(null), [reviewed, setReviewed] = useState(false), [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
   const [deviceName, setDeviceName] = useState(''), currentLine = useRef(1);
   const [theme, setTheme] = useState<ThemeChoice>(paintHint()), [systemDark, setSystemDark] = useState(systemPrefersDark);
@@ -190,6 +214,17 @@ export function App({ storage }: { storage: StorageProvider }) {
     .sort((a, b) => Number(Boolean(resolveValue(a, options.profileId))) - Number(Boolean(resolveValue(b, options.profileId))) || a.name.localeCompare(b.name));
   const saveStatus = phase === 'loading' ? 'Öppnar lokalt valv…' : phase === 'error' ? 'Fel vid sparning' : phase === 'saved' ? 'Sparat lokalt' : 'Sparar lokalt…';
   const currentId = controller.getLastProjectId(), filtered = projects.filter(p => projectMatches(p, query));
+  async function removeVersion(version: Version) {
+    await run(async () => {
+      if (version.id === session.baseVersionId) throw new Error('Utkastet bygger på den här versionen. Återställ en annan först.');
+      if (!await confirm({ title: `Radera v${version.number}?`, danger: true, confirmLabel: 'Radera versionen',
+        body: <><p>{version.label ? `"${version.label}"` : 'Versionen'} tas bort ur historiken för alltid.</p><p>Utkastet du arbetar i påverkas inte.</p></> })) return;
+      await storage.deleteVersion(version.id);
+      await controller.reloadVersions();
+      setViewing(null);
+      setNotice(`v${version.number} raderad.`);
+    });
+  }
   async function removeProject(id: string, name: string) {
     await run(async () => {
       const [versions, all] = await Promise.all([storage.listVersions(id), storage.listBindings()]);
@@ -206,6 +241,10 @@ export function App({ storage }: { storage: StorageProvider }) {
       if (wasOpen) setLocation('#/', true);
       setNotice(`${name} raderat.`);
     });
+  }
+  async function saveVersion(label: string) {
+    setLabelling(false);
+    await run(() => controller.saveVersion(label.trim()));
   }
   function changeTheme(next: ThemeChoice) {
     setTheme(next); applyTheme(next);
@@ -338,7 +377,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <div className="workspace" hidden={!workspaceVisible}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : 'BÖRJA DIREKT'}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
         <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => controller.changeLanguage(e.target.value as LanguageId)}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? `${session.files.length} ${session.files.length === 1 ? 'fil' : 'filer'}` : 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
-      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => void run(() => controller.saveVersion())}>Spara version</button></div></section>
+      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
         <div className="work-grid"><section className={`editor-panel mode-${mode}`}>
           <FileTabs files={session.files} activeId={session.activeFileId} disabled={busy}
             onSelect={id => { controller.selectFile(id); changeMode('template'); }}
@@ -365,7 +404,11 @@ export function App({ storage }: { storage: StorageProvider }) {
           <IssuePanel issues={issues} onSelect={showIssue} />
           <FindingsPanel findings={findings} onShow={f => { changeMode('template'); setFocusLine(f.line); }}
             onBind={bindFinding} onDismiss={f => void dismissFinding(f)} />
-          <details className="version-history"><summary>Sparade versioner <span>{versions.length}</span></summary>{versions.map(v => <div className="version-item" key={v.id}><button onClick={() => void applyVersion(v)}><b>v{v.number}</b><span>{v.label || 'Sparad version'}<small>{new Date(v.createdAt).toLocaleDateString('sv-SE')}</small></span></button><button className="text-button" onClick={() => void applyVersion(v, true)}>Återgå som ny version</button></div>)}{!versions.length && <p>Utkastet sparas automatiskt. Spara en version när du vill behålla en punkt i historiken.</p>}</details>
+          <VersionPanel versions={versions} baseVersionId={session.baseVersionId} disabled={busy}
+            onPreview={v => setViewing({ version: v, compareTo: null })}
+            onCompare={v => setViewing({ version: v, compareTo: versions[versions.indexOf(v) + 1] ?? null })}
+            onRestore={(v, asNew) => void applyVersion(v, asNew)}
+            onDelete={v => void removeVersion(v)} />
           <div className="m1-note"><b>Vad som ännu inte finns</b><p>Kod som kommer tillbaka från en AI matchas inte om mot dina värden automatiskt, och ett projekt rymmer bara en fil. Granskningsreglerna fångar det som liknar hemligheter, inte allt som är känsligt hos dig.</p></div>
         </aside></div>
       </div>
@@ -383,6 +426,16 @@ export function App({ storage }: { storage: StorageProvider }) {
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
     {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0} save={storeBinding} close={() => setBindingDialog(null)} />}
     {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} findings={copyFindings} />}{copyMode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.</label>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound && !seriousFindings ? 'primary' : ''} disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound && !seriousFindings ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
+    {viewing && <Modal title={viewing.compareTo ? `v${viewing.compareTo.number} → v${viewing.version.number}` : `v${viewing.version.number}${viewing.version.label ? ` · ${viewing.version.label}` : ''}`} close={() => setViewing(null)}>
+      <div className="version-view">
+        <DiffEditor language={language} theme={resolvedTheme}
+          original={viewing.compareTo?.templates[session.activeFileId] ?? (viewing.compareTo ? '' : viewing.version.templates[session.activeFileId] ?? '')}
+          modified={viewing.version.templates[session.activeFileId] ?? ''} />
+      </div>
+      <p className="notice">Skrivskyddad mall som den såg ut när versionen sparades. Ditt utkast är orört{viewing.version.files && viewing.version.files.length > 1 ? `. Visar ${session.files.find(f => f.id === session.activeFileId)?.name} av ${viewing.version.files.length} filer` : ''}.</p>
+      <div className="dialog-actions"><button onClick={() => setViewing(null)}>Stäng</button><button className="primary" onClick={() => { const v = viewing.version; setViewing(null); void applyVersion(v); }}>Återställ den här versionen</button></div>
+    </Modal>}
+    {labelling && <SaveVersionDialog next={Math.max(0, ...versions.map(v => v.number)) + 1} save={label => void saveVersion(label)} close={() => setLabelling(false)} />}
     {confirmDialog}
     {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
   </div>;

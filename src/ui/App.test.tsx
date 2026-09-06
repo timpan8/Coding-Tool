@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render as mount, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render as mount, screen, waitFor, within } from '@testing-library/react';
 import { App } from './App';
 import { IndexedDbProvider } from '../storage/IndexedDbProvider';
 import { binding, project, version } from '../test/fixtures/factories';
@@ -40,8 +40,13 @@ it('creates a project from first input, binds a selected value, renders both vie
   fireEvent.change(screen.getByLabelText('Privat värde · standard'), { target: { value: 'synthetic.user' } });
   fireEvent.click(screen.getByRole('button', { name: 'Spara binding' }));
   await waitFor(() => expect((editor as HTMLTextAreaElement).value).toContain('{{ADMIN_USERNAME}}'));
+  // Saving now asks for a label first, so the history is readable.
   fireEvent.click(screen.getByRole('button', { name: 'Spara version' }));
+  const labelField = await screen.findByLabelText('Versionsetikett');
+  fireEvent.change(labelField, { target: { value: 'första rundan' } });
+  fireEvent.click(within(labelField.closest('dialog')!).getByRole('button', { name: 'Spara version' }));
   await waitFor(async () => expect(await storage.listVersions((await storage.listProjects())[0].id)).toHaveLength(1));
+  expect((await storage.listVersions((await storage.listProjects())[0].id))[0].label).toBe('första rundan');
   fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
   // Masked by default whatever the category: the category is guessed from the variable name.
   expect((editor as HTMLTextAreaElement).value).not.toContain('synthetic.user');
