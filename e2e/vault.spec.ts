@@ -69,9 +69,9 @@ test('lets the caret be placed inside a placeholder', async ({ page }) => {
 });
 
 // Report F19 and invariant 9. Masking and the second confirmation before Copy Local both key off
-// category alone, and the suggestion heuristic reads only the variable name: `$p = "Hunter2"`
-// becomes `identity`, so a password is rendered in the clear. The value's own shape is ignored.
-test.fail('masks a password-shaped value the heuristic mis-categorised', async ({ page }) => {
+// category, and the name heuristic read only the variable name, so `$p = "Hunter2"` came out as
+// identity and the password rendered in the clear. The scanner rules now read the value's shape.
+test('masks a password-shaped value the heuristic would have mis-categorised', async ({ page }) => {
   await type(page, '$p = "Hunter2"\n');
   await bind(page, 'Hunter2', 'Hunter2');
   await page.getByRole('tab', { name: 'Local' }).click();
@@ -91,7 +91,7 @@ test('masks a value categorised as a secret until it is revealed', async ({ page
   await bind(page, 'Hunter2', 'Hunter2', 'secret');
   await page.getByRole('tab', { name: 'Local' }).click();
   await expect(page.locator('.editor-body')).not.toContainText('Hunter2');
-  await page.getByRole('button', { name: 'Visa secrets' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
   await expect(page.locator('.editor-body')).toContainText('Hunter2');
 });
 

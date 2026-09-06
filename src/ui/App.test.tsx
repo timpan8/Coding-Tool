@@ -43,6 +43,9 @@ it('creates a project from first input, binds a selected value, renders both vie
   fireEvent.click(screen.getByRole('button', { name: 'Spara version' }));
   await waitFor(async () => expect(await storage.listVersions((await storage.listProjects())[0].id)).toHaveLength(1));
   fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
+  // Masked by default whatever the category: the category is guessed from the variable name.
+  expect((editor as HTMLTextAreaElement).value).not.toContain('synthetic.user');
+  fireEvent.click(screen.getByRole('button', { name: 'Visa värden' }));
   expect((editor as HTMLTextAreaElement).value).toContain('synthetic.user');
   fireEvent.click(screen.getByRole('tab', { name: 'AI' }));
   expect((editor as HTMLTextAreaElement).value).toContain('example.user');

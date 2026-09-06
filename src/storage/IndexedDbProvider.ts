@@ -2,19 +2,22 @@ import Dexie, { type Table } from 'dexie';
 import type { StorageProvider } from './StorageProvider';
 import { DraftConflictError } from './StorageProvider';
 import type { ProjectDraft, ProjectDraftMetadata } from '../types/models';
-import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ScannerRule, Settings, Version, WorkspaceSnapshot } from '../types/models';
+import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ScanDismissal, ScannerRule, Settings, Version, WorkspaceSnapshot } from '../types/models';
 import { validateBinding } from '../domain/bindings';
+import { mergeRules } from '../domain/scanner/rules';
 
 class VaultDatabase extends Dexie {
   projects!: Table<Project, string>; versions!: Table<Version, string>; bindings!: Table<Binding, string>;
   profiles!: Table<Profile, string>; datasets!: Table<Dataset, string>; rules!: Table<ScannerRule, string>;
   settings!: Table<Settings & { key: string }, string>;
   drafts!: Table<ProjectDraft, string>;
+  dismissals!: Table<ScanDismissal, [string, string]>;
   constructor(name: string) {
     super(name);
     this.version(1).stores({ projects: 'id,updatedAt', versions: 'id,projectId,[projectId+number]',
       bindings: 'id,[scope+scopeRef],name', profiles: 'id', datasets: 'id,projectId', rules: 'id', settings: 'key' });
     this.version(2).stores({ drafts: 'projectId,updatedAt' });
+    this.version(3).stores({ dismissals: '[projectId+fingerprint],projectId' });
   }
 }
 export class IndexedDbProvider implements StorageProvider {
@@ -24,13 +27,14 @@ export class IndexedDbProvider implements StorageProvider {
   async getProject(id: string) { return this.db.projects.get(id); }
   async saveProject(p: Project) { await this.db.projects.put(p); }
   async deleteProject(id: string) {
-    await this.db.transaction('rw', [this.db.projects, this.db.versions, this.db.bindings, this.db.datasets, this.db.drafts], async () => {
+    await this.db.transaction('rw', [this.db.projects, this.db.versions, this.db.bindings, this.db.datasets, this.db.drafts, this.db.dismissals], async () => {
       const ids = (await this.listVersions(id)).map(v => v.id);
       await this.db.bindings.filter(b => b.scope === 'project' && b.scopeRef === id || b.scope === 'version' && ids.includes(b.scopeRef || '')).delete();
       await this.db.versions.where('projectId').equals(id).delete();
       await this.db.datasets.where('projectId').equals(id).delete();
       await this.db.projects.delete(id);
       await this.db.drafts.delete(id);
+      await this.db.dismissals.where('projectId').equals(id).delete();
     });
   }
   async getDraft(projectId: string) { return this.db.drafts.get(projectId); }
@@ -86,7 +90,13 @@ export class IndexedDbProvider implements StorageProvider {
   async saveProfile(p: Profile) { await this.db.profiles.put(p); }
   async listDatasets(filter?: DatasetFilter) { return this.db.datasets.filter(d => !filter || d.scope === 'global' || d.projectId === filter.projectId).toArray(); }
   async saveDataset(d: Dataset) { await this.db.datasets.put(d); }
-  async listScannerRules() { return this.db.rules.toArray(); }
+  // Built-ins are not written to the table: merging on read means a new built-in appears on
+  // upgrade, and one the user disabled stays disabled, with no migration either way.
+  async listScannerRules() { return mergeRules(await this.db.rules.toArray()); }
+  async deleteScannerRule(id: string) { await this.db.rules.delete(id); }
+  async listDismissals(projectId: string) { return this.db.dismissals.where('projectId').equals(projectId).toArray(); }
+  async saveDismissal(d: ScanDismissal) { await this.db.dismissals.put(d); }
+  async deleteDismissal(projectId: string, fingerprint: string) { await this.db.dismissals.delete([projectId, fingerprint]); }
   async saveScannerRule(r: ScannerRule) { await this.db.rules.put(r); }
   async getSettings(): Promise<Settings> {
     return this.db.transaction('rw', this.db.settings, async () => {
@@ -105,7 +115,7 @@ export class IndexedDbProvider implements StorageProvider {
     await this.getSettings();
     return this.db.transaction('r', this.db.tables, async () => ({ projects: await this.listProjects(), versions: await this.db.versions.toArray(), drafts: await this.db.drafts.toArray(),
       bindings: await this.listBindings(), profiles: await this.listProfiles(), datasets: await this.listDatasets(),
-      rules: await this.listScannerRules(), settings: (await this.db.settings.get('settings'))! }));
+      rules: await this.db.rules.toArray(), dismissals: await this.db.dismissals.toArray(), settings: (await this.db.settings.get('settings'))! }));
   }
   /** One transaction over every table: either the whole payload lands or none of it does, so a
    * failure halfway through cannot leave a vault that is part one backup and part another. */
@@ -141,6 +151,10 @@ export class IndexedDbProvider implements StorageProvider {
       await apply(this.db.profiles, payload.profiles, p => p.id);
       await apply(this.db.datasets, payload.datasets, d => d.id);
       await apply(this.db.rules, payload.rules, r => r.id);
+      for (const dismissal of payload.dismissals ?? []) {
+        if (!await this.db.dismissals.get([dismissal.projectId, dismissal.fingerprint])) { await this.db.dismissals.put(dismissal); result.added++; }
+        else result.skipped++;
+      }
       for (const draft of payload.drafts ?? []) {
         const existing = await this.db.drafts.get(draft.projectId);
         if (!existing) { await this.db.drafts.put(draft); result.added++; }

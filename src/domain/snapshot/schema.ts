@@ -89,6 +89,15 @@ export const profileSchema = z.object({
 export const datasetSchema = z.looseObject({ id, name: z.string() });
 export const ruleSchema = z.looseObject({ id, name: z.string(), pattern: z.string() });
 
+export const dismissalSchema = z.object({
+  projectId: id,
+  fingerprint: z.string(),
+  ruleId: z.string(),
+  reason: z.string(),
+  createdAt: iso,
+  deviceId: z.string(),
+});
+
 export const settingsSchema = z.object({
   deviceId: z.string(),
   deviceName: z.string(),
@@ -112,12 +121,16 @@ const fullPayload = z.strictObject({
   profiles: z.array(profileSchema),
   datasets: z.array(datasetSchema),
   rules: z.array(ruleSchema),
+  dismissals: z.array(dismissalSchema),
   settings: settingsSchema,
 });
 
 /** Private values and their configuration, and deliberately no project code — DECISIONS.md §14.2.
  * Strict rather than merely omitting the code keys: a payload that carries `projects` is then a
- * validation failure instead of a silently wider export. */
+ * validation failure instead of a silently wider export.
+ *
+ * Dismissals are absent for the same reason. A fingerprint is derived from a value found in the
+ * project's code, so it belongs with the code, not with the private configuration. */
 const privatePayload = z.strictObject({
   bindings: z.array(bindingSchema),
   profiles: z.array(profileSchema),

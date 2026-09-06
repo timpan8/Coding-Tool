@@ -484,3 +484,56 @@
   padding: 4px 10px;
   font-size: 0.75rem;
 }
+
+.findings-panel {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.finding {
+  margin-bottom: 10px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-faint);
+  border-radius: 7px;
+  background: var(--surface);
+}
+.finding.severity-critical,
+.finding.severity-high {
+  border-left-color: var(--danger);
+}
+.finding.severity-medium {
+  border-left-color: var(--warn-text);
+}
+.finding-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.finding-head small {
+  color: var(--text-muted);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.finding-excerpt {
+  display: block;
+  margin: 5px 0;
+  font-size: 0.75rem;
+  color: var(--danger-text);
+  word-break: break-all;
+}
+.finding p {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.finding-actions {
+  display: flex;
+  gap: 10px;
+}

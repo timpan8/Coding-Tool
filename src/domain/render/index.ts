@@ -3,7 +3,14 @@ import { resolveBinding, resolveValue } from '../bindings';
 import { contextAt, escapeValue } from './escape';
 
 export interface RenderIssue { name: string; start: number; message: string; kind: 'missing' | 'context' | 'leak' }
-export interface RenderResult { text: string; issues: RenderIssue[]; used: string[]; secretRanges: { start: number; end: number }[] }
+export interface RenderResult {
+  text: string;
+  issues: RenderIssue[];
+  used: string[];
+  /** Where a private value was substituted in the local projection. Drives masking and the second
+   * confirmation before Copy Local, so it covers every value rather than only secrets. */
+  secretRanges: { start: number; end: number }[];
+}
 export interface RenderOptions { mode: 'local' | 'ai'; language: LanguageId; projectId: string; versionId: string | null; profileId: string | null; maskSecrets?: boolean }
 export const placeholderRegex = () => /\{\{([A-Z][A-Z0-9_]{1,63})\}\}/g;
 
@@ -22,8 +29,12 @@ export function render(template: string, bindings: Binding[], options: RenderOpt
       const escaped = binding.escapeMode === 'raw' ? { text: value } : escapeValue(value, options.language, contextAt(template, start, options.language));
       if (escaped.error) issues.push({ name, start, kind: 'context', message: escaped.error });
       else replacement = escaped.text;
-      if (options.mode === 'local' && binding.category === 'secret' && !escaped.error) {
-        if (options.maskSecrets) replacement = '••••••••';
+      // Every substituted private value counts, not only the ones categorised 'secret'. The
+      // category is a guess made from the variable name, and `$p = "Hunter2"` guesses 'identity',
+      // which used to leave a password unmasked and skip the second confirmation before Copy
+      // Local. Invariant 9 must not rest on a heuristic.
+      if (options.mode === 'local' && !escaped.error) {
+        if (options.maskSecrets) replacement = '•'.repeat(Math.min(12, Math.max(4, value.length)));
         secretRanges.push({ start: output.length, end: output.length + replacement.length });
       }
     }

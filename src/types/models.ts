@@ -44,12 +44,15 @@ export interface ScannerRule {
   id: string; name: string; pattern: string; flags: string; severity: 'critical' | 'high' | 'medium' | 'low';
   category: Category; suggestedAiReplacement?: string; enabled: boolean; builtIn: boolean; explanation: string;
 }
+/** A finding the user has judged harmless in this project. Keyed by a hash of the value, never the
+ * value, so the record is safe to store and to include in a backup. */
+export interface ScanDismissal { projectId: string; fingerprint: string; ruleId: string; reason: string; createdAt: Iso; deviceId: string }
 export interface Settings {
   deviceId: string; deviceName: string; globalRootPath: string; aiRootPath: string; defaultSubfolders: string[];
   activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean;
   clipboardAutoClearSeconds: number; maskSecretsInUi: boolean; theme: 'system' | 'light' | 'dark';
 }
-export interface WorkspaceSnapshot { projects: Project[]; versions: Version[]; drafts: ProjectDraft[]; bindings: Binding[]; profiles: Profile[]; datasets: Dataset[]; rules: ScannerRule[]; settings: Settings }
+export interface WorkspaceSnapshot { projects: Project[]; versions: Version[]; drafts: ProjectDraft[]; bindings: Binding[]; profiles: Profile[]; datasets: Dataset[]; rules: ScannerRule[]; dismissals: ScanDismissal[]; settings: Settings }
 export type ProjectSummary = Project;
 export type VersionSummary = Version;
 export interface BindingFilter { projectId?: string; versionId?: string }

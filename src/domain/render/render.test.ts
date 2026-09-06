@@ -40,9 +40,17 @@ describe('render safety', () => {
     expect(first.text).toBe('"{{OTHER_BINDING}}"');
     expect(render('"{{ADMIN_PASSWORD}}"', [b], opts)).toEqual(first);
   });
-  it('masks secrets in display but preserves underlying rendering', () => {
-    expect(render('"{{ADMIN_PASSWORD}}"', [binding()], { ...opts, maskSecrets: true }).text).toBe('"••••••••"');
+  it('masks private values in display but preserves underlying rendering', () => {
+    expect(render('"{{ADMIN_PASSWORD}}"', [binding()], { ...opts, maskSecrets: true }).text).toBe('"••••••••••••"');
     expect(render('"{{ADMIN_PASSWORD}}"', [binding()], opts).text).toBe('"SuperSecret123!"');
+  });
+  it('masks a value the category heuristic got wrong, since the category is a guess', () => {
+    // `$p = "Hunter2"` yields category identity; the value is still private.
+    const misread = binding({ category: 'identity', values: { __default__: 'Hunter2' } });
+    const result = render('"{{ADMIN_PASSWORD}}"', [misread], { ...opts, maskSecrets: true });
+    expect(result.text).not.toContain('Hunter2');
+    // And the second confirmation before Copy Local keys off this, so it must not be empty.
+    expect(result.secretRanges).toHaveLength(1);
   });
   it('AI text and issue reports do not contain private profile values', () => {
     const b = binding();

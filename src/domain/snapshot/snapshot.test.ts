@@ -28,10 +28,11 @@ function workspace(): WorkspaceSnapshot {
     profiles: [],
     datasets: [],
     rules: [],
+    dismissals: [{ projectId: p.id, fingerprint: 'abc12345', ruleId: 'email', reason: 'exempelvärde', createdAt: '2026-09-05T12:00:00.000Z', deviceId: 'd' }],
     settings,
   };
 }
-const empty = (): WorkspaceSnapshot => ({ projects: [], versions: [], drafts: [], bindings: [], profiles: [], datasets: [], rules: [], settings });
+const empty = (): WorkspaceSnapshot => ({ projects: [], versions: [], drafts: [], bindings: [], profiles: [], datasets: [], rules: [], dismissals: [], settings });
 
 describe('export', () => {
   it('round-trips a full snapshot through parsing', () => {
@@ -49,6 +50,8 @@ describe('export', () => {
     for (const template of Object.values(source.versions[0].templates)) expect(text).not.toContain(template);
     expect(text).not.toContain(source.projects[0].name);
     expect(JSON.parse(text).payload).not.toHaveProperty('projects');
+    // A fingerprint is derived from the project's code, so it belongs with the code.
+    expect(JSON.parse(text).payload).not.toHaveProperty('dismissals');
   });
 
   it('does carry the private values, which is the point of that file', () => {

@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { StorageProvider } from './StorageProvider';
 import { IndexedDbProvider } from './IndexedDbProvider';
-import { binding, project, version } from '../test/fixtures/factories';
+import { binding, deviceId, project, time, version } from '../test/fixtures/factories';
 
 /** Provider-independent contract. A future adapter supplies only factory + teardown. */
 export function storageContract(factory: () => { storage: StorageProvider; cleanup: () => Promise<void> }) {
@@ -67,6 +67,27 @@ export function storageContract(factory: () => { storage: StorageProvider; clean
     expect(await storage.getProject(other.id)).toBeUndefined();
     expect(await storage.listBindings()).toEqual([]);
     expect((await storage.getProject(p.id))?.name).toBe(p.name);
+  });
+  it('merges built-in scanner rules with stored overrides', async () => {
+    const all = await storage.listScannerRules();
+    expect(all.length).toBeGreaterThan(5);
+    const first = all[0];
+    await storage.saveScannerRule({ ...first, enabled: false });
+    const after = await storage.listScannerRules();
+    expect(after.find(r => r.id === first.id)?.enabled).toBe(false);
+    // Disabling one must not drop the rest, which a naive "stored rules only" read would do.
+    expect(after.length).toBe(all.length);
+  });
+  it('scopes dismissals to their project and removes them with it', async () => {
+    const p = project(), other = project();
+    await storage.saveProject(p); await storage.saveProject(other);
+    const made = (projectId: string, fingerprint: string) => ({ projectId, fingerprint, ruleId: 'email', reason: '', createdAt: time, deviceId });
+    await storage.saveDismissal(made(p.id, 'aaa11111'));
+    await storage.saveDismissal(made(other.id, 'bbb22222'));
+    expect(await storage.listDismissals(p.id)).toHaveLength(1);
+    await storage.deleteProject(p.id);
+    expect(await storage.listDismissals(p.id)).toEqual([]);
+    expect(await storage.listDismissals(other.id)).toHaveLength(1);
   });
   it('clears the entire local store explicitly', async () => {
     await storage.saveProject(project());

@@ -15,6 +15,9 @@ import { ProjectBrowser, projectMatches } from './components/ProjectBrowser';
 import { BackupPanel } from './components/BackupPanel';
 import { useConfirm } from './components/ConfirmDialog';
 import { collectIssues, IssuePanel, type LocatedIssue } from './components/IssuePanel';
+import { FindingsPanel, useDismissals, useScanner } from './components/FindingsPanel';
+import { scan, type Finding } from '../domain/scanner';
+import type { ScannerRule } from '../types/models';
 import { Security } from './pages/Security';
 import { applyTheme, paintHint, resolveTheme, systemPrefersDark, watchSystemTheme, type ThemeChoice } from './theme';
 import { formatBytes, requestPersistence, storageState, type StorageState } from '../storage/persistence';
@@ -35,23 +38,36 @@ function ProjectName({ name, change }: { name: string; change: (name: string) =>
 /** What the app actually checked, said plainly. The previous wording announced that no known
  * problems were found even when nothing had been bound and therefore nothing could be known,
  * which made the default paste-and-copy path read as a clean bill of health. */
-function AiCopyReview({ coverage, issues, replaced }: { coverage: Coverage; issues: number; replaced: number }) {
+function AiCopyReview({ coverage, issues, replaced, findings }: { coverage: Coverage; issues: number; replaced: number; findings: Finding[] }) {
   const { bound, literals, unbound } = coverage;
+  const serious = findings.filter(f => f.severity === 'critical' || f.severity === 'high');
   const headline = issues
     ? 'Granskning krävs'
-    : bound === 0
+    : serious.length
+      ? `${serious.length} misstänkta värden hittades`
+      : bound === 0
       ? literals === 0
         ? 'Ingenting att skydda hittades i koden'
         : 'Inga värden är skyddade'
       : 'Inga kända problem hittades';
   return (
     <>
-      <p className={issues || bound === 0 ? 'danger-text' : ''}><b>{headline}</b></p>
+      <p className={issues || serious.length || bound === 0 ? 'danger-text' : ''}><b>{headline}</b></p>
       <p>
         <b>{bound} av {literals}</b> strängvärden är kopplade till bindings. {replaced} förekomster ersätts vid kopiering.
       </p>
       {bound === 0 && literals > 0 && (
-        <p>Ingen automatisk granskning har körts på den här koden. Värdena nedan skickas som de står.</p>
+        <p>Inget värde är kopplat till en binding, så allt nedan skickas som det står.</p>
+      )}
+      {findings.length > 0 && (
+        <ul className="unbound-values">
+          {findings.slice(0, 8).map((finding, index) => (
+            <li key={index}>
+              rad {finding.line} · {finding.ruleName} · <code>{finding.maskedExcerpt}</code>
+            </li>
+          ))}
+          {findings.length > 8 && <li>och {findings.length - 8} till</li>}
+        </ul>
       )}
       {unbound.length > 0 && (
         <ul className="unbound-values">
@@ -62,8 +78,8 @@ function AiCopyReview({ coverage, issues, replaced }: { coverage: Coverage; issu
         </ul>
       )}
       <p className="notice">
-        Kontrollen omfattar saknade bindings, stödd escaping och exakta kända privata värden. Den letar ännu inte
-        efter okända hemligheter på egen hand, så granska kommentarer och övrig kod själv.
+        Kontrollen omfattar saknade bindings, stödd escaping, exakta kända privata värden och {findings.length > 0 ? 'de misstänkta värden som listas ovan' : 'en genomsökning efter misstänkta värden'}. Mönstren fångar det som liknar
+        hemligheter — inte allt som är känsligt i just din miljö. Läs igenom koden själv innan du delar den.
       </p>
     </>
   );
@@ -80,11 +96,14 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [busy, setBusy] = useState(false), busyRef = useRef(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [bindingDialog, setBindingDialog] = useState<{ binding: Binding; selection?: Selection } | null>(null);
   const [showSecrets, setShowSecrets] = useState(false), [focusName, setFocusName] = useState(''), [focusLine, setFocusLine] = useState<number>();
-  const [copyMode, setCopyMode] = useState<'local' | 'ai' | null>(null), [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
+  const [copyMode, setCopyMode] = useState<'local' | 'ai' | null>(null), [reviewed, setReviewed] = useState(false), [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | null>(null);
   const [deviceName, setDeviceName] = useState(''), currentLine = useRef(1);
   const [theme, setTheme] = useState<ThemeChoice>(paintHint()), [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [storageInfo, setStorageInfo] = useState<StorageState | null>(null), asked = useRef(false);
   const [confirm, confirmDialog] = useConfirm();
+  const [rules, setRules] = useState<ScannerRule[]>([]);
+  const [dismissed, refreshDismissals] = useDismissals(() => project ? storage.listDismissals(project.id) : Promise.resolve([]), project?.id ?? '');
+  const findings = useScanner(mode === 'template' ? template : '', rules, dismissed);
   const [countdown, setCountdown] = useState<number | null>(null), pendingClear = useRef<string | null>(null);
   const overview = useRef<HTMLDivElement>(null), overviewScroll = useRef(0);
   const navigateRef = useRef<(hash: string, replace?: boolean) => Promise<void>>(async () => {});
@@ -130,6 +149,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   }, [controller, storage]);
   useEffect(() => watchSystemTheme(setSystemDark), []);
   useEffect(() => { void storageState().then(setStorageInfo); }, []);
+  useEffect(() => { void storage.listScannerRules().then(setRules).catch(() => {}); }, [storage]);
   // Asking on an empty first visit would prompt Firefox users before they have anything to lose.
   useEffect(() => {
     if (!project || asked.current) return;
@@ -157,6 +177,10 @@ export function App({ storage }: { storage: StorageProvider }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- optionsKey stands in for options.
   const local = useMemo(() => render(template, bindings, { ...options, mode: 'local', maskSecrets: !showSecrets }), [template, bindings, optionsKey, showSecrets]);
   const cover = ai.coverage;
+  // Re-scanned synchronously here rather than reusing the idle-scheduled list, so the dialog
+  // describes the text being copied and not what the panel last saw.
+  const copyFindings = copyMode === 'ai' ? scan(template, rules).filter(f => !dismissed.has(f.fingerprint)) : [];
+  const seriousFindings = copyFindings.filter(f => f.severity === 'critical' || f.severity === 'high').length;
   const visible = mode === 'template' ? template : mode === 'ai' ? ai.text : local.text;
   const issues = useMemo(() => collectIssues(template, local, ai), [template, local, ai]);
   const used = useMemo(() => usage(template), [template]);
@@ -185,6 +209,20 @@ export function App({ storage }: { storage: StorageProvider }) {
     setTheme(next); applyTheme(next);
     if (settings) void storage.saveSettings({ ...settings, theme: next }).catch(() => setNotice('Temat gäller nu men kunde inte sparas.'));
   }
+  function bindFinding(finding: Finding) {
+    changeMode('template'); setFocusLine(finding.line);
+    const value = template.slice(finding.start, finding.end);
+    createBinding({ text: value, start: finding.start, end: finding.end, line: finding.line,
+      lineBefore: template.slice(template.lastIndexOf('\n', finding.start) + 1, finding.start) }, finding);
+  }
+  async function dismissFinding(finding: Finding) {
+    const current = controller.getSnapshot();
+    if (!current.session.project || !current.settings) return;
+    await storage.saveDismissal({ projectId: current.session.project.id, fingerprint: finding.fingerprint,
+      ruleId: finding.ruleId, reason: '', createdAt: new Date().toISOString(), deviceId: current.settings.deviceId });
+    refreshDismissals();
+    setNotice(`${finding.ruleName} avfärdad i det här projektet.`);
+  }
   function showIssue(issue: LocatedIssue) {
     // The offset belongs to the projection that produced it, so switch there before jumping.
     changeMode(issue.view === 'ai' ? 'ai' : 'template');
@@ -192,15 +230,22 @@ export function App({ storage }: { storage: StorageProvider }) {
     if (issue.kind !== 'leak') setFocusName(issue.name);
   }
   function changeMode(next: Mode) { setMode(next); setShowSecrets(false); setFocusName(''); setFocusLine(undefined); }
-  function createBinding(selection: Selection) {
+  function createBinding(selection: Selection, finding?: Finding) {
     if (mode === 'local' || !selection.text || /\{\{.*\}\}/.test(selection.text)) return;
     void run(async () => {
       await controller.flush();
       const current = controller.getSnapshot();
       if (!current.session.project || !current.settings) return;
       const hint = suggestBinding(selection.lineBefore, selection.text), time = new Date().toISOString();
-      const binding: Binding = { id: crypto.randomUUID(), name: hint.name, category: hint.category, scope: 'project', scopeRef: current.session.project.id,
-        description: '', aiReplacement: mode === 'ai' ? selection.text : defaults[hint.category], values: mode === 'ai' ? {} : { __default__: selection.text },
+      // The name heuristic reads only the variable name, so `$p = "Hunter2"` came out as identity
+      // and a password rendered unmasked. Running the rules over the value itself is the missing
+      // half: what a value looks like says more than what it was called.
+      const matched = finding ?? scan(selection.text, rules, { skipRanges: [] })
+        .sort((a, b) => (a.severity === 'critical' ? -1 : b.severity === 'critical' ? 1 : 0))[0];
+      const category = matched?.category ?? hint.category;
+      const aiValue = matched?.suggestedAiReplacement ?? defaults[category];
+      const binding: Binding = { id: crypto.randomUUID(), name: hint.name, category, scope: 'project', scopeRef: current.session.project.id,
+        description: '', aiReplacement: mode === 'ai' ? selection.text : aiValue, values: mode === 'ai' ? {} : { __default__: selection.text },
         escapeMode: 'auto', matchHints: { lastVariableNames: [], previousAiValues: [], aliases: [] }, createdAt: time, updatedAt: time, deviceId: current.settings.deviceId };
       if (mode === 'ai') {
         const start = template.indexOf(selection.text);
@@ -265,7 +310,7 @@ export function App({ storage }: { storage: StorageProvider }) {
     // being copied, not on whatever it last saw.
     const result = auditForCopy(template, bindings, { ...options, mode: which });
     if (!result.canCopy) { setError('Kopiering blockerad. Åtgärda problemen i panelen.'); return; }
-    if (which === 'ai' || result.secretRanges.length) { setCopyMode(which); return; }
+    if (which === 'ai' || result.secretRanges.length) { setReviewed(false); setCopyMode(which); return; }
     await writeClipboard(result.text, which);
   }
   function openDrawer() { setDrawer(true); void controller.refreshProjects().catch(() => setError('Projektlistan kunde inte läsas. Din kod finns kvar.')); }
@@ -295,7 +340,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         <div className="work-grid"><section className={`editor-panel mode-${mode}`}>
           <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions">{Boolean(issues.length) && <span id="copy-blocked" className="copy-blocked">{issues.length} problem hindrar kopiering — se panelen</span>}<button disabled={!template.trim() || Boolean(local.issues.length)} aria-describedby={local.issues.length ? 'copy-blocked' : undefined} title={local.issues.length ? `Blockerad: ${local.issues.length} problem i Local-vyn` : undefined} onClick={() => void copy('local')}>Copy Local</button><button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} aria-describedby={ai.issues.length ? 'copy-blocked' : undefined} title={ai.issues.length ? `Blockerad: ${ai.issues.length} problem i AI-vyn` : undefined} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
           <div className="view-banner" key={mode}><strong>{mode === 'template' ? '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN' : mode === 'local' ? '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN' : '◇ AI — SANERAD'}</strong><span>{mode === 'template' ? 'Redigerbar källa' : 'Skrivskyddad projektion'}</span></div>
-          {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj secrets' : 'Visa secrets'}</button></div>}
+          {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj värden' : 'Visa värden'}</button></div>}
           <div className="editor-body">{!template && mode === 'template' && <div className="paste-prompt" aria-hidden="true"><strong>Klistra in din kod här</strong><span>Ctrl+V · Projektet skapas automatiskt och sparas lokalt.</span></div>}
             <CodeEditor key="primary-editor" documentKey={`${session.key}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => controller.changeText(text)} onBinding={createBinding}
               onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }} />
@@ -304,6 +349,8 @@ export function App({ storage }: { storage: StorageProvider }) {
           {activeBindings.map(b => <div className="binding-card" key={b.id}><button className="binding-name" onClick={() => { setMode('template'); setFocusName(b.name); }}>{b.name}</button><div className="binding-meta"><span>{b.category}</span><span>{b.scope}</span></div><div className="binding-value">{resolveValue(b, options.profileId) ? b.category === 'secret' ? '••••••••' : 'Privat värde angivet' : <span className="danger-text">⚠ VÄRDE SAKNAS</span>}</div><div className="binding-example">AI: {b.aiReplacement}</div><div className="binding-actions"><small>{used.find(u => u.bindingName === b.name)?.occurrences ?? 0} förekomster</small><button className="text-button" onClick={() => setBindingDialog({ binding: b })}>Redigera</button><button className="text-button" aria-label={`Radera ${b.name}`} onClick={() => void removeBinding(b)}>×</button></div></div>)}
           {!activeBindings.length && <div className="bindings-empty">{'{{NAMN}}'}<p>Dina privata värden får en egen plats här.</p>{!template && language === 'powershell' && <button onClick={() => controller.changeText(fixture)}>Prova med exempelkod</button>}</div>}
           <IssuePanel issues={issues} onSelect={showIssue} />
+          <FindingsPanel findings={findings} onShow={f => { changeMode('template'); setFocusLine(f.line); }}
+            onBind={bindFinding} onDismiss={f => void dismissFinding(f)} />
           <details className="version-history"><summary>Sparade versioner <span>{versions.length}</span></summary>{versions.map(v => <div className="version-item" key={v.id}><button onClick={() => void applyVersion(v)}><b>v{v.number}</b><span>{v.label || 'Sparad version'}<small>{new Date(v.createdAt).toLocaleDateString('sv-SE')}</small></span></button><button className="text-button" onClick={() => void applyVersion(v, true)}>Återgå som ny version</button></div>)}{!versions.length && <p>Utkastet sparas automatiskt. Spara en version när du vill behålla en punkt i historiken.</p>}</details>
           <div className="m1-note"><b>Vad som ännu inte finns</b><p>Ingen automatisk scanner letar efter okända hemligheter, och kod som kommer tillbaka från en AI matchas inte om automatiskt. Granska den sanerade koden själv.</p></div>
         </aside></div>
@@ -321,7 +368,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
     {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0} save={storeBinding} close={() => setBindingDialog(null)} />}
-    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} />}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound ? 'primary' : ''} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
+    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} findings={copyFindings} />}{copyMode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.</label>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound && !seriousFindings ? 'primary' : ''} disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound && !seriousFindings ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
     {confirmDialog}
     {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
   </div>;

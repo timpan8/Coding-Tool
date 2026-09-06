@@ -1,4 +1,4 @@
-import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ProjectSummary, ScannerRule, Settings, Version, VersionSummary, WorkspaceSnapshot } from '../types/models';
+import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ProjectSummary, ScanDismissal, ScannerRule, Settings, Version, VersionSummary, WorkspaceSnapshot } from '../types/models';
 import type { ProjectDraft, ProjectDraftMetadata } from '../types/models';
 
 export class DraftConflictError extends Error {
@@ -24,8 +24,14 @@ export interface StorageProvider {
   saveProfile(p: Profile): Promise<void>;
   listDatasets(filter?: DatasetFilter): Promise<Dataset[]>;
   saveDataset(d: Dataset): Promise<void>;
+  /** Returns the built-ins merged with any stored overrides, so disabling one sticks and new
+   * built-ins appear without a migration. */
   listScannerRules(): Promise<ScannerRule[]>;
   saveScannerRule(r: ScannerRule): Promise<void>;
+  deleteScannerRule(id: string): Promise<void>;
+  listDismissals(projectId: string): Promise<ScanDismissal[]>;
+  saveDismissal(d: ScanDismissal): Promise<void>;
+  deleteDismissal(projectId: string, fingerprint: string): Promise<void>;
   getSettings(): Promise<Settings>;
   saveSettings(s: Settings): Promise<void>;
   exportAll(): Promise<WorkspaceSnapshot>;
