@@ -537,3 +537,52 @@
   display: flex;
   gap: 10px;
 }
+
+.rules-panel {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.rule-list {
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.rule-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 9px 12px;
+  font-weight: 400;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.rule-row:last-child {
+  border-bottom: 0;
+}
+.rule-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+.rule-name {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.875rem;
+}
+.rule-name small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+.rules-panel textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8125rem;
+}

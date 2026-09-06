@@ -188,3 +188,32 @@ test('counts down and clears the clipboard after a local copy', async ({ page, c
   await expect(page.locator('.clipboard-countdown')).toHaveCount(0);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('Hunter2');
 });
+
+// Report F1. The rules exist to be adjusted: a value that is an example in one project is a real
+// secret in another, and a company's own domain is not in any built-in list.
+test('lets rules be turned off and a term of your own added', async ({ page }) => {
+  await type(page, '$c = "https://intranet.mittforetag.se/api"\n$mail = "anna@example.com"\n');
+  await expect(page.locator('.findings-panel')).toContainText('E-postadress');
+  await expect(page.locator('.findings-panel')).not.toContainText('mittforetag.se');
+  // '#/' means "new code", so returning has to be to this project's own route.
+  const project = page.url();
+
+  await page.evaluate(() => (location.hash = '#/settings'));
+  await page.getByLabel('Eget sökord').fill('mittforetag.se');
+  await page.getByRole('button', { name: 'Lägg till sökord' }).click();
+  await expect(page.locator('.import-result, .inline-notice')).toContainText('tillagt');
+
+  await page.goto(project);
+  await expect(page.locator('.findings-panel')).toContainText('mittforetag.se');
+
+  // Turning a built-in off removes its findings without touching the others.
+  await page.evaluate(() => (location.hash = '#/settings'));
+  // click() rather than uncheck(): the new state arrives after a write to IndexedDB, which
+  // uncheck()'s immediate re-read does not wait for.
+  const emailRule = page.locator('.rule-row').filter({ hasText: 'E-postadress' }).getByRole('checkbox');
+  await emailRule.click();
+  await expect(emailRule).not.toBeChecked();
+  await page.goto(project);
+  await expect(page.locator('.findings-panel')).toContainText('mittforetag.se');
+  await expect(page.locator('.findings-panel')).not.toContainText('E-postadress');
+});
