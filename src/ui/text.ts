@@ -170,6 +170,8 @@ export const sv = {
     undone: 'Ångrat.',
     undoFailed: 'Det gick inte att ångra. Ingenting ändrades tillbaka.',
     settingsSaved: 'Inställningar sparade lokalt',
+    // Said "M1" until the milestone scheme it referred to was replaced by the report's list.
+    footerNote: 'Lokalt valv · ingen nätverksåtkomst',
   },
   settings: {
     eyebrow: 'DEN HÄR INSTALLATIONEN',

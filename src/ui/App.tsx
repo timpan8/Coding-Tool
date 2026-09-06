@@ -602,7 +602,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         onStorageInfo={setStorageInfo} deviceName={deviceName} onDeviceName={setDeviceName} rules={rules}
         onRules={() => void storage.listScannerRules().then(setRules)} save={patch => changeEditor(patch)} notify={setNotice}
         confirm={confirm} showIntro={() => setIntro(true)} /></div>
-    </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>Lokalt valv · M1</span></footer>
+    </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>{t.app.footerNote}</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={drawerQuery} onQuery={setDrawerQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
     {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} profiles={profiles} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0}

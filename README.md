@@ -23,9 +23,9 @@ pnpm preview --port 4173
 
 Använd produktionsförhandsvisningen för säkerhetskontroller. Utvecklingsserverns HMR använder WebSocket och blockeras av den avsiktligt strikta CSP:n; sänk inte produktionspolicyn för att få HMR att fungera.
 
-1. Skapa projekt med PowerShell som språk.
-2. Klistra in kod eller välj den ofarliga exempelkoden.
-3. Markera ett värde och tryck **Ctrl+B** (eller högerklick → Skapa binding). Ange exempelvis `ADMIN_USERNAME`, ett syntetiskt privat värde och `example.user` som AI-värde.
+1. Klistra in kod, dra in en fil, eller välj den ofarliga exempelkoden. Språket gissas vid inklistring och följer filändelsen när du drar in en fil.
+2. Byt språk i väljaren om gissningen blev fel — det är språket som avgör hur värden escapas.
+3. Markera ett värde och tryck **Ctrl+B** (eller högerklick → Skapa binding). Ange exempelvis `ADMIN_USERNAME`, ditt riktiga värde och `example.user` som AI-värde.
 4. Spara en version. Växla mellan **Mall**, **Local**, **AI** och kopiera rätt vy.
 5. Redigera endast mallen. Varje sparning skapar en ny version; återgång skapar också en ny version.
 
@@ -56,7 +56,7 @@ Det skyddar **inte** mot skadlig kod, keyloggers, annan användare på samma OS-
 
 **Origin är viktigt:** `http://localhost:5173`, `http://127.0.0.1:4173` och `https://timpan8.github.io` har separata valv. Välj ett primärt origin. Repo-sökvägar på samma `user.github.io` delar däremot origin; separata databasnamn är bara namnisolering, ingen säkerhetsgräns mellan appar. Aktuellt origin visas i inställningarna. Ingen synk mellan datorer.
 
-Appen redovisar vad den faktiskt kontrollerat och säger aldrig att säkerhet är garanterad. Före AI-kopiering blockeras saknade värden, osäkra renderingskontexter och exakta kända privata värden, och dialogen visar hur många av kodens strängvärden som är kopplade till bindings. Är inget kopplat sägs det rakt ut i stället för att beskedet låter godkännande. Okända och transformerade värden kan fortfarande förekomma; en heuristisk scanner återstår. Escaping är konservativ textbearbetning och ersätter inte en fullständig språkparser.
+Appen redovisar vad den faktiskt kontrollerat och säger aldrig att säkerhet är garanterad. Före AI-kopiering blockeras saknade värden, osäkra renderingskontexter och exakta kända privata värden, och dialogen visar hur många av kodens strängvärden som är kopplade till bindings. Är inget kopplat sägs det rakt ut i stället för att beskedet låter godkännande. En heuristisk scanner letar dessutom efter värden som liknar hemligheter och varnar per träff, men heuristik hårdblockerar aldrig: falska positiva som inte går att kvittera leder till att verktyget kringgås. Okända och transformerade värden kan fortfarande förekomma. Escaping är konservativ textbearbetning och ersätter inte en fullständig språkparser.
 
 ## Verifiering
 

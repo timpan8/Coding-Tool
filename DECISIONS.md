@@ -48,3 +48,31 @@ och den commit som rättar den tar bort markören — historiken bär då bevise
 Rensningen skriver bara över texten appen själv lade dit, när webbläsaren tillåter att urklippet läses. Nekas läsning
 rensas ändå: nedräkningen är synlig hela tiden och går att avbryta, så användaren har haft sin chans att behålla det som
 kopierats, och ett kvarlämnat lösenord är det värre utfallet. Utfallet redovisas i gränssnittet i stället för att antas.
+
+## 2026-09-06 — Beslut fattade under genomförandet
+
+**Nya språk blockerar hellre än gissar.** `dotenv`, `hcl` och `sql` har egna escaping-regler, och varje
+regel vägrar de fall där rätt svar inte går att veta ur filen: ett `$` i en dubbelciterad `.env`-sträng
+(många läsare expanderar `$VAR`, vilka går inte att se), ett bakstreck i en SQL-sträng (MySQL
+escapar, standarden gör det inte), en apostrof i en apostrofciterad `.env`-sträng (den kan inte
+representeras). Terraforms `${…}` och `%{…}` dubblas i stället för att escapas, annars kan ett
+privat värde läsa en annan variabel.
+
+**Introduktionen räknas som sedd när den visas, inte när den stängs.** Att skriva vid stängning
+kapplöper med en omladdning gjord strax efteråt, och introduktionen kom då tillbaka för någon som
+just hade avfärdat den. Ett befintligt valv startar med flaggan satt: en introduktion är värd att
+visa före första användningen, inte för någon som använt verktyget i månader.
+
+**Ångra fångar in vägen tillbaka före raderingen.** `captureProject` läser allt kaskaden tar med sig
+och återställningen går genom `importAll`, alltså samma testade väg som en backupimport. Remsan är
+en artighet, inte en garanti: raderingen har redan skett när den visas, och den ersätter ingen
+bekräftelse.
+
+**`contextAt` skrevs om under ett differentiellt property-test.** Modulen avgör hur ett privat värde
+escapas, så omskrivningen jämförs mot implementationen som den såg ut före ändringen, kopierad ordagrant
+in i testfilen. Den hittade omedelbart en riktig bugg. Kopian får tas bort den dag omskrivningen är
+beprövad, och inte tidigare.
+
+**Strängextraktionen har tre medvetna undantag.** Säkerhetssidan och introduktionen är dokument med
+inbäddad markup; `shortcuts.ts` är redan en tabell där etiketten hör ihop med tangenten. Skälen står
+i `src/ui/text.ts`.
