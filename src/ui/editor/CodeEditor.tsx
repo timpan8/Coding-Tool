@@ -82,7 +82,10 @@ export function CodeEditor(props: EditorProps) {
       scrollBeyondLastLine: false, wordWrap: callbacks.current.wordWrap === false ? 'off' : 'on', padding: { top: 16 }, contextmenu: true,
       links: false, hover: { enabled: 'on', delay: 250 }, unicodeHighlight: { ambiguousCharacters: false },
       quickSuggestions: false, parameterHints: { enabled: false }, renderValidationDecorations: 'off',
-      ariaLabel: 'Kodredigerare', accessibilitySupport: 'auto' });
+      // Report A.2. Tab indents here and never moves focus. WCAG 2.1.2 allows that only if the way
+      // out is advised where the trap is, and the label is the one thing read on entering it.
+      ariaLabel: 'Kodredigerare. Tab gör indrag — tryck Ctrl+M för att låta Tab flytta fokus vidare.',
+      accessibilitySupport: 'auto' });
     editor.current = instance;
     const decorations = instance.createDecorationsCollection();
     const decorate = () => {

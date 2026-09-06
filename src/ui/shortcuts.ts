@@ -28,6 +28,9 @@ export const editorShortcuts: { keys: string[]; label: string; note?: string }[]
   { keys: ['Ctrl+F'], label: 'Sök i koden', note: 'Editorns egen sökruta, inte webbläsarens.' },
   { keys: ['Ctrl+H'], label: 'Sök och ersätt' },
   { keys: ['{{'], label: 'Föreslå platshållarnamn', note: 'Skriv två klammer så listas dina bindings.' },
+  // Report A.2. Tab indents inside Monaco and never moves focus, so a keyboard user who tabbed in
+  // could not tab out. The way out exists; it was listed nowhere, which is what made it a trap.
+  { keys: ['Ctrl+M'], label: 'Låt Tab lämna editorn', note: 'Växlar mellan att Tab gör indrag och att Tab flyttar fokus vidare.' },
 ];
 
 /** Matches a keyboard event against a shortcut. Kept away from the components so the bindings can

@@ -69,7 +69,11 @@ export const sv = {
     draftFooter: 'Utkast sparas automatiskt · ingen kod körs',
     bannerTemplate: '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN',
     bannerLocal: '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN',
-    bannerAi: '◇ AI — SANERAD',
+    /** Only says sanitised when something actually was. With no bindings the AI projection is
+     * byte-identical to the template, and the solid accent banner then sat above real secrets
+     * telling the reader they had been dealt with. */
+    bannerAi: (replaced: number) => `◇ AI — SANERAD · ${replaced === 1 ? '1 värde ersatt' : `${replaced} värden ersatta`}`,
+    bannerAiNothing: '◇ AI — INGET ERSATT ÄNNU',
     editableSource: 'Redigerbar källa',
     readOnlyProjection: 'Skrivskyddad projektion',
     editAsTemplate: 'Redigera som mall',
@@ -376,6 +380,7 @@ export const sv = {
   },
   findings: {
     title: 'Misstänkta värden',
+    dismissed: (rule: string) => `${rule} är avfärdad i det här projektet.`,
   },
   ingest: {
     tier1: 'Platshållare kvar',

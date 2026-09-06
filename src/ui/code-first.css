@@ -25,6 +25,9 @@
   align-items: center;
   gap: 4px;
   flex: 1;
+  /* Without this the nav refuses to shrink below its content and pushes the rest of the bar out
+     instead of letting it wrap. */
+  min-width: 0;
 }
 .top-navigation button {
   border: 0;
@@ -137,6 +140,20 @@
 }
 .paste-prompt span {
   font-size: 0.78rem;
+}
+/* Report F-1.1. The prompt is pointer-events:none so clicks reach the editor underneath, but the
+   button inherited it and Monaco's .view-lines sits on top: the empty state's only affordance
+   could not be clicked at all, not even with a forced click. */
+.paste-prompt button {
+  pointer-events: auto;
+  justify-self: start;
+  margin-top: 10px;
+  padding: 8px 13px;
+  border: 1px solid var(--accent-border);
+  border-radius: 6px;
+  background: var(--accent-surface);
+  color: var(--accent-text);
+  font-size: 0.8125rem;
 }
 .code-first .code-editor {
   min-height: 0;

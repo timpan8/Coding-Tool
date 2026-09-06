@@ -325,9 +325,14 @@ kbd {
   display: flex;
   flex-direction: column;
 }
+/* Report F-0.1. Wrapping only started at 750px, so between there and roughly 1000px the bar could
+   not break and ran off the side: scrollWidth was 1122 in a 768px viewport on every route, taking
+   the profile picker, the theme picker and the save status off screen. Wrapping by default lets it
+   break when it needs to rather than at a guessed width. */
 .topbar {
   min-height: 68px;
   display: flex;
+  flex-wrap: wrap;
   gap: 20px;
   align-items: center;
   border-bottom: 1px solid var(--border);
@@ -608,6 +613,13 @@ main {
 .mode-ai .view-banner {
   background: var(--accent);
   color: var(--accent-fg);
+}
+/* Nothing was substituted, so the projection is the template. Green here would be a clean bill of
+   health the app has no basis for. */
+.mode-ai .view-banner.nothing-replaced {
+  background: var(--warn-surface);
+  color: var(--warn-text);
+  border-bottom: 1px solid var(--warn-border);
 }
 .local-tools {
   display: flex;
