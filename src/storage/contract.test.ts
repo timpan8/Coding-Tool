@@ -1,13 +1,19 @@
 import 'fake-indexeddb/auto';
+import Dexie from 'dexie';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { StorageProvider } from './StorageProvider';
 import { IndexedDbProvider } from './IndexedDbProvider';
+import { formatRecoveryKey, openSnapshot, VaultLockedError, WrongPasswordError } from './crypto';
 import { binding, deviceId, project, time, version } from '../test/fixtures/factories';
 
-/** Provider-independent contract. A future adapter supplies only factory + teardown. */
-export function storageContract(factory: () => { storage: StorageProvider; cleanup: () => Promise<void> }) {
+/** Provider-independent contract. A future adapter supplies only factory + teardown.
+ *
+ * Run twice: once against a plaintext vault and once against an encrypted one. Encryption moves
+ * every field Dexie does not index behind AES-GCM, so a query that reads a value inside a
+ * transaction, or a write that forgot to seal, fails here rather than in front of a user. */
+export function storageContract(factory: () => { storage: StorageProvider; cleanup: () => Promise<void> }, prepare?: (storage: StorageProvider) => Promise<void>) {
   let storage: StorageProvider, cleanup: () => Promise<void>;
-  beforeEach(() => { ({ storage, cleanup } = factory()); });
+  beforeEach(async () => { ({ storage, cleanup } = factory()); await prepare?.(storage); });
   afterEach(async () => { await cleanup(); });
   it('persists projects and version templates without collapsing to local output', async () => {
     const p = project(); await storage.saveProject(p);
@@ -208,6 +214,100 @@ export function storageContract(factory: () => { storage: StorageProvider; clean
     await storage.clearAll(); expect(await storage.listProjects()).toEqual([]);
   });
 }
-describe('IndexedDB StorageProvider contract', () => storageContract(() => {
-  const storage = new IndexedDbProvider('test-' + crypto.randomUUID()); return { storage, cleanup: () => storage.destroy() };
-}));
+const provider = () => {
+  const storage = new IndexedDbProvider('test-' + crypto.randomUUID());
+  return { storage, cleanup: () => storage.destroy() };
+};
+describe('IndexedDB StorageProvider contract', () => storageContract(provider));
+// PBKDF2 at the production count would dominate the suite; the wrapping is the same either way.
+describe('IndexedDB StorageProvider contract, encrypted', () => storageContract(provider, storage => storage.enableEncryption('pw', { iterations: 1000 }).then(() => {})));
+
+describe('encryption', () => {
+  let storage: StorageProvider, cleanup: () => Promise<void>;
+  beforeEach(() => { ({ storage, cleanup } = provider()); });
+  afterEach(async () => { await cleanup(); });
+  const fast = { iterations: 1000 };
+
+  it('starts in plaintext and says so', async () => {
+    expect(await storage.vaultStatus()).toMatchObject({ encrypted: false, locked: false });
+  });
+
+  it('encrypts what is already there, and locks and unlocks it', async () => {
+    const p = project(); await storage.saveProject(p);
+    const b = binding(); await storage.saveBinding(b);
+    const { recoveryKey } = await storage.enableEncryption('hunter2', fast);
+    expect(recoveryKey).toMatch(/^[0-9a-f]{32}$/);
+    expect(await storage.vaultStatus()).toMatchObject({ encrypted: true, locked: false });
+    // Still readable while the key is held.
+    expect(await storage.getProject(p.id)).toEqual(p);
+    expect(await storage.listBindings()).toEqual([b]);
+
+    storage.lock();
+    expect(await storage.vaultStatus()).toMatchObject({ encrypted: true, locked: true });
+    await expect(storage.getProject(p.id)).rejects.toBeInstanceOf(VaultLockedError);
+    await expect(storage.listBindings()).rejects.toBeInstanceOf(VaultLockedError);
+    // Settings still answer, because the lock screen needs the theme before any password is given.
+    expect((await storage.vaultStatus()).theme).toBeDefined();
+
+    await expect(storage.unlock({ password: 'hunter3' })).rejects.toBeInstanceOf(WrongPasswordError);
+    await storage.unlock({ password: 'hunter2' });
+    expect(await storage.getProject(p.id)).toEqual(p);
+    await storage.lock();
+    await storage.unlock({ recoveryKey: formatRecoveryKey(recoveryKey) });
+    expect(await storage.listBindings()).toEqual([b]);
+  });
+
+  it('leaves no private value in the stored rows', async () => {
+    const p = project(); await storage.saveProject(p);
+    const v = version(p); await storage.commitVersion({ ...p, currentVersionId: v.id }, v);
+    await storage.saveBinding(binding({ values: { '': 'Hunter2-Very-Secret!' } }));
+    await storage.saveBlocklistEntry({ id: 'b1', term: 'mittforetag.se', replacement: '', enabled: true, createdAt: time });
+    await storage.enableEncryption('pw', fast);
+
+    // Opened as a second, plain Dexie connection: what is on disk, not what the provider returns.
+    // No version declared, so Dexie opens whatever schema is on disk and every table shows up.
+    const db = new Dexie((storage as unknown as { db: Dexie }).db.name);
+    await db.open();
+    const dumped = JSON.stringify(await Promise.all(db.tables.map(table => table.toArray())));
+    await db.close();
+    for (const secret of ['Hunter2-Very-Secret!', 'mittforetag.se', p.name, '{{ADMIN_PASSWORD}}']) expect(dumped).not.toContain(secret);
+    // The ids are still there: without them Dexie could not find a row at all.
+    expect(dumped).toContain(p.id);
+  });
+
+  it('changes the password, shows the recovery key again, and goes back to plaintext', async () => {
+    const p = project(); await storage.saveProject(p);
+    const { recoveryKey } = await storage.enableEncryption('first', fast);
+    expect(await storage.revealRecoveryKey('first')).toBe(recoveryKey);
+    await expect(storage.revealRecoveryKey('wrong')).rejects.toBeInstanceOf(WrongPasswordError);
+
+    await storage.changePassword({ password: 'first' }, 'second');
+    storage.lock();
+    await expect(storage.unlock({ password: 'first' })).rejects.toBeInstanceOf(WrongPasswordError);
+    await storage.unlock({ password: 'second' });
+    expect(await storage.getProject(p.id)).toEqual(p);
+
+    await storage.disableEncryption({ password: 'second' });
+    expect(await storage.vaultStatus()).toMatchObject({ encrypted: false, locked: false });
+    expect(await storage.getProject(p.id)).toEqual(p);
+  });
+
+  it('keeps an emptied vault encrypted, and takes a reset to undo that', async () => {
+    await storage.saveProject(project());
+    await storage.enableEncryption('pw', fast);
+    await storage.clearAll();
+    expect(await storage.listProjects()).toEqual([]);
+    expect(await storage.vaultStatus()).toMatchObject({ encrypted: true });
+    await storage.resetVault();
+    expect(await storage.vaultStatus()).toMatchObject({ encrypted: false, locked: false });
+  });
+
+  it('seals a snapshot with the vault, so the file needs the same secret', async () => {
+    await storage.saveBinding(binding({ values: { '': 'Hunter2' } }));
+    const { recoveryKey } = await storage.enableEncryption('pw', fast);
+    const file = await storage.sealSnapshot(JSON.stringify(await storage.exportAll()));
+    expect(JSON.stringify(file)).not.toContain('Hunter2');
+    expect(JSON.parse(await openSnapshot(file, { password: 'pw' })).bindings[0].values['']).toBe('Hunter2');
+    expect(await openSnapshot(file, { recoveryKey })).toContain('Hunter2');
+  });
+});

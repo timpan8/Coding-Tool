@@ -276,3 +276,42 @@ utkastet bygger på, räknat med en rad-LCS så en insättning högst upp inte k
 ändrad; den första versionen får filens storlek. Dialogen säger vad som skrivs om fältet lämnas
 tomt, så det aldrig kommer som en överraskning i historiken. Samma tal står vid varje version i
 listan.
+
+## Kryptering är valbar, och klartext är fortfarande standard
+
+**Standard är klartext, för att appen ska gå att förlora.** Ett valv utan lösenord kan inte bli
+oåtkomligt: rensad webbläsardata kostar dig valvet, men ingen glömd hemlighet gör det. Kryptering
+är ett val med ett pris, och priset står i dialogen innan den frågar: förlorat lösenord plus
+förlorad återställningsnyckel är ett förlorat valv, och appen har ingen kopia av något av dem.
+Därför finns nyckeln, den visas en gång med en nedladdningsknapp, och dialogen stänger inte förrän
+du kryssat att du sparat den. Den går att visa igen — för den som kan lösenordet.
+
+**Rad för rad, inte databas för databas.** Dexie måste kunna hitta en post utan nyckel:
+`versions.where('projectId')` kan inte fråga ett låst valv vad en rad innehåller. Därför ligger
+id:n, tidsstämplar, utkastets revision och `number` kvar i klartext, och allt annat flyttar in i
+ett `enc`-fält med AES-256-GCM och AAD `tabell:id`, så en rad inte kan flyttas till en annan post.
+Det som syns utan nyckel är alltså att ett projekt finns och när det ändrades — aldrig vad det
+innehåller. Kontraktstestet körs i båda lägena, för en fråga som läser ett krypterat fält inuti en
+transaktion ska falla i testet och inte framför en användare. `Dexie.waitFor()` finns runt varje
+`crypto.subtle`-väntan inuti en transaktion; utan den commitar transaktionen under fötterna på oss.
+
+**Låset tömmer, det gömmer inte.** Att låsa skriver först ut osparad text (invariant 8: går det
+inte, låses valvet inte alls), och därefter kastas nyckeln, sessionen, bindings, profiler,
+blocklistan och reglerna. Låsskärmen är hela appen — inget skal med gammal data bakom. Temat,
+teckenstorleken och auto-låsets tid ligger kvar i klartext, eftersom de behövs innan något
+lösenord finns att fråga efter.
+
+**Fältet är inte `type="password"`.** Det är just det som får en lösenordshanterare att erbjuda sig
+att spara huvudlösenordet till ett lokalt valv, bredvid datan det skyddar. Tecknen döljs med CSS,
+autofyll avvisas, och en knapp visar dem — vilket är fallet hanterarens egen visning hade täckt.
+
+**En krypterad export är krypterad.** En backup som lämnar skyddet kvar i webbläsaren är precis det
+hål krypteringen skulle täppa till. Filen bär valvets egen nyckelinpackning, så den öppnas med
+samma lösenord eller återställningsnyckel på vilken maskin som helst, och innehållet är exakt det
+klartextsnapshot schemat redan känner till. Klartextexport finns kvar bakom en uttrycklig varning.
+Import känner igen kuvertet på filen själv, inte på filnamnet.
+
+**"Rensa hela valvet" behåller huvudet.** Ett valv någon valt att kryptera ska inte skriva nästa
+sak i klartext för att det råkade tömmas. Detsamma gäller en ersättande import: den återställer
+innehåll, aldrig nyckeln som öppnar det. Den som tappat både lösenord och nyckel kommer vidare med
+en fullständig återställning, som tar bort huvudet också.

@@ -74,6 +74,26 @@ test('the sanitise page has no accessibility violations', async ({ page }) => {
   expect(await audit(page)).toEqual([]);
 });
 
+test('the lock screen and the encryption section stay clean', async ({ page }) => {
+  await open(page, '#/settings');
+  await expect(page.locator('.encryption-panel')).toBeVisible();
+  expect(await audit(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Kryptera valvet' }).click();
+  const dialog = page.locator('dialog[open]');
+  await dialog.getByLabel('Nytt lösenord', { exact: true }).fill('ett-langt-losenord');
+  await dialog.getByLabel('Upprepa lösenordet', { exact: true }).fill('ett-langt-losenord');
+  expect(await audit(page)).toEqual([]);
+  await dialog.getByRole('button', { name: 'Kryptera', exact: true }).click();
+  await expect(dialog).toContainText('Din återställningsnyckel');
+  expect(await audit(page)).toEqual([]);
+  await dialog.getByLabel(/Jag har sparat nyckeln/).check();
+  await dialog.getByRole('button', { name: 'Stäng', exact: true }).click();
+
+  await page.reload();
+  await expect(page.locator('.unlock-page')).toBeVisible();
+  expect(await audit(page)).toEqual([]);
+});
+
 test('the settings page has no accessibility violations', async ({ page }) => {
   await open(page, '#/settings');
   await expect(page.locator('.rules-panel')).toBeVisible();
