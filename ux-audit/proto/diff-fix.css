@@ -83,6 +83,39 @@
   .paste-diff-sections {
     grid-template-columns: 1fr;
   }
+
+  /* Fyra kolumner på ~200px bröt varje cell mitt i ordet: "ADMIN_USE R",
+     "C:\Temp \Exampl e", "ai- value · hög". Staplade celler med kryssrutan
+     kvar till höger. Kolumnrubrikerna tas bort med kolumnerna — cellerna
+     bär sin egen betydelse: namn i fetstil, värde med pil, metod i småtext. */
+  .reconciliation-head {
+    display: none;
+  }
+  /* display:grid måste sättas här. .reconciliation-row är definierad två gånger
+     i stilmallen — den första ger den grid och kolumnerna 1fr 1.4fr 1fr 35px,
+     den andra gör den till flex. Den senare vinner på källordning, så
+     kolumnproportionerna är död CSS och grid-column på barnen är verkningslöst
+     tills raden faktiskt är ett rutnät igen. */
+  .reconciliation-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    row-gap: 3px;
+  }
+  .reconciliation-row > span:nth-child(-n + 3) {
+    grid-column: 1;
+  }
+  .reconciliation-row > span:nth-child(4) {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: start;
+  }
+
+  /* Med 26 rader kod rullade alla tre rutorna lodrätt inuti en dialog som
+     själv rullar vid 90vh: fyra rullningsytor i varandra. Låt dialogen vara
+     den enda. Kortare blir det först när de två nedre fälls ihop. */
+  .paste-diff-preview {
+    max-height: none;
+  }
 }
 /* Textarean är min-height 270px, vilket trycker ner primärhandlingen.
    Efter en analys behöver den inte vara lika stor. */
