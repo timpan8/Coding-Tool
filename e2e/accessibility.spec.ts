@@ -26,6 +26,27 @@ test('the workspace stays clean with code, bindings and findings on screen', asy
   expect(await audit(page)).toEqual([]);
 });
 
+test('the armed real copy, its checklist and a toast stay clean', async ({ page }) => {
+  await open(page);
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.locator('.code-editor').click();
+  await page.keyboard.type('$p = "Hunter2"\n');
+  await page.getByText('Hunter2', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+  await page.getByLabel('Kategori').selectOption('secret');
+  await page.getByLabel('Privat värde · standard').fill('Hunter2');
+  await page.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  // Arming shows the checklist; Ctrl+B in the Local view raises a warning toast.
+  await page.locator('.copy-actions').getByRole('button', { name: /Kopiera RIKTIGT/ }).click();
+  await expect(page.locator('.exit-checklist')).toBeVisible();
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+b');
+  await expect(page.locator('.toast').last()).toContainText('Byt till Mall-vyn');
+  expect(await audit(page)).toEqual([]);
+});
+
 test('the settings page has no accessibility violations', async ({ page }) => {
   await open(page, '#/settings');
   await expect(page.locator('.rules-panel')).toBeVisible();

@@ -26,9 +26,7 @@ export function BindingPanel({
   const orphans = rows.filter((r) => r.occurrences === 0).length;
   return (
     <>
-      <div className="panel-title">
-        <h2>{t.bindingPanel.title}</h2>
-        <span className="count">{rows.length}</span>
+      <div className="panel-actions">
         <button className="text-button" disabled={!canCreate} onClick={onCreate}>
           ＋ Ny
         </button>

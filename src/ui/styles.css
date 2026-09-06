@@ -1,59 +1,78 @@
 @charset "UTF-8";
+/* Type, apart from the colour tokens below so the theme tests count colours only. */
+html {
+  --font: system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+}
 :root {
-  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  font-family: var(--font);
   font-synthesis: none;
   font-size: 16px;
   line-height: 1.5;
   color-scheme: light dark;
 
   /* Surfaces */
-  --bg: #f3f6f9;
+  --bg: #f4f6f8;
   --surface: #ffffff;
-  --surface-raised: #f8fafb;
-  --surface-sunken: #f0f4f7;
-  --surface-hover: #eef4f7;
+  --surface-raised: #f9fafb;
+  --surface-sunken: #eef1f4;
+  --surface-hover: #e9edf1;
 
   /* Lines */
-  --border-subtle: #e8edf1;
-  --border: #dbe3ea;
-  --border-strong: #c8d3de;
-  --focus-ring: #4cb9df;
+  --border-subtle: #e6e9ee;
+  --border: #d9dde3;
+  --border-strong: #c3c9d2;
+  --focus-ring: #1f6feb;
 
   /* Text */
-  --text-strong: #102333;
-  --text: #21364a;
-  --text-muted: #526375;
-  --text-subtle: #59697c;
-  --text-faint: #5f7185;
+  --text-strong: #0f1216;
+  --text: #1a1d21;
+  --text-muted: #5c6470;
+  --text-subtle: #5a626d;
+  --text-faint: #616a76;
 
   /* Accent, and the AI projection that shares it */
-  --accent: #126956;
-  --accent-hover: #0d5142;
+  --accent: #067647;
+  --accent-hover: #05603a;
   --accent-fg: #ffffff;
-  --accent-text: #116957;
-  --accent-bright: #2e7766;
-  --accent-muted: #587d72;
-  --accent-on-dark: #70dec3;
-  --accent-glow: #6aaf97;
-  --accent-surface: #e9f6f1;
-  --accent-surface-strong: #e0eee9;
-  --accent-border: #bedfd1;
-  --accent-border-strong: #97cdbb;
+  --accent-text: #067647;
+  --accent-bright: #0f6e4a;
+  --accent-muted: #3f7a5f;
+  --accent-on-dark: #32d583;
+  --accent-glow: #6fcf9f;
+  --accent-surface: #e8f7ee;
+  --accent-surface-strong: #d3f0e0;
+  --accent-border: #b3e2c8;
+  --accent-border-strong: #7fcfa3;
 
   /* Danger, and the LOCAL projection that shares it */
-  --danger: #a33925;
-  --danger-strong: #a84427;
-  --danger-text: #8f3a23;
-  --danger-muted: #a47669;
-  --danger-surface: #fff1e6;
-  --danger-surface-strong: #f5dfd3;
-  --danger-border: #e5c7b6;
-  --danger-border-strong: #b85a32;
+  --danger: #b42318;
+  --danger-strong: #9f1e14;
+  --danger-text: #b42318;
+  --danger-muted: #9c5a4e;
+  --danger-surface: #fdeceb;
+  --danger-surface-strong: #f8d5d2;
+  --danger-border: #f1b3ad;
+  --danger-border-strong: #d5463b;
 
   /* Warning */
-  --warn-text: #846328;
-  --warn-surface: #fff5df;
-  --warn-border: #e5d5ae;
+  --warn-text: #b54708;
+  --warn-surface: #fff4e5;
+  --warn-border: #f6d4a8;
+
+  /* The real copy: amber, so it can never be mistaken for the green AI exit or the red Local view */
+  --real: #b54708;
+  --real-hover: #9a3c06;
+  --real-fg: #ffffff;
+  --real-surface: #fff4e5;
+  --real-border: #f2bf7a;
+
+  /* Status and information */
+  --ok: #067647;
+  --ok-surface: #e8f7ee;
+  --info-text: #1f4fa3;
+  --info-surface: #e8f0fe;
+  --info-border: #c5d8fb;
 
   /* Depth */
   --shadow-xs: #10233304;
@@ -73,48 +92,60 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --bg: #0e1a24;
-    --surface: #16242f;
-    --surface-raised: #1c2c38;
-    --surface-sunken: #111d27;
-    --surface-hover: #223341;
+    --bg: #0f1216;
+    --surface: #171b21;
+    --surface-raised: #1c2128;
+    --surface-sunken: #12161b;
+    --surface-hover: #222830;
 
-    --border-subtle: #1e2f3b;
-    --border: #2a3e4d;
-    --border-strong: #3a5265;
-    --focus-ring: #5cc8ec;
+    --border-subtle: #222831;
+    --border: #2c333c;
+    --border-strong: #3b444f;
+    --focus-ring: #4c8dff;
 
-    --text-strong: #eaf2f7;
-    --text: #d3e0e9;
-    --text-muted: #a3b5c2;
-    --text-subtle: #9aadbb;
-    --text-faint: #91a4b3;
+    --text-strong: #f2f4f7;
+    --text: #e6e8eb;
+    --text-muted: #9aa3ad;
+    --text-subtle: #98a1ab;
+    --text-faint: #8f98a3;
 
-    --accent: #1c9078;
-    --accent-hover: #23a88c;
-    --accent-fg: #04140f;
-    --accent-text: #62d5b6;
-    --accent-bright: #70dec3;
-    --accent-muted: #7fa89c;
-    --accent-on-dark: #70dec3;
-    --accent-glow: #1c9078;
-    --accent-surface: #122d27;
-    --accent-surface-strong: #16382f;
-    --accent-border: #24523f;
-    --accent-border-strong: #2f6b52;
+    --accent: #1f9e63;
+    --accent-hover: #27b874;
+    --accent-fg: #06170e;
+    --accent-text: #32d583;
+    --accent-bright: #32d583;
+    --accent-muted: #7fb99c;
+    --accent-on-dark: #32d583;
+    --accent-glow: #1f9e63;
+    --accent-surface: #0d2a1c;
+    --accent-surface-strong: #123a27;
+    --accent-border: #1f5a3c;
+    --accent-border-strong: #2a7a52;
 
-    --danger: #c05a3c;
-    --danger-strong: #d06a49;
-    --danger-text: #f2a98d;
-    --danger-muted: #b89486;
-    --danger-surface: #2e1b14;
-    --danger-surface-strong: #3a221a;
-    --danger-border: #5a3324;
-    --danger-border-strong: #8a4a31;
+    --danger: #d9463a;
+    --danger-strong: #e45a4f;
+    --danger-text: #f97066;
+    --danger-muted: #b58a84;
+    --danger-surface: #2d1412;
+    --danger-surface-strong: #3b1b18;
+    --danger-border: #5a2a25;
+    --danger-border-strong: #8a3a32;
 
-    --warn-text: #e8c987;
-    --warn-surface: #2c2415;
-    --warn-border: #4d4024;
+    --warn-text: #f79009;
+    --warn-surface: #2a1d0b;
+    --warn-border: #5a3d12;
+
+    --real: #f79009;
+    --real-hover: #ffa726;
+    --real-fg: #0b1220;
+    --real-surface: #2a1d0b;
+    --real-border: #6b4a12;
+
+    --ok: #32d583;
+    --ok-surface: #0d2a1c;
+    --info-text: #8fb4ff;
+    --info-surface: #12213a;
+    --info-border: #1f3a66;
 
     --shadow-xs: #00000030;
     --shadow-sm: #0000004d;
@@ -126,48 +157,60 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #0e1a24;
-  --surface: #16242f;
-  --surface-raised: #1c2c38;
-  --surface-sunken: #111d27;
-  --surface-hover: #223341;
+  --bg: #0f1216;
+  --surface: #171b21;
+  --surface-raised: #1c2128;
+  --surface-sunken: #12161b;
+  --surface-hover: #222830;
 
-  --border-subtle: #1e2f3b;
-  --border: #2a3e4d;
-  --border-strong: #3a5265;
-  --focus-ring: #5cc8ec;
+  --border-subtle: #222831;
+  --border: #2c333c;
+  --border-strong: #3b444f;
+  --focus-ring: #4c8dff;
 
-  --text-strong: #eaf2f7;
-  --text: #d3e0e9;
-  --text-muted: #a3b5c2;
-  --text-subtle: #9aadbb;
-  --text-faint: #91a4b3;
+  --text-strong: #f2f4f7;
+  --text: #e6e8eb;
+  --text-muted: #9aa3ad;
+  --text-subtle: #98a1ab;
+  --text-faint: #8f98a3;
 
-  --accent: #1c9078;
-  --accent-hover: #23a88c;
-  --accent-fg: #04140f;
-  --accent-text: #62d5b6;
-  --accent-bright: #70dec3;
-  --accent-muted: #7fa89c;
-  --accent-on-dark: #70dec3;
-  --accent-glow: #1c9078;
-  --accent-surface: #122d27;
-  --accent-surface-strong: #16382f;
-  --accent-border: #24523f;
-  --accent-border-strong: #2f6b52;
+  --accent: #1f9e63;
+  --accent-hover: #27b874;
+  --accent-fg: #06170e;
+  --accent-text: #32d583;
+  --accent-bright: #32d583;
+  --accent-muted: #7fb99c;
+  --accent-on-dark: #32d583;
+  --accent-glow: #1f9e63;
+  --accent-surface: #0d2a1c;
+  --accent-surface-strong: #123a27;
+  --accent-border: #1f5a3c;
+  --accent-border-strong: #2a7a52;
 
-  --danger: #c05a3c;
-  --danger-strong: #d06a49;
-  --danger-text: #f2a98d;
-  --danger-muted: #b89486;
-  --danger-surface: #2e1b14;
-  --danger-surface-strong: #3a221a;
-  --danger-border: #5a3324;
-  --danger-border-strong: #8a4a31;
+  --danger: #d9463a;
+  --danger-strong: #e45a4f;
+  --danger-text: #f97066;
+  --danger-muted: #b58a84;
+  --danger-surface: #2d1412;
+  --danger-surface-strong: #3b1b18;
+  --danger-border: #5a2a25;
+  --danger-border-strong: #8a3a32;
 
-  --warn-text: #e8c987;
-  --warn-surface: #2c2415;
-  --warn-border: #4d4024;
+  --warn-text: #f79009;
+  --warn-surface: #2a1d0b;
+  --warn-border: #5a3d12;
+
+  --real: #f79009;
+  --real-hover: #ffa726;
+  --real-fg: #0b1220;
+  --real-surface: #2a1d0b;
+  --real-border: #6b4a12;
+
+  --ok: #32d583;
+  --ok-surface: #0d2a1c;
+  --info-text: #8fb4ff;
+  --info-surface: #12213a;
+  --info-border: #1f3a66;
 
   --shadow-xs: #00000030;
   --shadow-sm: #0000004d;
@@ -192,8 +235,8 @@ button {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  border-radius: 7px;
-  padding: 8px 13px;
+  border-radius: 6px;
+  padding: 7px 12px;
   font-size: 0.875rem;
   font-weight: 600;
   transition: background 0.15s;
@@ -427,6 +470,7 @@ main {
 .project-card {
   padding: 22px;
   text-align: left;
+  border-radius: 10px;
   box-shadow: 0 2px 3px var(--shadow-xs);
   min-width: 0;
 }
@@ -445,7 +489,7 @@ main {
   align-items: center;
 }
 .code-glyph {
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
   background: var(--accent-surface);
   color: var(--accent-bright);
   padding: 8px 12px;
@@ -531,9 +575,9 @@ main {
   font-size: 0.65rem;
 }
 .editor-panel {
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -577,18 +621,13 @@ main {
   box-shadow: 0 1px 4px var(--shadow-sm);
   color: var(--text-strong);
 }
-.copy-actions {
+.toolbar-actions {
   display: flex;
   gap: 5px;
 }
-.copy-actions button {
+.toolbar-actions button {
   font-size: 0.7rem;
   padding: 6px 8px;
-}
-.copy-actions button.ai-copy {
-  color: var(--accent-text);
-  background: var(--accent-surface);
-  border-color: var(--accent-border);
 }
 .view-banner {
   display: flex;
@@ -787,10 +826,10 @@ main {
 }
 .binding-panel {
   min-width: 0;
-  background: var(--surface-raised);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 15px;
+  border-radius: 10px;
+  padding: 4px 14px 14px;
   height: fit-content;
 }
 .panel-title {
@@ -823,7 +862,7 @@ main {
   border: 0;
   background: transparent;
   padding: 0;
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.8rem;
   color: var(--text);
   text-align: left;
@@ -878,24 +917,13 @@ main {
   text-align: center;
   padding: 25px 3px;
   color: var(--text-faint);
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
 }
 .bindings-empty p {
-  font-family: "Segoe UI", sans-serif;
+  font-family: var(--font);
   font-size: 0.75rem;
   margin-top: 10px;
   color: var(--text-subtle);
-}
-.m1-note {
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
-  margin-top: 18px;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-.m1-note p {
-  margin: 5px 0 0;
-  font-size: 0.7rem;
 }
 .issue-panel {
   padding: 10px;
@@ -906,8 +934,9 @@ main {
   margin-top: 15px;
   font-size: 0.75rem;
 }
-.issue-panel h3 {
-  font-size: 0.8rem;
+.issue-panel h2 {
+  font-size: 0.85rem;
+  margin: 0 0 8px;
 }
 .issue-panel p {
   color: var(--danger-text);

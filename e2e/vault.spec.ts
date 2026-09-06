@@ -54,7 +54,7 @@ test.beforeEach(async ({ page }) => {
 // the affirmative and then copies the secret verbatim.
 test('does not claim a clean review of code it has not checked', async ({ page }) => {
   await type(page, '$password = "Hunter2!"\n');
-  await page.getByRole('button', { name: /Copy for AI/ }).click();
+  await page.getByRole('button', { name: /Kopiera för AI/ }).click();
   const dialog = page.locator('dialog[open]');
   await expect(dialog).toBeVisible();
   await expect(dialog).not.toContainText('Inga kända problem hittades');
@@ -68,10 +68,10 @@ test('explains why a copy button is disabled', async ({ page }) => {
   await page.locator('.code-editor').click();
   await page.keyboard.press('Control+End');
   await page.keyboard.type('# the old value was Hunter2\n');
-  await expect(page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ })).toBeDisabled();
+  await expect(page.locator('.copy-actions').getByRole('button', { name: /Kopiera för AI/ })).toBeDisabled();
   // Blocked is correct; blocked with no explanation anywhere on screen was the defect.
   await expect(page.locator('.issue-panel')).toBeVisible();
-  await expect(page.locator('.issue-panel')).toContainText('blockerar Copy for AI');
+  await expect(page.locator('.issue-panel')).toContainText('blockerar Kopiera för AI');
   await expect(page.locator('.copy-blocked')).toBeVisible();
   // The problem is reachable: clicking it switches to the projection that has it.
   await page.locator('.issue-item').first().click();
@@ -296,7 +296,7 @@ test('puts a blocklisted term away by itself when code is pasted', async ({ page
   await paste(page, '$url = "https://mittforetag.se/api"\n$mail = "post@mittforetag.se"\n');
   await expect(page.locator('.editor-body')).toContainText('{{MITTFORETAG_SE}}');
   await expect(page.locator('.editor-body')).not.toContainText('mittforetag.se');
-  await expect(page.locator('.inline-notice')).toContainText('förekomster');
+  await expect(page.locator('.toast', { hasText: 'förekomster' })).toBeVisible();
 
   // The AI view carries the harmless value, the Local view the real one — the term became an
   // ordinary binding, so nothing else in the app had to learn about the blocklist.
@@ -365,7 +365,7 @@ test('puts a known value back behind its placeholder from the issue panel', asyn
   await page.locator('.issue-row').getByRole('button', { name: 'Byt mot {{HOST}}' }).click();
   await expect(page.locator('.issue-panel')).toHaveCount(0);
   await expect(page.locator('.editor-body')).not.toContainText('sql01.corp.local');
-  await expect(page.locator('.inline-notice')).toContainText('byttes mot platshållaren');
+  await expect(page.locator('.toast', { hasText: 'byttes mot platshållaren' })).toBeVisible();
 });
 
 // Punkt 4. Den farligaste händelsen i hela rundturen, och tidigare helt tyst: AI:n ger tillbaka det
@@ -428,16 +428,21 @@ test('names the profile it is about to copy and says how old the last backup is'
   await go(page, '＋ Ny kod', '.code-editor');
   await type(page, '$host = "prod.example.test"\n');
   await bind(page, 'prod', 'prod.internal', 'infrastructure');
-  await page.locator('.copy-actions').getByRole('button', { name: 'Copy Local' }).click();
-  await expect(page.locator('dialog[open]')).toContainText('Ingen profil är vald');
-  await page.locator('dialog[open]').getByRole('button', { name: 'Avbryt' }).click();
+  // The first press arms the real copy and shows the checklist, which names the profile.
+  await page.locator('.copy-actions').getByRole('button', { name: /Kopiera RIKTIGT/ }).click();
+  await expect(page.locator('.exit-checklist')).toContainText('Ingen profil är vald');
+  // The arming lapses by itself; wait for it so the next press arms again rather than copies.
+  await expect(page.locator('.exit-checklist')).toBeHidden({ timeout: 8000 });
 
   await page.getByLabel('Aktiv profil').selectOption('__manage__');
   await page.getByLabel('Ny profil').fill('Test');
   await page.locator('dialog[open]').getByRole('button', { name: 'Lägg till' }).click();
   await page.locator('dialog[open]').getByRole('button', { name: 'Stäng', exact: true }).click();
   await page.getByLabel('Aktiv profil').selectOption({ label: 'Test' });
-  await page.locator('.copy-actions').getByRole('button', { name: 'Copy Local' }).click();
+  await page.locator('.copy-actions').getByRole('button', { name: /Kopiera RIKTIGT/ }).click();
+  await expect(page.locator('.exit-checklist')).toContainText('profilen Test');
+  // The details dialog is still there for anyone who wants the long version.
+  await page.locator('.exit-checklist').getByRole('button', { name: 'Visa detaljer' }).click();
   await expect(page.locator('dialog[open]')).toContainText('profilen Test');
   await page.locator('dialog[open]').getByRole('button', { name: 'Avbryt' }).click();
 
@@ -510,10 +515,14 @@ test('counts down and clears the clipboard after a local copy', async ({ page, c
 
   await type(page, '$p = "Hunter2"\n');
   await bind(page, 'Hunter2', 'Hunter2', 'secret');
-  await page.locator('.copy-actions').getByRole('button', { name: 'Copy Local' }).click();
-  await page.getByRole('button', { name: 'Kopiera LOCAL med secrets' }).click();
+  // Two presses: the first arms and shows the checklist, the second writes the clipboard.
+  const real = page.locator('.copy-actions').getByRole('button', { name: /Kopiera RIKTIGT/ });
+  await real.click();
+  await expect(page.locator('.exit-checklist')).toBeVisible();
+  expect(await clipboard(page)).not.toContain('Hunter2');
+  await real.click();
 
-  await expect(page.locator('.clipboard-countdown')).toContainText('Urklippet rensas om');
+  await expect(page.locator('.clipboard-countdown')).toContainText('rensas om');
   expect(await clipboard(page)).toContain('Hunter2');
 
   // Cancelling leaves it alone, which is the whole point of showing the countdown.
@@ -534,7 +543,7 @@ test('lets rules be turned off and a term of your own added', async ({ page }) =
   await page.evaluate(() => (location.hash = '#/settings'));
   await page.getByLabel('Eget sökord').fill('mittforetag.se');
   await page.getByRole('button', { name: 'Lägg till sökord' }).click();
-  await expect(page.locator('.import-result, .inline-notice')).toContainText('tillagt');
+  await expect(page.locator('.toast', { hasText: 'tillagt' })).toBeVisible();
 
   await page.goto(project);
   await expect(page.locator('.findings-panel')).toContainText('mittforetag.se');
@@ -743,7 +752,7 @@ test('offers to write the value back when a binding is deleted', async ({ page }
   // The value is back in the template rather than an unresolvable placeholder.
   await expect(page.locator('.editor-body')).toContainText('Hunter2!');
   await expect(page.locator('.editor-body')).not.toContainText('{{');
-  await expect(page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ })).toBeEnabled();
+  await expect(page.locator('.copy-actions').getByRole('button', { name: /Kopiera för AI/ })).toBeEnabled();
 });
 
 // A binding can also be prepared before the code that uses it exists.
@@ -778,7 +787,7 @@ test('renames a binding and rewrites its placeholder everywhere', async ({ page 
   await expect(page.locator('.binding-card')).toContainText('2 förekomster');
 
   // Still resolvable, so copying is not blocked by a dangling name.
-  await expect(page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ })).toBeEnabled();
+  await expect(page.locator('.copy-actions').getByRole('button', { name: /Kopiera för AI/ })).toBeEnabled();
 });
 
 // Report F18. Binding.values was keyed by profile and resolveValue already had the fallback, but
@@ -902,10 +911,10 @@ test('lists its shortcuts and uses combinations the browser leaves alone', async
   await expect(dialog).toContainText('utvecklarverktygen');
   await dialog.getByRole('button', { name: 'Stäng', exact: true }).click();
 
-  await type(page, '$p = "Hunter2!"\n');
-  await bind(page, 'Hunter2', 'Hunter2!', 'secret');
+  await type(page, '$password = "Hunter2!"\n');
 
-  // Ctrl+Enter opens the AI copy review rather than copying blind.
+  // Ctrl+Enter opens the AI copy review when something looks like a secret, rather than copying
+  // blind. (When the file is bound and clean it copies on the spot — see the unit test.)
   await page.keyboard.press('Control+Enter');
   await expect(page.locator('dialog[open]')).toContainText('AI-export');
   await page.locator('dialog[open]').getByRole('button', { name: 'Avbryt' }).click();
@@ -927,7 +936,7 @@ test('reads a file dropped onto the workspace', async ({ page }) => {
     grid.dispatchEvent(new DragEvent('dragover', { dataTransfer: transfer, bubbles: true }));
     grid.dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true }));
   });
-  await expect(page.locator('.inline-notice')).toContainText('deploy.ps1 inläst');
+  await expect(page.locator('.toast', { hasText: 'deploy.ps1 inläst' })).toBeVisible();
   await expect(page.getByLabel('Språk', { exact: true })).toHaveValue('powershell');
   await expect(page.locator('.file-tabs')).toContainText('deploy.ps1');
   await expect(page.locator('.editor-body')).toContainText('sql01.corp.local');
@@ -943,10 +952,11 @@ test('recognises the language of pasted code and can write the result to a file'
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 
   await bind(page, 'Hunter2', 'Hunter2!', 'secret');
-  await page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ }).click();
+  // Bound and clean, so the file needs no review dialog either: the button beside the AI exit
+  // writes it directly, through the same audit.
   const download = await Promise.all([
     page.waitForEvent('download'),
-    page.locator('dialog[open]').getByRole('button', { name: 'Ladda ned som fil' }).click(),
+    page.locator('.copy-actions').getByRole('button', { name: 'Spara AI-kopia som fil' }).click(),
   ]).then(([d]) => d);
 
   expect(download.suggestedFilename()).toContain('ai-');
@@ -996,7 +1006,8 @@ test('says why an action was refused instead of doing nothing', async ({ page })
   await page.locator('.code-editor').click();
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Control+b');
-  const strip = page.locator('.inline-notice');
+  // The newest toast: a refusal is a warning toast, not a strip and not a modal.
+  const strip = page.locator('.toast').last();
   await expect(strip).toContainText('Byt till Mall-vyn');
   // A refusal is not a modal: the page stays usable.
   await expect(page.locator('dialog[open]')).toHaveCount(0);
@@ -1173,7 +1184,7 @@ test('undoes a deleted project, with its versions and bindings', async ({ page }
   await expect(page.locator('.empty-project-list')).toBeVisible();
 
   await page.locator('.undo-bar').getByRole('button', { name: 'Ångra', exact: true }).click();
-  await expect(page.locator('.inline-notice')).toContainText('Ångrat');
+  await expect(page.locator('.toast', { hasText: 'Ångrat' })).toBeVisible();
   const card = page.locator('.project-card');
   await expect(card).toBeVisible();
   await expect(card).toContainText('Ångra-provet');
@@ -1208,13 +1219,13 @@ test('copies a selection in sanitised form without the rest of the file', async 
   await page.locator('.code-editor').click();
   await page.keyboard.press('Control+End');
   await page.keyboard.type('$q = "{{NO_SUCH_BINDING}}"\n');
-  await expect(page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ })).toBeDisabled();
+  await expect(page.locator('.copy-actions').getByRole('button', { name: /Kopiera för AI/ })).toBeDisabled();
 
   await page.getByText('second line').first().dblclick();
   const button = page.getByRole('button', { name: 'Kopiera markering ↗' });
   await expect(button).toBeVisible();
   await button.click();
-  await expect(page.locator('.inline-notice')).toContainText('Markeringen kopierad');
+  await expect(page.locator('.toast', { hasText: 'Markeringen kopierad' })).toBeVisible();
   await context.grantPermissions(['clipboard-read']);
   const clipped = await clipboard(page);
   // No placeholders in this fragment, so no instruction block claiming there are any.
@@ -1225,7 +1236,7 @@ test('copies a selection in sanitised form without the rest of the file', async 
   await page.keyboard.press('Control+Home');
   await page.keyboard.press('Shift+End');
   await page.getByRole('button', { name: 'Kopiera markering ↗' }).click();
-  await expect(page.locator('.inline-notice')).toContainText('1 värde utbytta');
+  await expect(page.locator('.toast', { hasText: '1 värde utbytta' })).toBeVisible();
   const second = await clipboard(page);
   expect(second).toContain('<PASSWORD>');
   expect(second).toContain('Behåll dem exakt');
@@ -1255,7 +1266,10 @@ test('keeps editor preferences and points at the editor commands', async ({ page
   await expect(page.getByRole('group', { name: 'Editorinställningar' }).getByRole('button', { name: /Radbrytning/ }))
     .toHaveAttribute('aria-pressed', 'false');
 
-  // Ctrl+H does work; it was undiscoverable. The overview now names it.
+  // Ctrl+H does work; it was undiscoverable. The overview now names it. Inside Monaco, Ctrl+/ is
+  // the editor's own comment toggle, so the overview is asked for from outside it: where focus
+  // lands after a reload is a race between the lazy editor and the settings, not something to lean on.
+  await page.locator('.app-footer').click();
   await page.keyboard.press('Control+/');
   await expect(page.locator('dialog[open]')).toContainText('Sök och ersätt');
   await page.getByRole('button', { name: 'Stäng', exact: true }).click();
@@ -1267,7 +1281,7 @@ test('keeps editor preferences and points at the editor commands', async ({ page
 // A file is as easy to paste into a chat as the clipboard is, so it goes through the same gate.
 test('holds the download behind the same review as the clipboard', async ({ page }) => {
   await type(page, '$db = "AKIAIOSFODNN7EXAMPLE"\n');
-  await page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ }).click();
+  await page.locator('.copy-actions').getByRole('button', { name: /Kopiera för AI/ }).click();
   const dialog = page.locator('dialog[open]');
   const save = dialog.getByRole('button', { name: 'Ladda ned som fil' });
   await expect(save).toBeDisabled();

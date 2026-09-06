@@ -31,55 +31,68 @@ Ljust värde först, mörkt inom parentes.
 
 **Ytor**
 
-| Token              | Ljus      | Mörk      | Används till                   |
-| ------------------ | --------- | --------- | ------------------------------ |
-| `--bg`             | `#f3f6f9` | `#0e1a24` | Sidbakgrund, `main`            |
-| `--surface`        | `#ffffff` | `#16242f` | Kort, paneler, topbar, knappar |
-| `--surface-raised` | `#f8fafb` | `#1c2c38` | Upphöjda ytor                  |
-| `--surface-sunken` | `#f0f4f7` | `#111d27` | Nedsänkta ytor, `.status-pill` |
-| `--surface-hover`  | `#eef4f7` | `#223341` | Hover på knapp och nav         |
+| Token              | Ljus      | Mörk      | Används till                    |
+| ------------------ | --------- | --------- | ------------------------------- |
+| `--bg`             | `#f4f6f8` | `#0f1216` | Sidbakgrund, `main`             |
+| `--surface`        | `#ffffff` | `#171b21` | Kort, paneler, topbar, knappar  |
+| `--surface-raised` | `#f9fafb` | `#1c2128` | Upphöjda ytor, toasts, utgångar |
+| `--surface-sunken` | `#eef1f4` | `#12161b` | Nedsänkta ytor, aktiv navflik   |
+| `--surface-hover`  | `#e9edf1` | `#222830` | Hover på knapp och nav          |
 
 **Linjer**
 
 | Token             | Ljus      | Mörk      | Används till                       |
 | ----------------- | --------- | --------- | ---------------------------------- |
-| `--border-subtle` | `#e8edf1` | `#1e2f3b` | Svaga avdelare, `.count`-bakgrund  |
-| `--border`        | `#dbe3ea` | `#2a3e4d` | Standardram på knapp, kort, dialog |
-| `--border-strong` | `#c8d3de` | `#3a5265` | `input`, `select`                  |
-| `--focus-ring`    | `#4cb9df` | `#5cc8ec` | Fokusmarkering                     |
+| `--border-subtle` | `#e6e9ee` | `#222831` | Svaga avdelare, `.count`-bakgrund  |
+| `--border`        | `#d9dde3` | `#2c333c` | Standardram på knapp, kort, dialog |
+| `--border-strong` | `#c3c9d2` | `#3b444f` | `input`, `select`                  |
+| `--focus-ring`    | `#1f6feb` | `#4c8dff` | Fokusmarkering                     |
 
 **Text** — fem nivåer, varav tre ligger mycket nära varandra.
 
 | Token           | Ljus      | Mörk      | Används till                              |
 | --------------- | --------- | --------- | ----------------------------------------- |
-| `--text-strong` | `#102333` | `#eaf2f7` | Rubriker, projektnamn, varumärke          |
-| `--text`        | `#21364a` | `#d3e0e9` | Brödtext, knapptext                       |
-| `--text-muted`  | `#526375` | `#a3b5c2` | `p`, `.muted`, `.eyebrow`, `.text-button` |
-| `--text-subtle` | `#59697c` | `#9aadbb` | `small`, sidfot, `.paste-prompt`          |
-| `--text-faint`  | `#5f7185` | `#91a4b3` | `.bindings-empty`                         |
+| `--text-strong` | `#0f1216` | `#f2f4f7` | Rubriker, projektnamn, varumärke          |
+| `--text`        | `#1a1d21` | `#e6e8eb` | Brödtext, knapptext                       |
+| `--text-muted`  | `#5c6470` | `#9aa3ad` | `p`, `.muted`, `.eyebrow`, `.text-button` |
+| `--text-subtle` | `#5a626d` | `#98a1ab` | `small`, sidfot, `.paste-prompt`          |
+| `--text-faint`  | `#616a76` | `#8f98a3` | `.bindings-empty`, radnummer i editorn    |
 
-> **Observation:** `--text-muted` (`#526375`), `--text-subtle` (`#59697c`) och `--text-faint`
-> (`#5f7185`) skiljer sig med under 5 % i luminans. Tre tokens gör i praktiken ett jobb. Det är
-> ingen bugg, men det är tre namn att välja mellan där ett hade räckt — se §6.
+> **Observation:** `--text-muted`, `--text-subtle` och `--text-faint` ligger inom några procent i
+> luminans. Tre tokens gör i praktiken ett jobb. Det är ingen bugg, men det är tre namn att välja
+> mellan där ett hade räckt — se §6. Alla tre klarar AA mot `--surface`, `--bg` och `--surface-raised`;
+> `src/ui/contrast.test.ts` mäter det.
+
+**Typsnitt** — `--font` `system-ui, "Segoe UI", Roboto, sans-serif` · `--mono` `Consolas, "Cascadia Mono",
+"Courier New", monospace`. Definierade på `html`, inte i tokenblocket, så att temat­esterna räknar färger.
 
 **Accent (grön) — delas med AI-projektionen**
 
-`--accent` `#126956` (`#1c9078`) · `--accent-hover` `#0d5142` (`#23a88c`) · `--accent-fg` `#ffffff`
-(`#04140f`) · `--accent-text` `#116957` (`#62d5b6`) · `--accent-bright` `#2e7766` (`#70dec3`) ·
-`--accent-muted` `#587d72` (`#7fa89c`) · `--accent-on-dark` `#70dec3` (samma i båda) ·
-`--accent-glow` `#6aaf97` (`#1c9078`) · `--accent-surface` `#e9f6f1` (`#122d27`) ·
-`--accent-surface-strong` `#e0eee9` (`#16382f`) · `--accent-border` `#bedfd1` (`#24523f`) ·
-`--accent-border-strong` `#97cdbb` (`#2f6b52`)
+`--accent` `#067647` (`#1f9e63`) · `--accent-hover` `#05603a` (`#27b874`) · `--accent-fg` `#ffffff`
+(`#06170e`) · `--accent-text` `#067647` (`#32d583`) · `--accent-bright` `#0f6e4a` (`#32d583`) ·
+`--accent-muted` `#3f7a5f` (`#7fb99c`) · `--accent-on-dark` `#32d583` (samma i båda) ·
+`--accent-glow` `#6fcf9f` (`#1f9e63`) · `--accent-surface` `#e8f7ee` (`#0d2a1c`) ·
+`--accent-surface-strong` `#d3f0e0` (`#123a27`) · `--accent-border` `#b3e2c8` (`#1f5a3c`) ·
+`--accent-border-strong` `#7fcfa3` (`#2a7a52`)
 
 **Fara (röd/tegel) — delas med Local-projektionen**
 
-`--danger` `#a33925` (`#c05a3c`) · `--danger-strong` `#a84427` (`#d06a49`) · `--danger-text`
-`#8f3a23` (`#f2a98d`) · `--danger-muted` `#a47669` (`#b89486`) · `--danger-surface` `#fff1e6`
-(`#2e1b14`) · `--danger-surface-strong` `#f5dfd3` (`#3a221a`) · `--danger-border` `#e5c7b6`
-(`#5a3324`) · `--danger-border-strong` `#b85a32` (`#8a4a31`)
+`--danger` `#b42318` (`#d9463a`) · `--danger-strong` `#9f1e14` (`#e45a4f`) · `--danger-text`
+`#b42318` (`#f97066`) · `--danger-muted` `#9c5a4e` (`#b58a84`) · `--danger-surface` `#fdeceb`
+(`#2d1412`) · `--danger-surface-strong` `#f8d5d2` (`#3b1b18`) · `--danger-border` `#f1b3ad`
+(`#5a2a25`) · `--danger-border-strong` `#d5463b` (`#8a3a32`)
 
-**Varning** — `--warn-text` `#846328` (`#e8c987`) · `--warn-surface` `#fff5df` (`#2c2415`) ·
-`--warn-border` `#e5d5ae` (`#4d4024`)
+**Varning** — `--warn-text` `#b54708` (`#f79009`) · `--warn-surface` `#fff4e5` (`#2a1d0b`) ·
+`--warn-border` `#f6d4a8` (`#5a3d12`)
+
+**Riktig kopia (amber)** — `--real` `#b54708` (`#f79009`) · `--real-hover` `#9a3c06` (`#ffa726`) ·
+`--real-fg` `#ffffff` (`#0b1220`) · `--real-surface` `#fff4e5` (`#2a1d0b`) · `--real-border` `#f2bf7a`
+(`#6b4a12`). Bara knappen "Kopiera RIKTIGT", dess checklista och urklippsbannern. Den ska varken kunna
+förväxlas med den gröna AI-utgången eller den röda Local-vyn.
+
+**Status och information** — `--ok` `#067647` (`#32d583`) · `--ok-surface` `#e8f7ee` (`#0d2a1c`) ·
+`--info-text` `#1f4fa3` (`#8fb4ff`) · `--info-surface` `#e8f0fe` (`#12213a`) · `--info-border` `#c5d8fb`
+(`#1f3a66`). Toasts och statusmarkörer.
 
 **Djup** — `--shadow-xs` `#10233304` · `--shadow-sm` `#10233318` · `--shadow-md` `#10233340` ·
 `--scrim` `#10233325` · `--backdrop` `#10233380`. I mörkt läge byts basen mot ren svart.

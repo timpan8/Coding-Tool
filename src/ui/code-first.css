@@ -32,11 +32,33 @@
 .top-navigation button {
   border: 0;
   background: transparent;
-  padding: 8px 11px;
+  padding: 7px 11px;
   font-size: 0.8rem;
+  border-radius: 6px;
+  color: var(--text-muted);
 }
 .top-navigation button:hover {
   background: var(--surface-hover);
+  color: var(--text-strong);
+}
+/* The page that is open, so the bar reads as a place and not only as a row of links. */
+.top-navigation button.active {
+  background: var(--surface-sunken);
+  color: var(--text-strong);
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.icon-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0.9rem;
 }
 .top-navigation kbd {
   margin-left: 5px;
@@ -110,11 +132,22 @@
 .code-first .workspace {
   padding: 30px 35px;
 }
+/* Three columns: versions, the code, the bindings. The right column used to carry five stacked
+   panels in 270 px; the history has its own side now and the rest fold. */
 .code-first .work-grid {
-  max-width: 1450px;
+  max-width: 1600px;
   margin: auto;
-  grid-template-columns: minmax(0, 1fr) 270px;
-  gap: 18px;
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  gap: 16px;
+}
+.version-column {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  max-height: calc(100vh - 245px);
+  overflow: auto;
 }
 .code-first .editor-panel {
   height: calc(100vh - 245px);
@@ -163,37 +196,24 @@
   overflow: auto;
 }
 .version-history {
-  border-top: 1px solid var(--border);
-  margin-top: 18px;
-  padding-top: 14px;
   color: var(--text-muted);
   font-size: 0.75rem;
 }
-.version-history summary {
-  cursor: pointer;
-  font-weight: 650;
-  display: flex;
-  justify-content: space-between;
-}
-.version-history summary span {
-  background: var(--border-subtle);
-  border-radius: 15px;
-  padding: 1px 7px;
-  font-weight: 400;
+.version-history .panel-title {
+  margin-bottom: 10px;
 }
 .version-history p {
   font-size: 0.72rem;
   margin-top: 12px;
 }
-.persistence-error,
-.inline-notice {
+.persistence-error {
   display: flex;
   align-items: center;
   gap: 15px;
   padding: 10px 30px;
-  border-bottom: 1px solid var(--accent-border);
-  background: var(--accent-surface);
-  color: var(--accent-text);
+  border-bottom: 1px solid var(--danger-border);
+  background: var(--danger-surface);
+  color: var(--danger-text);
   font-size: 0.8rem;
 }
 .persistence-error p {
@@ -201,18 +221,187 @@
   flex: 1;
   color: var(--danger-text);
 }
-/* A refusal or a failed convenience, as opposed to something that worked. Report U6: these used to
-   be full-screen modals. */
-.inline-notice.warn {
-  border-bottom-color: var(--warn-border);
-  background: var(--warn-surface);
+/* Folding sections in the right column. One heading level for all of them, the count in the
+   summary so a closed section still says what it holds (UX-AUDIT F-2.4). */
+.side-section > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  color: var(--text-strong);
+}
+.side-section > summary::-webkit-details-marker {
+  display: none;
+}
+.side-section > summary::before {
+  content: "▸";
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.side-section[open] > summary::before {
+  content: "▾";
+}
+.side-section > summary h2 {
+  font-size: 0.85rem;
+  margin: 0;
+}
+.side-section > summary .count {
+  margin-left: auto;
+}
+.side-section + .side-section,
+.issue-panel + .side-section {
+  border-top: 1px solid var(--border);
+}
+.panel-actions {
+  margin-bottom: 8px;
+}
+/* Transient messages, bottom right; the undo bar keeps the bottom centre. */
+.toasts {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 45;
+  display: grid;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 40px));
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-left-color: var(--info-text);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: 0 6px 24px var(--shadow-md);
+  font-size: 0.8125rem;
   color: var(--text);
 }
-.inline-notice button {
-  margin-left: auto;
+.toast span {
+  flex: 1;
+}
+.toast button {
   border: 0;
   background: transparent;
-  padding: 2px 7px;
+  padding: 0 4px;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.toast-ok {
+  border-left-color: var(--accent);
+}
+.toast-warn {
+  border-left-color: var(--warn-text);
+  background: var(--warn-surface);
+}
+.toast-error {
+  border-left-color: var(--danger);
+  background: var(--danger-surface);
+}
+/* The two exits. Green and first for the AI copy; amber, armed by one press and fired by the next,
+   for the real one. */
+.exits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+.exit-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.exit-ai small {
+  font-weight: 500;
+  font-size: 0.7rem;
+  opacity: 0.9;
+}
+.exit-download {
+  font-size: 0.75rem;
+}
+.exit-real {
+  margin-left: auto;
+  border-color: var(--real-border);
+  background: var(--real-surface);
+  color: var(--real);
+}
+.exit-real:hover:not(:disabled) {
+  background: var(--real-border);
+}
+.exit-real.armed {
+  background: var(--real);
+  border-color: var(--real);
+  color: var(--real-fg);
+  animation: armed-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes armed-pulse {
+  from {
+    box-shadow: 0 0 0 0 var(--real-border);
+  }
+  to {
+    box-shadow: 0 0 0 4px var(--real-border);
+  }
+}
+.exit-checklist {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--real-border);
+  border-radius: 8px;
+  background: var(--real-surface);
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+.exit-checklist ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+.exit-checklist li.ok {
+  color: var(--accent-text);
+}
+.exit-checklist li.bad {
+  color: var(--danger-text);
+  font-weight: 600;
+}
+.exit-checklist li.warn {
+  color: var(--warn-text);
+  font-weight: 600;
+}
+.exit-checklist p {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.clipboard-banner.error {
+  background: var(--danger-surface);
+  border-bottom-color: var(--danger-border);
+  color: var(--danger-text);
+}
+.clipboard-banner small {
+  margin-left: auto;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+@media (max-width: 1100px) {
+  .code-first .work-grid {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+  .version-column {
+    grid-column: 1 / -1;
+    order: 3;
+    max-height: none;
+  }
+  .clipboard-banner small {
+    display: none;
+  }
 }
 .overview-scroll {
   min-height: calc(100vh - 120px);
@@ -516,10 +705,9 @@
   font-size: 0.75rem;
 }
 
-.findings-panel {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+.findings-panel > .muted {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
 }
 .finding {
   margin-bottom: 10px;
@@ -737,7 +925,7 @@
   padding: 6px 10px;
 }
 .version-file-name {
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.8125rem;
   color: var(--text-strong);
 }
@@ -926,7 +1114,7 @@ dialog:has(.version-view) {
   border: 0;
   background: var(--surface);
   color: var(--text);
-  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.8125rem;
   line-height: 1.6;
   resize: none;

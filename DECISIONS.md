@@ -168,3 +168,46 @@ escaping och beskrivning ligger bakom en fällning som är öppen när man redig
 den som öppnar en sådan kom hit för ett av de fälten. AI-värdet står kvar på skärmen som text även när
 det inte står där som ett fält: det är det enda fält som lämnar valvet, och att fälla undan är inte
 detsamma som att dölja.
+
+## 2026-09-06 — Gränssnittet tar CodeVaults form
+
+En parallell implementation (`codevault/`, mergad i PR #7) hade ett gränssnitt som var lättare att
+läsa: tre kolumner, två utgångar som inte går att förväxla, meddelanden som försvinner av sig
+själva. Funktionaliteten i den här appen är större, så det är formen som flyttas hit, inte koden.
+
+**Tre kolumner i stället för fem staplade paneler.** Versionshistoriken har fått en egen kolumn till
+vänster; höger kolumn fäller sina sektioner med antalet i rubriken, bindings öppna som standard.
+Problemlistan ligger alltid överst där när den finns, eftersom den blockerar kopiering. Under 1100 px
+flyttar versionerna under editorn, under 750 px blir det en kolumn.
+
+**Kopiera för AI kopierar direkt när inget kräver ett beslut.** Dialogen fanns för två saker: att
+något i filen ser ut som en hemlighet, och att inget är skyddat fast koden har strängar som kunde
+vara det. I båda fallen öppnas den fortfarande, med samma kvittens och samma nedladdning bakom den.
+I det vanliga fallet — något är bundet, inga allvarliga fynd — är dialogen ett klick som inte
+tillför något, och pressen kopierar och säger hur många värden som ersattes. Granskningen är
+oförändrad: `auditForCopy` körs på texten som kopieras, och scannern körs synkront på samma text i
+stället för att lita på panelens fördröjda lista. Filen går samma väg: "Spara AI-kopia som fil"
+öppnar dialogen när granskning krävs och laddar ner direkt annars.
+
+**Kopiera RIKTIGT armeras av ett tryck och kopierar på det andra.** Invariant 9 kräver ett andra
+uttryckligt val före riktiga värden. Det valet var en dialog; nu är det ett andra tryck inom fem
+sekunder, med checklistan mellan trycken: hur många bindings som har värde, vilka som saknar, vilka
+kontexter som inte kan escapas, hur många riktiga värden som skrivs, vilken profil. Armeringen
+släpper när texten eller vyn ändras. Dialogen finns kvar bakom "Visa detaljer" för den som vill ha
+den långa versionen. Knappen är amber, en färg som varken den gröna AI-utgången eller den röda
+Local-vyn använder.
+
+**Meddelanden är toasts.** Remsan under sidhuvudet stod kvar tills någon stängde den, vilket läste
+som ett tillstånd hos appen; "AI-kod kopierad" är inget tillstånd. En vägran är fortfarande ingen
+modal (U6): den blir en varningstoast som stannar dubbelt så länge och behåller sin stängknapp.
+Behållaren är en artig live-region, aldrig `alert`, så en ny toast inte avbryter det en skärmläsare
+håller på med (A.7). Sparfelet och uppdateringsnotisen är tillstånd och står kvar som förut.
+
+**Urklippsbannern säger sanningen om rensningen.** Den visas efter varje riktig kopia, även när
+auto-rensning är av, med en knapp för att rensa nu. Misslyckas rensningen blir bannern röd och står
+kvar tills urklippet faktiskt är rent; appen försöker igen när fliken får fokus. Noten om
+urklippshistorik står där för att det är det enda en webbsida inte kan göra något åt.
+
+**Paletten bytte värden, inte namn.** Tokennamnen och kopplingen grönt = AI, tegel = Local, gult =
+varning är oförändrade; nya tokens finns bara för amber (`--real*`), status (`--ok*`) och
+information (`--info*`). `contrast.test.ts` och `theme.test.ts` mäter fortfarande varje par.

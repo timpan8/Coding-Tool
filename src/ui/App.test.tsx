@@ -55,12 +55,13 @@ it('creates a project from first input, binds a selected value, renders both vie
   fireEvent.click(screen.getByRole('tab', { name: 'AI' }));
   expect((editor as HTMLTextAreaElement).value).toContain('example.user');
   expect((editor as HTMLTextAreaElement).value).not.toContain('synthetic.user');
-  fireEvent.click(screen.getByRole('button', { name: /Copy for AI/ }));
-  expect(clipboard).not.toHaveBeenCalled();
-  fireEvent.click(await screen.findByRole('button', { name: 'Jag har granskat · kopiera för AI' }));
+  // One value bound and nothing that looks like a secret left over: the copy needs no review, so
+  // one press writes the clipboard and no dialog opens.
+  fireEvent.click(screen.getByRole('button', { name: /Kopiera för AI/ }));
   // The AI copy now carries an instruction block above the code, as a comment in the file's own
   // language, telling the model to leave the placeholders alone.
   await waitFor(() => expect(clipboard).toHaveBeenCalled());
+  expect(screen.queryByRole('button', { name: 'Jag har granskat · kopiera för AI' })).toBeNull();
   const copied = clipboard.mock.calls.at(-1)![0];
   expect(copied).toContain('$username = "example.user"');
   expect(copied).toContain('# Koden nedan har privata värden');
@@ -78,9 +79,12 @@ it('masks local secrets and requires a second deliberate action to copy them', a
   fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
   expect((editor as HTMLTextAreaElement).value).toContain('••••••••');
   expect((editor as HTMLTextAreaElement).value).not.toContain('SuperSecret123!');
-  fireEvent.click(screen.getByRole('button', { name: 'Copy Local' }));
+  // The first press only arms the button and shows the checklist; the second press copies.
+  fireEvent.click(screen.getByRole('button', { name: /Kopiera RIKTIGT/ }));
   expect(clipboard).not.toHaveBeenCalled();
-  fireEvent.click(await screen.findByRole('button', { name: 'Kopiera LOCAL med secrets' }));
+  expect(screen.getByRole('button', { name: 'Kopiera RIKTIGT · tryck igen' })).toBeTruthy();
+  expect(screen.getByText(/1 riktigt värde skrivs in i klartext/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: /Kopiera RIKTIGT/ }));
   await waitFor(() => expect(clipboard).toHaveBeenCalledWith('$password = "SuperSecret123!"'));
 });
 
@@ -88,7 +92,7 @@ it('blocks both copy actions when a binding is unresolved', async () => {
   const p = project(), v = version(p); await storage.commitVersion({ ...p, currentVersionId: v.id }, v);
   location.hash = `#/project/${p.id}`; mount(<App storage={storage} />);
   await screen.findByLabelText('Testkod');
-  expect((screen.getByRole('button', { name: 'Copy Local' }) as HTMLButtonElement).disabled).toBe(true);
-  expect((screen.getByRole('button', { name: /Copy for AI/ }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole('button', { name: /Kopiera RIKTIGT/ }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole('button', { name: /Kopiera för AI/ }) as HTMLButtonElement).disabled).toBe(true);
   expect(clipboard).not.toHaveBeenCalled();
 });
