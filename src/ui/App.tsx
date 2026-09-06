@@ -334,6 +334,14 @@ export function App({ storage }: { storage: StorageProvider }) {
   }
   async function storeBinding(binding: Binding, all: boolean) {
     const selection = bindingDialog?.selection;
+    const previous = bindings.find(b => b.id === binding.id);
+    // A rename has to rewrite every template that uses the placeholder, in one transaction, or the
+    // templates end up pointing at a name that no longer resolves.
+    if (previous && previous.name !== binding.name) {
+      const { occurrences } = await storage.renameBinding(binding.id, binding.name);
+      await controller.reloadTemplates();
+      if (occurrences) setNotice(`${previous.name} heter nu ${binding.name}. ${occurrences} platshållare skrevs om.`);
+    }
     await storage.saveBinding({ ...binding, updatedAt: new Date().toISOString() }); setBindings(await storage.listBindings());
     if (selection) {
       const source = controller.getSnapshot().session.text;

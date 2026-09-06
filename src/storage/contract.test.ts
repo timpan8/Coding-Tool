@@ -91,6 +91,36 @@ export function storageContract(factory: () => { storage: StorageProvider; clean
     expect(Object.keys(removed.templates)).toEqual([first.id]);
     await expect(storage.changeFiles('p2', [], {}, removed.revision)).rejects.toThrow(/minst en fil/);
   });
+  it('renames a binding everywhere in one transaction', async () => {
+    const p = project(); await storage.saveProject(p);
+    const file = p.files[0].id;
+    const b = binding({ name: 'OLD_NAME', scopeRef: p.id }); await storage.saveBinding(b);
+    const v = version(p, { templates: { [file]: '$a = "{{OLD_NAME}}"\n$b = "{{OLD_NAME}}"' },
+      bindingUsage: [{ bindingName: 'OLD_NAME', fileId: file, occurrences: 2 }] });
+    await storage.commitVersion({ ...p, currentVersionId: v.id }, v);
+    const draft = await storage.createProjectWithDraft(project({ id: 'p3', files: p.files }),
+      { projectId: 'p3', baseVersionId: null, templates: { [file]: '{{OLD_NAME}}' }, updatedAt: time, revision: 0 });
+
+    expect(await storage.renameBinding(b.id, 'NEW_NAME')).toEqual({ occurrences: 3 });
+    expect((await storage.getVersion(v.id))?.templates[file]).toBe('$a = "{{NEW_NAME}}"\n$b = "{{NEW_NAME}}"');
+    expect((await storage.getVersion(v.id))?.bindingUsage[0].bindingName).toBe('NEW_NAME');
+    expect((await storage.getDraft('p3'))?.templates[file]).toBe('{{NEW_NAME}}');
+    // The draft revision advances so a tab holding the old text cannot write it back over this.
+    expect((await storage.getDraft('p3'))?.revision).toBe(draft.revision + 1);
+    expect((await storage.listBindings()).map(x => x.name)).toEqual(['NEW_NAME']);
+  });
+  it('refuses a rename that would collide, leaving every template untouched', async () => {
+    const p = project(); await storage.saveProject(p);
+    const file = p.files[0].id;
+    await storage.saveBinding(binding({ name: 'TAKEN', scopeRef: p.id }));
+    const b = binding({ name: 'MINE', scopeRef: p.id }); await storage.saveBinding(b);
+    const v = version(p, { templates: { [file]: '{{MINE}}' } });
+    await storage.commitVersion({ ...p, currentVersionId: v.id }, v);
+
+    await expect(storage.renameBinding(b.id, 'TAKEN')).rejects.toThrow();
+    expect((await storage.getVersion(v.id))?.templates[file]).toBe('{{MINE}}');
+    expect((await storage.listBindings()).map(x => x.name).sort()).toEqual(['MINE', 'TAKEN']);
+  });
   it('merges built-in scanner rules with stored overrides', async () => {
     const all = await storage.listScannerRules();
     expect(all.length).toBeGreaterThan(5);

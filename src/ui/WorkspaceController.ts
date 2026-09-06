@@ -237,6 +237,15 @@ export class WorkspaceController {
     this.session({ project });
     this.publish({ projects: [project, ...this.state.projects.filter(p => p.id !== project.id)] });
   }
+  /** Re-reads the draft after something rewrote it underneath the session, so the in-memory text
+   * and the stored revision line up again. */
+  async reloadTemplates() {
+    const s = this.state.session;
+    if (!s.project) return;
+    const [draft, versions] = await Promise.all([this.storage.getDraft(s.project.id), this.storage.listVersions(s.project.id)]);
+    if (!draft) return;
+    this.session({ draft, versions, texts: Object.fromEntries(s.files.map(f => [f.id, draft.templates[f.id] ?? ''])), saved: this.state.session.changed });
+  }
   async reloadVersions() { const s = this.state.session; if (s.project) this.session({ versions: await this.storage.listVersions(s.project.id) }); }
   async reloadSettings() { this.publish({ settings: await this.storage.getSettings() }); }
   async refreshProjects() { this.publish({ projects: await this.storage.listProjects() }); }

@@ -372,3 +372,25 @@ test('creates a binding without a selection and warns when it is unused', async 
   await expect(page.locator('.binding-card')).toContainText('0 förekomster');
   await expect(page.locator('.orphan-note')).toBeVisible();
 });
+
+// Report F15. The name was locked after creation "to preserve the templates' references", which
+// solved the problem by removing the feature.
+test('renames a binding and rewrites its placeholder everywhere', async ({ page }) => {
+  await type(page, '$a = "Hunter2!"\n$b = "Hunter2!"\n');
+  await bind(page, 'Hunter2', 'Hunter2!', 'secret');
+  await expect(page.locator('.binding-card')).toContainText('2 förekomster');
+
+  await page.locator('.binding-card').getByLabel(/^Redigera /).click();
+  await page.getByLabel('Bindingnamn').fill('DB_PASSWORD');
+  await expect(page.locator('dialog[open]')).toContainText('skrivs om i alla versioner');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+  await expect(page.locator('.editor-body')).toContainText('{{DB_PASSWORD}}');
+  await expect(page.locator('.editor-body')).not.toContainText('PASSWORD}}"\n$b = "{{P');
+  await expect(page.locator('.binding-card')).toContainText('DB_PASSWORD');
+  await expect(page.locator('.binding-card')).toContainText('2 förekomster');
+
+  // Still resolvable, so copying is not blocked by a dangling name.
+  await expect(page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ })).toBeEnabled();
+});

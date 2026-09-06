@@ -5,6 +5,7 @@ import type { ProjectDraft, ProjectDraftMetadata, ProjectFile } from '../types/m
 import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ScanDismissal, ScannerRule, Settings, Version, WorkspaceSnapshot } from '../types/models';
 import { validateBinding } from '../domain/bindings';
 import { mergeRules } from '../domain/scanner/rules';
+import { renameInTemplates } from '../domain/bindings/rewrite';
 
 class VaultDatabase extends Dexie {
   projects!: Table<Project, string>; versions!: Table<Version, string>; bindings!: Table<Binding, string>;
@@ -105,6 +106,32 @@ export class IndexedDbProvider implements StorageProvider {
     });
   }
   async deleteBinding(id: string) { await this.db.bindings.delete(id); }
+  async renameBinding(id: string, name: string): Promise<{ occurrences: number }> {
+    return this.db.transaction('rw', [this.db.bindings, this.db.versions, this.db.drafts], async () => {
+      const binding = await this.db.bindings.get(id);
+      if (!binding) throw new Error('Bindingen finns inte längre.');
+      if (binding.name === name) return { occurrences: 0 };
+      const errors = validateBinding({ ...binding, name }, (await this.db.bindings.toArray()).filter(b => b.id !== id));
+      if (errors.length) throw new Error(errors.join('\n'));
+      let occurrences = 0;
+      for (const version of await this.db.versions.toArray()) {
+        const rewritten = renameInTemplates(version.templates, binding.name, name);
+        if (!rewritten.occurrences) continue;
+        occurrences += rewritten.occurrences;
+        await this.db.versions.put({ ...version, templates: rewritten.templates,
+          bindingUsage: version.bindingUsage.map(u => u.bindingName === binding.name ? { ...u, bindingName: name } : u) });
+      }
+      for (const draft of await this.db.drafts.toArray()) {
+        const rewritten = renameInTemplates(draft.templates, binding.name, name);
+        if (!rewritten.occurrences) continue;
+        occurrences += rewritten.occurrences;
+        // The revision advances: a tab holding the old text must not write it back over this.
+        await this.db.drafts.put({ ...draft, templates: rewritten.templates, revision: draft.revision + 1, updatedAt: new Date().toISOString() });
+      }
+      await this.db.bindings.put({ ...binding, name, updatedAt: new Date().toISOString() });
+      return { occurrences };
+    });
+  }
   async listProfiles() { return this.db.profiles.toArray(); }
   async saveProfile(p: Profile) { await this.db.profiles.put(p); }
   async listDatasets(filter?: DatasetFilter) { return this.db.datasets.filter(d => !filter || d.scope === 'global' || d.projectId === filter.projectId).toArray(); }

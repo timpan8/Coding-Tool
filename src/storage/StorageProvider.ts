@@ -24,6 +24,9 @@ export interface StorageProvider {
   listBindings(filter?: BindingFilter): Promise<Binding[]>;
   saveBinding(b: Binding): Promise<void>;
   deleteBinding(id: string): Promise<void>;
+  /** Renames a binding and rewrites its placeholder everywhere in one transaction. Doing it in two
+   * steps would leave templates pointing at a name that no longer resolves. */
+  renameBinding(id: string, name: string): Promise<{ occurrences: number }>;
   listProfiles(): Promise<Profile[]>;
   saveProfile(p: Profile): Promise<void>;
   listDatasets(filter?: DatasetFilter): Promise<Dataset[]>;

@@ -24,7 +24,7 @@ export function BindingDialog({ initial, bindings, count, preview, save, close }
   }
   return <Modal title={existing ? 'Redigera binding' : 'Skapa binding'} close={close}>
     <div className="form-grid">
-      <label>Namn<input aria-label="Bindingnamn" value={value.name} disabled={existing} onChange={e => setValue({ ...value, name: e.target.value.toUpperCase() })} autoFocus />{existing && <small>Namnet är låst för att bevara mallarnas referenser.</small>}</label>
+      <label>Namn<input aria-label="Bindingnamn" value={value.name} onChange={e => setValue({ ...value, name: e.target.value.toUpperCase() })} autoFocus />{existing && value.name !== initial.name && <small>Platshållaren skrivs om i alla versioner och utkast som använder den.</small>}</label>
       <label>Kategori<select value={value.category} onChange={e => { const category = e.target.value as Category; setValue({ ...value, category, aiReplacement: existing ? value.aiReplacement : defaults[category] }); }}>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
       <label>Scope<select value={value.scope} onChange={e => setValue({ ...value, scope: e.target.value as Binding['scope'], scopeRef: e.target.value === 'global' ? null : initial.scopeRef })} disabled={existing || initial.scope === 'version'}><option value="project">Projekt</option><option value="global">Globalt</option>{initial.scope === 'version' && <option value="version">Version</option>}</select></label>
       <label>AI-värde<input value={value.aiReplacement} onChange={e => setValue({ ...value, aiReplacement: e.target.value })} spellCheck={false} autoComplete="off" /></label>
