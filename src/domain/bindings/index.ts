@@ -5,9 +5,21 @@ export function resolveBinding(name: string, bindings: Binding[], projectId: str
     ?? bindings.find(b => b.name === name && b.scope === 'project' && b.scopeRef === projectId)
     ?? bindings.find(b => b.name === name && b.scope === 'global');
 }
-export function resolveValue(binding: Binding, profileId: string | null): string | undefined {
-  return (profileId ? binding.values[profileId] : undefined) ?? binding.values.__default__;
+/** The private value for a profile.
+ *
+ * A path binding may be written against a root rather than as a fixed string: `{{ROOT}}\\AdSync`
+ * resolves against whatever root this machine uses, so moving the working folder moves every path
+ * with it. One level only, and only `{{ROOT}}` — invariant 3 stands, and a root that itself
+ * contained a placeholder would put us back in recursive substitution. Without a root the stored
+ * value is used, which is what it was when the template was last resolved. */
+export function resolveValue(binding: Binding, profileId: string | null, root?: string): string | undefined {
+  const stored = (profileId ? binding.values[profileId] : undefined) ?? binding.values.__default__;
+  if (!binding.pathTemplate || !root) return stored;
+  return binding.pathTemplate.split(ROOT_TOKEN).join(root.replace(/[\\/]+$/, ''));
 }
+export const ROOT_TOKEN = '{{ROOT}}';
+/** What the path would be under a given root, for a preview that has to show it before it exists. */
+export const underRoot = (template: string, root: string) => template.split(ROOT_TOKEN).join(root.replace(/[\\/]+$/, ''));
 /** A refusal the user can act on, as opposed to a failure they cannot. The dialog prints the message
  * of this class and nothing else's, so invariant 5 holds by construction: only text we wrote here
  * reaches the screen, never a storage error that might carry a key or a value. */

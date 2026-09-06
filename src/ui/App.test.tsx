@@ -89,7 +89,8 @@ it('masks local secrets and requires a second deliberate action to copy them', a
   expect(screen.getByRole('button', { name: 'Kopiera RIKTIGT · tryck igen' })).toBeTruthy();
   expect(screen.getByText(/1 riktigt värde skrivs in i klartext/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /Kopiera RIKTIGT/ }));
-  await waitFor(() => expect(clipboard).toHaveBeenCalledWith('$password = "SuperSecret123!"'));
+  // The local copy starts with the line that says what it carries; the code follows it verbatim.
+  await waitFor(() => expect(clipboard).toHaveBeenCalledWith('# [REAL VALUES - never paste into AI] v1\n$password = "SuperSecret123!"'));
 });
 
 it('blocks both copy actions when a binding is unresolved', async () => {

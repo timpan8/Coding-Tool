@@ -2,11 +2,14 @@ import { useState } from 'react';
 import type { Binding, Category, Profile } from '../../types/models';
 import { t } from '../text';
 import { categories } from '../../types/models';
-import { BindingRefusal, validateBinding } from '../../domain/bindings';
+import { BindingRefusal, ROOT_TOKEN, underRoot, validateBinding } from '../../domain/bindings';
 import { sharedAiValue, takenAiValues, uniqueExample } from '../../domain/bindings/examples';
 import { Modal } from './Modal';
-export function BindingDialog({ initial, bindings, count, preview, profiles, reuse, save, close }: {
+export function BindingDialog({ initial, bindings, count, preview, profiles, reuse, root, save, close }: {
   initial: Binding; bindings: Binding[]; count: number; profiles?: Profile[];
+  /** The working folder this machine uses, so a path can be written against it instead of being
+   * fixed. Absent when there is none set, and then the offer is not made. */
+  root?: string;
   /** A binding that already holds this exact value. The app knew this all along — the leak check is
    * built on it — and used it only to refuse the copy afterwards. Offered here instead, as a choice
    * rather than as automatic matching. */
@@ -36,7 +39,20 @@ export function BindingDialog({ initial, bindings, count, preview, profiles, reu
   const shared = sharedAiValue(value, bindings);
   /** A stand-in for the category that nothing else in the vault uses, shaped like the value. */
   const freshAiValue = (category: Category) => uniqueExample(undefined, category, value.values.__default__ ?? '', takenAiValues(bindings.filter(b => b.id !== initial.id)));
+  // A path under the root can be written against it: the binding then follows the root when it
+  // moves. Offered only where it is true — the value has to actually start with the root.
+  const rootable = Boolean(root) && !value.pathTemplate && Boolean(value.values.__default__?.toLowerCase().startsWith(root!.toLowerCase()));
+  function useRoot() {
+    const stored = value.values.__default__ ?? '';
+    edit({ pathTemplate: ROOT_TOKEN + stored.slice(root!.length) });
+  }
+  function dropRoot() {
+    edit({ pathTemplate: undefined, values: { ...value.values, __default__: underRoot(value.pathTemplate!, root ?? '') } });
+  }
   async function submit() {
+    // The stored value is kept in step with the template, so a context that does not know the
+    // root — an older export, another tab mid-change — still resolves to something true.
+    if (value.pathTemplate && root) value.values = { ...value.values, __default__: underRoot(value.pathTemplate, root) };
     const errors = validateBinding(value, bindings);
     if (errors.length) { setEdited(true); setError(errors.join(' ')); return; }
     if (vagueSecret && !acknowledged) { setError(t.bindingDialog.acknowledgeFirst); return; }
@@ -70,6 +86,14 @@ export function BindingDialog({ initial, bindings, count, preview, profiles, reu
       <label className="check"><input type="checkbox" checked={value.escapeMode === 'raw'} onChange={e => edit({ escapeMode: e.target.checked ? 'raw' : 'auto' })} />{t.bindingDialog.raw}</label>
       <label className="wide">{t.bindingDialog.description}<input value={value.description} onChange={e => edit({ description: e.target.value })} /></label>
     </div>
+    {value.pathTemplate ? <div className="root-offer" role="status">
+      <span>{t.bindingDialog.rootTemplate}<code>{value.pathTemplate}</code></span>
+      <small>{t.bindingDialog.rootResolves(underRoot(value.pathTemplate, root ?? ''))}</small>
+      <button className="text-button" onClick={dropRoot}>{t.bindingDialog.rootDrop}</button>
+    </div> : rootable && <div className="root-offer" role="status">
+      <span>{t.bindingDialog.rootLead(root!)}</span>
+      <button onClick={useRoot}>{t.bindingDialog.rootUse}</button>
+    </div>}
     {value.escapeMode === 'raw' && <p className="inline-warning" role="status">{t.bindingDialog.rawNote}</p>}
     {shared && <p className="inline-warning" role="status">{t.bindingDialog.sharedAi(shared)}</p>}
     {vagueSecret && <label className="check inline-warning"><input type="checkbox" checked={acknowledged} onChange={e => { setAcknowledged(e.target.checked); setError(''); }} />{t.bindingDialog.vagueBefore}<code>&lt;PASSWORD&gt;</code>{t.bindingDialog.vagueAfter}</label>}

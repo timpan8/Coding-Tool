@@ -1587,3 +1587,91 @@ test('turns encryption off again and goes back to plaintext', async ({ page }) =
   await expect(page.locator('.unlock-page')).toHaveCount(0);
   await expect(page.locator('.editor-body')).toContainText('{{P_VALUE}}');
 });
+
+// PR 5. The gate stays exact but knows the shapes a value can be written in: base64 on its way to
+// an AI is still the value, and blocks the copy.
+test('blocks a copy that carries a known value in base64', async ({ page }) => {
+  await type(page, '$p = "Hunter2-Very-Secret!"\n');
+  await bind(page, 'Hunter2-Very-Secret!', 'Hunter2-Very-Secret!', 'secret');
+  const encoded = Buffer.from('Hunter2-Very-Secret!', 'utf8').toString('base64');
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type(`$b = "${encoded}"\n`);
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await expect(page.locator('.issue-panel')).toContainText('base64-kodat');
+  // The AI exit is refused outright, the same as for a value in the clear.
+  const ai = page.locator('.copy-actions').getByRole('button', { name: /Kopiera för AI/ });
+  await expect(ai).toBeDisabled();
+  await expect(ai).toHaveAttribute('title', /Blockerad/);
+  await expect(page.locator('#copy-blocked')).toBeVisible();
+});
+
+// A value the binding used to have is still out there in code written while it was current.
+test('keeps watching a value after it has been replaced', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.locator('.binding-card').getByLabel(/^Redigera /).click();
+  await page.getByLabel('Privat värde · standard').fill('Hunter3-New');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('# the old one was Hunter2\n');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await expect(page.locator('.issue-panel')).toContainText('haft tidigare');
+});
+
+// Copy Local says what it carries, and the app recognises that line coming back.
+test('marks the real copy and notices it coming back as an AI answer', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.locator('.copy-actions').getByRole('button', { name: /Kopiera RIKTIGT/ }).click();
+  await page.locator('.copy-actions').getByRole('button', { name: /Kopiera RIKTIGT/ }).click();
+  const copied = await clipboard(page);
+  expect(copied).toContain('[REAL VALUES - never paste into AI]');
+  expect(copied).toContain('$p = "Hunter2"');
+
+  await page.getByRole('button', { name: 'Klistra in från AI ↙' }).click();
+  await page.locator('textarea[aria-label="Kod från AI"]').fill(copied);
+  await expect(page.locator('dialog[open]')).toContainText('ser ut att komma från din editor');
+  await expect(page.locator('dialog[open]')).toContainText('Ett riktigt värde står i texten');
+  await page.locator('dialog[open]').getByRole('button', { name: /Ersätt mallen/ }).click();
+  // The binding is flagged as exposed, and stays flagged until the value is changed.
+  await expect(page.locator('.binding-exposed')).toContainText('Exponerad');
+  await page.locator('.binding-exposed').getByRole('button', { name: /Markera roterad/ }).click();
+  await expect(page.locator('.binding-exposed')).toHaveCount(0);
+});
+
+// A path written against the root follows it, and a found file path binds its folder only.
+test('writes a path against the root and binds only the folder', async ({ page }) => {
+  await paste(page, '$log = "C:\\Temp\\AdSync\\run.log"\n');
+  const projectUrl = page.url();
+  const panel = page.locator('.findings-panel');
+  await panel.getByLabel(/Välj Windows-sökväg/).check();
+  await panel.getByRole('button', { name: /^Skapa (binding för den valda|\d+ bindings)$/ }).click();
+  // The file name stays in the template: an AI may rename the log, the folder is not its business.
+  expect(await modelText(page)).toContain('\\run.log"');
+  expect(await modelText(page)).not.toContain('C:\\Temp\\AdSync\\run.log');
+
+  await page.locator('.binding-card').getByLabel(/^Redigera /).click();
+  const dialog = page.locator('dialog[open]');
+  await expect(dialog.locator('.root-offer')).toContainText('C:\\Temp');
+  await dialog.getByRole('button', { name: 'Skriv mot roten' }).click();
+  await expect(dialog.locator('.root-offer')).toContainText('{{ROOT}}');
+  await dialog.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+  // Moving the root moves the path with it, without touching the binding.
+  await go(page, 'Inställningar', '.encryption-panel');
+  await page.getByLabel('Rot för arbetsmappar').fill('D:\\Projekt');
+  await page.getByLabel('Rot för arbetsmappar').blur();
+  await expect(page.locator('.toast', { hasText: 'Roten är ändrad' })).toBeVisible();
+  await page.goto(projectUrl);
+  await expect(page.locator('.work-grid')).toBeVisible();
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
+  // Read from the model: in a projection the substituted value carries its binding's name as an
+  // injected badge, which sits between the value and the rest of the line on screen.
+  await expect(async () => expect(await modelText(page)).toContain('D:\\Projekt\\AdSync\\run.log')).toPass({ timeout: 5000 });
+});

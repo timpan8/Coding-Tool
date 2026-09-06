@@ -28,7 +28,9 @@ export function sanitize(text: string, bindings: Binding[], blocklist: Blocklist
   // replaced whole. Placeholders left over are ones the text carried in from a project.
   let replaced = listed.replacements;
   const byName = new Map(bindings.map((b) => [b.name, b.aiReplacement]));
-  const known = [...buildValueIndex(bindings).values].sort((a, b) => b.value.length - a.value.length);
+  // The plain values: swapping an encoded form for a plain stand-in would corrupt the text it
+  // sits in. The encoded forms are still reported below, as what is left over.
+  const known = [...buildValueIndex(bindings).plain].sort((a, b) => b.value.length - a.value.length);
   for (const entry of known) {
     const parts = out.split(entry.value);
     if (parts.length > 1) {

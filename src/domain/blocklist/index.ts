@@ -73,7 +73,9 @@ export function applyBlocklist(
       parts[part] = parts[part].replace(pattern(entry.term), found => {
         let match = matches.find(m => m.matched === found);
         if (!match) {
-          const owner = index.values.find(v => v.value === found);
+          // The plain values only: a blocklist term matched in the text is a literal, never a
+          // base64 run, and a variant would name the binding after a form it does not have.
+          const owner = index.plain.find(v => v.value === found && !v.retired);
           const name = owner?.name ?? freeName(nameForTerm(entry.term), taken, scope);
           if (!owner) taken.push({ name, scope: scope.scope, scopeRef: scope.scopeRef });
           match = { entry, matched: found, name, existing: Boolean(owner), count: 0 };

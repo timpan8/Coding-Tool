@@ -315,3 +315,36 @@ Import känner igen kuvertet på filen själv, inte på filnamnet.
 sak i klartext för att det råkade tömmas. Detsamma gäller en ersättande import: den återställer
 innehåll, aldrig nyckeln som öppnar det. Den som tappat både lösenord och nyckel kommer vidare med
 en fullständig återställning, som tar bort huvudet också.
+
+## Utgående skydd: fler former av samma värde, pensionerade värden, en märkning
+
+**Grinden är fortfarande exakt.** Varje sträng kontrollen letar efter är härledd ur ett värde valvet
+känner: base64 i UTF-8 och UTF-16, URL-kodning, JSON- och HTML-escaping, backtick, dubblerade
+apostrofer, regex-escaping. Ett träff är därför fortfarande "det här exakta värdet står i utdatan",
+aldrig en gissning — men ett värde slutar inte vara sitt värde för att någon base64-kodade det på
+vägen ut. Långa base64-körningar avkodas dessutom och genomsöks, vid varje teckenalignment, eftersom
+ett värde kan ligga mitt i en `-EncodedCommand`. Ett värde under fyra tecken får inga varianter: det
+skulle matcha halva filen, och den exakta formen stoppar det ändå. Meddelandet säger vilken form
+värdet hittades i men aldrig värdet och aldrig den kodade texten — invariant 5 gäller båda.
+
+**Pensionerade värden bevakas för alltid.** Ett roterat lösenord är fortfarande lösenordet som satt
+på kontot förra veckan, och kod skriven då bär det. När en bindings värde byts flyttar det gamla till
+`retired` och fortsätter blockera AI-kopiering. Att byta värde är också det som rensar
+exponeringsflaggan: "roterad" betyder att du har bytt det på riktigt, inte att appen kontrollerat
+något — appen kan inte det och påstår det inte.
+
+**Exponering är ett faktum, inte en dom.** Klistras kod in som AI-svar och den bär ett riktigt värde,
+märks bindingen med datumet. Panelen visar det tills värdet byts. Ingenting blockeras: texten finns
+redan på maskinen, och det som är kvar att göra ligger utanför appen.
+
+**Sentinelraden gör två små saker.** Kopiera RIKTIGT lägger `# [REAL VALUES - never paste into AI] v1`
+överst (i filens kommentarsyntax, utelämnad i språk som saknar en). Den som hittar filen senare vet
+vad den bär, och appen känner igen den om den klistras in som AI-svar — vilket är ett misstag värt att
+fånga, eftersom värdena i den aldrig var sanerade. Valbar, på som standard.
+
+**Sökvägar skrivs mot en rot.** En binding kan hålla `{{ROOT}}\AdSync` i stället för en fast sökväg;
+byter du arbetsmapp följer alla med. En nivå och bara `{{ROOT}}` — invariant 3 står kvar, och en rot
+som själv innehöll en platshållare vore rekursiv substitution igen. Det lagrade värdet hålls i takt,
+så en kontext utan rot (en äldre export, en annan flik mitt i ändringen) fortfarande löser till något
+sant. En hittad filsökväg binds som sin katalog: mappen tillhör den här maskinen, filnamnet tillhör
+koden, och en AI som döper om loggfilen ska få göra det.
