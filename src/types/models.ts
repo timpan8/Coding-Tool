@@ -20,6 +20,9 @@ export interface Version {
   id: string; projectId: string; number: number; label: string; parentVersionId: string | null;
   branchName: string; status: 'stable' | 'testing' | 'experimental' | 'broken'; notes: string;
   templates: Record<string, string>; bindingUsage: BindingUsage[]; ingestReport?: IngestReport;
+  /** The file list as it stood when the version was saved. Without it a diff across a rename shows
+   * a phantom delete and add, and a preview cannot label its tabs. Absent on older records. */
+  files?: ProjectFile[];
   createdAt: Iso; deviceId: string;
 }
 export interface Binding {

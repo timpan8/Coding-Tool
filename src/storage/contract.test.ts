@@ -68,6 +68,29 @@ export function storageContract(factory: () => { storage: StorageProvider; clean
     expect(await storage.listBindings()).toEqual([]);
     expect((await storage.getProject(p.id))?.name).toBe(p.name);
   });
+  it('changes the file set only through the operation meant for it, with a revision check', async () => {
+    const p = project(); await storage.saveProject(p);
+    const first = p.files[0];
+    const draft = await storage.createProjectWithDraft(project({ id: 'p2', files: [first] }), { projectId: 'p2', baseVersionId: null, templates: { [first.id]: 'a' }, updatedAt: time, revision: 0 });
+    const second = { id: 'file-2', name: 'helper.ps1', language: 'powershell' as const, order: 1 };
+
+    // saveDraft still refuses a changed file set: that guard is what stops a stale tab from
+    // resurrecting a deleted file through autosave.
+    await expect(storage.saveDraft({ ...draft, templates: { [first.id]: 'a', [second.id]: 'b' } }, draft.revision,
+      { name: 'x', language: 'powershell', files: [first, second] })).rejects.toThrow(/Filreferenser/);
+
+    const added = await storage.changeFiles('p2', [first, second], { [first.id]: 'a', [second.id]: 'b' }, draft.revision);
+    expect(added.revision).toBe(draft.revision + 1);
+    expect((await storage.getProject('p2'))?.files).toHaveLength(2);
+
+    // A stale writer is rejected here too.
+    await expect(storage.changeFiles('p2', [first], { [first.id]: 'a' }, draft.revision)).rejects.toThrow(/annan flik/);
+
+    // Removing a file drops its draft template rather than leaving an orphan.
+    const removed = await storage.changeFiles('p2', [first], { [first.id]: 'a', [second.id]: 'b' }, added.revision);
+    expect(Object.keys(removed.templates)).toEqual([first.id]);
+    await expect(storage.changeFiles('p2', [], {}, removed.revision)).rejects.toThrow(/minst en fil/);
+  });
   it('merges built-in scanner rules with stored overrides', async () => {
     const all = await storage.listScannerRules();
     expect(all.length).toBeGreaterThan(5);

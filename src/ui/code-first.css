@@ -586,3 +586,59 @@
   font: inherit;
   font-size: 0.8125rem;
 }
+
+.file-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+.file-tab {
+  display: flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+}
+.file-tab.current {
+  border-color: var(--border);
+  background: var(--surface);
+}
+.file-tab button {
+  padding: 7px 10px;
+  border: 0;
+  background: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.file-tab.current button {
+  color: var(--text);
+  font-weight: 600;
+}
+.file-tab input {
+  width: 130px;
+  margin: 3px;
+  padding: 4px 7px;
+  font-size: 0.8125rem;
+}
+.file-close {
+  padding: 4px 7px !important;
+  font-size: 0.875rem !important;
+  opacity: 0.5;
+}
+.file-close:hover {
+  opacity: 1;
+  color: var(--danger-text);
+}
+.file-add {
+  margin-left: 4px;
+  padding: 5px 10px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+}

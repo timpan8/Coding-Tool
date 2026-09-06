@@ -109,7 +109,17 @@ export function CodeEditor(props: Props) {
       if (old) old.view = instance.saveViewState();
       let next = documents.current.get(key);
       if (!next) { next = { model: monaco.editor.createModel(props.value, props.language), view: null }; documents.current.set(key, next); }
+      // The map was unbounded and only cleared on unmount. Bounded by projects × views before
+      // multiple files existed; now projects × files × views, which grows without limit in a long
+      // session. Map preserves insertion order, so the oldest entry that is not in use is evicted.
       activeKey.current = key;
+      while (documents.current.size > 12) {
+        const oldest = [...documents.current.keys()].find(k => k !== key);
+        if (!oldest) break;
+        documents.current.get(oldest)?.model.dispose();
+        documents.current.delete(oldest);
+      }
+      documents.current.delete(key); documents.current.set(key, next);
       instance.setModel(next.model);
       if (next.view) instance.restoreViewState(next.view);
       if (props.active) instance.focus();

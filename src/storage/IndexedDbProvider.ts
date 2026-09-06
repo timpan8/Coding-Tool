@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { StorageProvider } from './StorageProvider';
 import { DraftConflictError } from './StorageProvider';
-import type { ProjectDraft, ProjectDraftMetadata } from '../types/models';
+import type { ProjectDraft, ProjectDraftMetadata, ProjectFile } from '../types/models';
 import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ScanDismissal, ScannerRule, Settings, Version, WorkspaceSnapshot } from '../types/models';
 import { validateBinding } from '../domain/bindings';
 import { mergeRules } from '../domain/scanner/rules';
@@ -57,6 +57,25 @@ export class IndexedDbProvider implements StorageProvider {
       const saved = { ...draft, revision: expectedRevision + 1 };
       await this.db.drafts.put(saved);
       await this.db.projects.put({ ...project, ...metadata, updatedAt: draft.updatedAt });
+      return saved;
+    });
+  }
+  async changeFiles(projectId: string, files: ProjectFile[], templates: Record<string, string>, expectedRevision: number): Promise<ProjectDraft> {
+    if (!files.length) throw new Error('Ett projekt måste ha minst en fil.');
+    if (new Set(files.map(f => f.id)).size !== files.length) throw new Error('Filerna måste ha unika id:n.');
+    return this.db.transaction('rw', [this.db.projects, this.db.drafts], async () => {
+      const project = await this.db.projects.get(projectId);
+      if (!project) throw new Error('Projektet finns inte längre.');
+      const current = await this.db.drafts.get(projectId);
+      if ((current?.revision ?? 0) !== expectedRevision) throw new DraftConflictError();
+      const known = new Set(files.map(f => f.id));
+      // Templates for removed files are dropped here, not kept as orphans. Saved versions keep
+      // their own copies, so a deleted file is still recoverable from history.
+      const kept = Object.fromEntries(Object.entries(templates).filter(([fileId]) => known.has(fileId)));
+      const time = new Date().toISOString();
+      const saved: ProjectDraft = { projectId, baseVersionId: current?.baseVersionId ?? null, templates: kept, updatedAt: time, revision: expectedRevision + 1 };
+      await this.db.drafts.put(saved);
+      await this.db.projects.put({ ...project, files, updatedAt: time });
       return saved;
     });
   }

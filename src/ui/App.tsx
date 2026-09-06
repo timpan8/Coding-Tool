@@ -17,6 +17,7 @@ import { RulesPanel } from './components/RulesPanel';
 import { useConfirm } from './components/ConfirmDialog';
 import { collectIssues, IssuePanel, type LocatedIssue } from './components/IssuePanel';
 import { FindingsPanel, useDismissals, useScanner } from './components/FindingsPanel';
+import { FileTabs } from './components/FileTabs';
 import { scan, type Finding } from '../domain/scanner';
 import type { ScannerRule } from '../types/models';
 import { Security } from './pages/Security';
@@ -336,14 +337,26 @@ export function App({ storage }: { storage: StorageProvider }) {
     <main inert={busy}>
       <div className="workspace" hidden={!workspaceVisible}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : 'BÖRJA DIREKT'}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
-        <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => controller.changeLanguage(e.target.value as LanguageId)}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project?.files[0].name ?? 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
+        <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => controller.changeLanguage(e.target.value as LanguageId)}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? `${session.files.length} ${session.files.length === 1 ? 'fil' : 'filer'}` : 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
       </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => void run(() => controller.saveVersion())}>Spara version</button></div></section>
         <div className="work-grid"><section className={`editor-panel mode-${mode}`}>
+          <FileTabs files={session.files} activeId={session.activeFileId} disabled={busy}
+            onSelect={id => { controller.selectFile(id); changeMode('template'); }}
+            onAdd={() => void run(async () => { await controller.addFile(); changeMode('template'); })}
+            onRename={(id, name) => void controller.renameFile(id, name)}
+            onRemove={id => void run(async () => {
+              const file = session.files.find(f => f.id === id);
+              if (!file) return;
+              const hasText = (session.texts[id] ?? '').trim().length > 0;
+              if (hasText && !await confirm({ title: `Ta bort ${file.name}?`, danger: true, confirmLabel: 'Ta bort filen',
+                body: <><p>Filens innehåll försvinner ur arbetsutkastet.</p><p>Sparade versioner behåller sin kopia, så den går att få tillbaka därifrån.</p></> })) return;
+              await controller.removeFile(id);
+            })} />
           <div className="editor-toolbar"><div className="view-tabs" role="tablist" aria-label="Kodvy">{(['template', 'local', 'ai'] as Mode[]).map(m => <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'active' : ''} onClick={() => changeMode(m)}>{m === 'template' ? 'Mall' : m === 'local' ? 'Local' : 'AI'}</button>)}</div><div className="copy-actions">{Boolean(issues.length) && <span id="copy-blocked" className="copy-blocked">{issues.length} problem hindrar kopiering — se panelen</span>}<button disabled={!template.trim() || Boolean(local.issues.length)} aria-describedby={local.issues.length ? 'copy-blocked' : undefined} title={local.issues.length ? `Blockerad: ${local.issues.length} problem i Local-vyn` : undefined} onClick={() => void copy('local')}>Copy Local</button><button className="ai-copy" disabled={!template.trim() || Boolean(ai.issues.length)} aria-describedby={ai.issues.length ? 'copy-blocked' : undefined} title={ai.issues.length ? `Blockerad: ${ai.issues.length} problem i AI-vyn` : undefined} onClick={() => void copy('ai')}>Copy for AI ↗</button></div></div>
           <div className="view-banner" key={mode}><strong>{mode === 'template' ? '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN' : mode === 'local' ? '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN' : '◇ AI — SANERAD'}</strong><span>{mode === 'template' ? 'Redigerbar källa' : 'Skrivskyddad projektion'}</span></div>
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj värden' : 'Visa värden'}</button></div>}
           <div className="editor-body">{!template && mode === 'template' && <div className="paste-prompt" aria-hidden="true"><strong>Klistra in din kod här</strong><span>Ctrl+V · Projektet skapas automatiskt och sparas lokalt.</span></div>}
-            <CodeEditor key="primary-editor" documentKey={`${session.key}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => controller.changeText(text)} onBinding={createBinding}
+            <CodeEditor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => controller.changeText(text)} onBinding={createBinding}
               onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }} />
           </div><div className="editor-footer"><span>{visible.split('\n').length} rader · {used.length} bindings</span><span>{mode === 'local' ? 'Använd endast i din lokala kodmiljö' : 'Utkast sparas automatiskt · ingen kod körs'}</span></div>
         </section><aside className="binding-panel"><div className="panel-title"><h2>Bindings</h2><span className="count">{activeBindings.length}</span></div><p className="muted">Markera ett värde och tryck <kbd>Ctrl+B</kbd> för att koppla det till en platshållare.</p>

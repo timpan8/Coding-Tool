@@ -1,5 +1,5 @@
 import type { Binding, BindingFilter, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ProjectSummary, ScanDismissal, ScannerRule, Settings, Version, VersionSummary, WorkspaceSnapshot } from '../types/models';
-import type { ProjectDraft, ProjectDraftMetadata } from '../types/models';
+import type { ProjectDraft, ProjectDraftMetadata, ProjectFile } from '../types/models';
 
 export class DraftConflictError extends Error {
   constructor() { super('Projektet har ändrats i en annan flik. Din text finns kvar här. Kopiera mallen till en lokal fil innan du laddar om projektet.'); this.name = 'DraftConflictError'; }
@@ -13,6 +13,10 @@ export interface StorageProvider {
   getDraft(projectId: string): Promise<ProjectDraft | undefined>;
   createProjectWithDraft(project: Project, draft: ProjectDraft): Promise<ProjectDraft>;
   saveDraft(draft: ProjectDraft, expectedRevision: number, metadata: ProjectDraftMetadata): Promise<ProjectDraft>;
+  /** Adds or removes files. saveDraft deliberately refuses a changed file set, so that a stale tab
+   * cannot resurrect a deleted file through the autosave path; this is the one operation allowed to
+   * change it, and it carries the same revision check. */
+  changeFiles(projectId: string, files: ProjectFile[], templates: Record<string, string>, expectedRevision: number): Promise<ProjectDraft>;
   listVersions(projectId: string): Promise<VersionSummary[]>;
   getVersion(id: string): Promise<Version | undefined>;
   saveVersion(v: Version): Promise<void>;
