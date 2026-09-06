@@ -82,6 +82,10 @@ export interface UnknownValue {
   literal: string
   kindGuess?: FieldKind
   reasons: string[]
+  /** Syntactic context, so the value can become a slot when the user registers it. */
+  quote: QuoteKind
+  regex?: boolean
+  bindingName?: string
 }
 
 export interface ReapplyInput {
@@ -289,6 +293,36 @@ export function reapply(input: ReapplyInput): ReapplyResult {
     if (real) needles.push({ value: real, why: 'real' })
     for (const r of input.retired ?? []) if (r.fieldId === f.id && r.value) needles.push({ value: r.value, why: 'retired' })
     const isPath = f.kind === 'path' || f.kind === 'unc'
+    if (f.kind === 'blob') {
+      // Whole-text search: a block spans many tokens and is emitted raw.
+      for (const nd of needles) {
+        if (nd.value.length < 8) continue
+        let from = 0
+        while (true) {
+          const idx = text.indexOf(nd.value, from)
+          if (idx < 0) break
+          const exposed = nd.why === 'real' || nd.why === 'retired'
+          cands.push({
+            start: idx,
+            end: idx + nd.value.length,
+            line: lineOfOffset(text, idx),
+            tok: undefined,
+            field: f,
+            fieldId: f.id,
+            quote: 'comment',
+            conf: 0.95,
+            status: 'confirm',
+            why: nd.why,
+            literal: nd.value.slice(0, 60),
+            warnings: [],
+            fromOtherScript: fromOther,
+            exposed,
+          })
+          from = idx + nd.value.length
+        }
+      }
+      continue
+    }
     for (const tok of vtoks) {
       const logical = tok.logical ?? ''
       if (!logical) continue
@@ -541,6 +575,9 @@ export function reapply(input: ReapplyInput): ReapplyResult {
             literal: c.literal,
             ...(c.kindGuess ? { kindGuess: c.kindGuess } : {}),
             reasons: [c.reason ?? 'detector'],
+            quote: c.quote,
+            ...(c.regex ? { regex: true } : {}),
+            ...(c.bindingName ? { bindingName: c.bindingName } : {}),
           })
         }
         accepted.splice(i, 1)
@@ -570,6 +607,12 @@ export function reapply(input: ReapplyInput): ReapplyResult {
     },
     summary,
   }
+}
+
+function lineOfOffset(text: string, offset: number): number {
+  let line = 0
+  for (let i = 0; i < offset && i < text.length; i++) if (text.charCodeAt(i) === 10) line++
+  return line
 }
 
 function isValueToken(tok: Token): boolean {
@@ -680,7 +723,16 @@ function scanUnknown(
       }
     }
     if (reasons.length === 0) continue
-    out.push({ ...span, line: tok.line, literal: v, ...(det ? { kindGuess: det.kind } : {}), reasons: [...new Set(reasons)] })
+    out.push({
+      ...span,
+      line: tok.line,
+      literal: v,
+      ...(det ? { kindGuess: det.kind } : {}),
+      reasons: [...new Set(reasons)],
+      quote: tok.quote ?? 'bare',
+      ...(tok.regexContext ? { regex: true } : {}),
+      ...(tok.binding ? { bindingName: tok.binding.name } : {}),
+    })
   }
   return out
 }

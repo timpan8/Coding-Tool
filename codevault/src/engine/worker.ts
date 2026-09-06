@@ -1,5 +1,13 @@
 /// <reference lib="webworker" />
-import { handleRequest, type EngineRequest, type EngineResponse } from './rpc'
+import { handleRequest, registerMethod, type EngineRequest, type EngineResponse } from './rpc'
+import { reapply } from './reapply'
+import { guard } from './guard'
+import { normalizePaste } from './normalize'
+import { toGuardInput, toReapplyInput, type GuardRequest, type ReapplyRequest } from './client'
+
+registerMethod('reapply', (p) => reapply(toReapplyInput(p as ReapplyRequest)))
+registerMethod('guard', (p) => guard(toGuardInput(p as GuardRequest)))
+registerMethod('normalizePaste', (p) => normalizePaste(p as string))
 
 const scope = self as unknown as DedicatedWorkerGlobalScope
 

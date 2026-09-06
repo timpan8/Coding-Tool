@@ -98,7 +98,8 @@ export interface ExampleValidationInput {
 export function validateExample(example: string, input: ExampleValidationInput): ExampleProblem[] {
   const problems: ExampleProblem[] = []
   if (example.length < 6) problems.push('too-short')
-  if (needsEscapingChars(example)) problems.push('needs-escaping')
+  const structural = input.kind === 'blob'
+  if (!structural && needsEscapingChars(example)) problems.push('needs-escaping')
   const ex = example.toLowerCase()
   for (const other of input.otherExamples) {
     const o = other.toLowerCase()
@@ -106,7 +107,7 @@ export function validateExample(example: string, input: ExampleValidationInput):
       problems.push('not-unique')
       continue
     }
-    if (input.kind === 'path' || input.kind === 'unc') continue
+    if (input.kind === 'path' || input.kind === 'unc' || structural) continue
     if (o.includes(ex)) problems.push('substring-of-other')
     else if (ex.includes(o)) problems.push('contains-other')
   }
@@ -116,7 +117,7 @@ export function validateExample(example: string, input: ExampleValidationInput):
       problems.push('equals-real')
       continue
     }
-    if (input.kind === 'path' || input.kind === 'unc') continue
+    if (input.kind === 'path' || input.kind === 'unc' || structural) continue
     if (r.length >= 4 && (r.includes(ex) || ex.includes(r))) problems.push('substring-of-other')
   }
   return [...new Set(problems)]

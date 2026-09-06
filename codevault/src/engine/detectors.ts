@@ -336,7 +336,6 @@ export function detectTableBlocks(tokens: readonly Token[], text: string): BlobH
       // include the assignment "$Var = @(" / "[PSCustomObject]" prefix on the same statement
       const parentTok = first.parentOpen !== null ? tokens[first.parentOpen] : undefined
       if (parentTok && parentTok.raw === '@(') start = parentTok.start
-      start = extendToAssignment(tokens, start)
       let end = last.close
       if (parentTok && parentTok.raw === '@(') {
         // closing paren of the parent array
@@ -378,24 +377,6 @@ export function detectTableBlocks(tokens: readonly Token[], text: string): BlobH
 
 function sameKeys(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((k, i) => k === b[i])
-}
-
-function extendToAssignment(tokens: readonly Token[], start: number): number {
-  const idx = tokens.findIndex((t) => t.start === start)
-  if (idx < 0) return start
-  let i = idx - 1
-  while (i >= 0 && tokens[i]!.kind === 'whitespace') i--
-  if (i >= 0 && tokens[i]!.kind === 'type') {
-    start = tokens[i]!.start
-    i--
-    while (i >= 0 && tokens[i]!.kind === 'whitespace') i--
-  }
-  if (i >= 0 && tokens[i]!.kind === 'operator' && tokens[i]!.raw === '=') {
-    i--
-    while (i >= 0 && tokens[i]!.kind === 'whitespace') i--
-    if (i >= 0 && (tokens[i]!.kind === 'variable' || tokens[i]!.kind === 'bareword')) return tokens[i]!.start
-  }
-  return start
 }
 
 function lineAt(text: string, offset: number): number {

@@ -90,6 +90,8 @@ export interface SettingsRecord {
   orgHostRegex?: string
   /** Lazy setup steps completed. */
   setupDone: string[]
+  /** Prepend the "keep placeholders as-is" line to AI copies. */
+  preambleForAi: boolean
   lastBackupAt?: string
   lastBackupVerifiedAt?: string
   updatedAt: string
@@ -102,6 +104,7 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   hiddenTabLockMinutes: 2,
   hideAllPathsFromAi: false,
   setupDone: [],
+  preambleForAi: true,
   updatedAt: '1970-01-01T00:00:00.000Z',
 }
 

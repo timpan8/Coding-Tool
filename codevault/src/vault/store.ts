@@ -64,6 +64,16 @@ export class VaultStore {
     return (await this.header()) !== undefined
   }
 
+  /** Small clear-text settings that must be readable while locked (e.g. a directory handle). */
+  async getMeta<T>(key: string): Promise<T | undefined> {
+    const row = await this.db.meta.get(key)
+    return row?.value as T | undefined
+  }
+
+  async setMeta(key: string, value: unknown): Promise<void> {
+    await this.db.meta.put({ key, value })
+  }
+
   async putRecord<T>(dek: CryptoKey, rec: Omit<DecodedRecord<T>, 'scriptId'> & { scriptId?: string }): Promise<void> {
     const payload = await encryptRecord(dek, JSON.stringify(rec.data), `${rec.type}:${rec.id}`)
     await this.db.records.put({
