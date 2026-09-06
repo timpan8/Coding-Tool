@@ -1,5 +1,5 @@
 export interface Shortcut {
-  id: 'projects' | 'copyAi' | 'copyLocal' | 'save' | 'help';
+  id: 'projects' | 'copyAi' | 'copyLocal' | 'save' | 'lock' | 'help';
   keys: string[];
   label: string;
   /** Why the obvious key was not used, where that is not obvious. */
@@ -16,6 +16,7 @@ export const shortcuts: Shortcut[] = [
   { id: 'copyAi', keys: ['Ctrl+Enter'], label: 'Kopiera för AI', note: 'Ctrl+Shift+C öppnar utvecklarverktygen i Chrome och Firefox.' },
   { id: 'copyLocal', keys: ['Ctrl+Shift+Enter'], label: 'Kopiera RIKTIGT', note: 'Första trycket armerar, det andra kopierar.' },
   { id: 'save', keys: ['Ctrl+S'], label: 'Spara version' },
+  { id: 'lock', keys: ['Ctrl+L'], label: 'Lås valvet', note: 'Bara när valvet är krypterat.' },
   { id: 'help', keys: ['Ctrl+/', '?'], label: 'Visa genvägar' },
 ];
 
@@ -47,6 +48,8 @@ export function match(event: KeyboardEvent, id: Shortcut['id']): boolean {
       return meta && event.shiftKey && key === 'enter';
     case 'save':
       return meta && !event.shiftKey && key === 's';
+    case 'lock':
+      return meta && !event.shiftKey && !event.altKey && key === 'l';
     case 'help':
       return (meta && key === '/') || (key === '?' && !meta);
     default:

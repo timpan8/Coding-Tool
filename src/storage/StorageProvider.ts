@@ -1,11 +1,36 @@
 import type { Binding, BindingFilter, BlocklistEntry, Dataset, DatasetFilter, ImportMode, ImportResolution, ImportResult, Profile, Project, ProjectSummary, ScanDismissal, ScannerRule, Settings, Version, VersionSummary, WorkspaceSnapshot } from '../types/models';
 import type { ProjectDraft, ProjectDraftMetadata, ProjectFile } from '../types/models';
+import type { EncryptedSnapshotFile, VaultSecret } from './crypto';
 
 export class DraftConflictError extends Error {
   constructor() { super('Projektet har ändrats i en annan flik. Din text finns kvar här. Kopiera mallen till en lokal fil innan du laddar om projektet.'); this.name = 'DraftConflictError'; }
 }
 
+/** What can be known about the vault without a key: whether it is encrypted, whether a key is held,
+ * and the few settings that have to work on a lock screen. */
+export interface VaultStatus {
+  encrypted: boolean;
+  locked: boolean;
+  theme: Settings['theme'];
+  autoLockMinutes: number;
+}
+
 export interface StorageProvider {
+  vaultStatus(): Promise<VaultStatus>;
+  /** Encrypts every row in place and returns the recovery key, which is shown once. Plaintext is
+   * the default; this is a choice, and `disableEncryption` is the way back. */
+  enableEncryption(password: string, options?: { iterations?: number }): Promise<{ recoveryKey: string }>;
+  disableEncryption(secret: VaultSecret): Promise<void>;
+  changePassword(current: VaultSecret, next: string): Promise<void>;
+  revealRecoveryKey(password: string): Promise<string>;
+  unlock(secret: VaultSecret): Promise<void>;
+  /** Drops the key. Rows are untouched; every read of encrypted content now throws VaultLockedError. */
+  lock(): void;
+  /** The snapshot JSON, encrypted so the file opens with the vault's password or recovery key. */
+  sealSnapshot(json: string): Promise<EncryptedSnapshotFile>;
+  /** Everything gone, header included — the way out for someone who has lost both the password
+   * and the recovery key. `clearAll` keeps the header so a cleared vault stays encrypted. */
+  resetVault(): Promise<void>;
   listProjects(): Promise<ProjectSummary[]>;
   getProject(id: string): Promise<Project | undefined>;
   saveProject(p: Project): Promise<void>;

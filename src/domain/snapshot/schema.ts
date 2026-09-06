@@ -119,6 +119,7 @@ export const settingsSchema = z.object({
   editorFontSize: z.number().int().min(10).max(24).default(14),
   editorWordWrap: z.boolean().default(true),
   introSeen: z.boolean().default(true),
+  autoLockMinutes: z.number().int().nonnegative().optional(),
   lastExportAt: iso.optional(),
 });
 

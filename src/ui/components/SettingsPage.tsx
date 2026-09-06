@@ -1,8 +1,10 @@
 import type { BlocklistEntry, ScannerRule, Settings } from '../../types/models';
-import type { StorageProvider } from '../../storage/StorageProvider';
+import type { StorageProvider, VaultStatus } from '../../storage/StorageProvider';
 import { formatBytes, requestPersistence, type StorageState } from '../../storage/persistence';
 import { RulesPanel } from './RulesPanel';
 import { BlocklistPanel } from './BlocklistPanel';
+import { EncryptionPanel } from './EncryptionPanel';
+import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
 import { t } from '../text';
 
 /** Report K-a. This lived as one 3.5 kB line inside App.tsx, which is why every settings change made
@@ -13,9 +15,15 @@ import { t } from '../text';
 export function SettingsPage({
   settings, storage, storageInfo, onStorageInfo, deviceName, onDeviceName,
   rules, onRules, blocklist, onBlocklist, save, notify, showIntro,
+  vault, onVault, confirm, lock,
 }: {
   settings: Settings | null;
   storage: StorageProvider;
+  /** Whether this vault is encrypted, and how long it waits before locking itself. */
+  vault: VaultStatus | null;
+  onVault: () => Promise<void>;
+  confirm: (request: ConfirmRequest) => Promise<ConfirmResult>;
+  lock: () => void;
   storageInfo: StorageState | null;
   onStorageInfo: (state: StorageState) => void;
   deviceName: string;
@@ -42,7 +50,7 @@ export function SettingsPage({
       <dt>{t.settings.origin}</dt><dd>{location.origin}</dd>
       <dt>{t.settings.path}</dt><dd>{location.pathname}</dd>
       <dt>{t.settings.deviceId}</dt><dd>{settings?.deviceId}</dd>
-      <dt>{t.settings.storage}</dt><dd>{t.settings.storageValue}</dd>
+      <dt>{t.settings.storage}</dt><dd>{t.settings.storageValue(vault?.encrypted ?? false)}</dd>
       <dt>{t.settings.persistence}</dt><dd>{persistence}</dd>
       <dt>{t.settings.space}</dt>
       <dd>{storageInfo?.supported ? t.settings.spaceUsed(formatBytes(storageInfo.usedBytes), formatBytes(storageInfo.quotaBytes)) : t.settings.spaceUnknown}</dd>
@@ -88,6 +96,7 @@ export function SettingsPage({
     <button onClick={showIntro}>{t.settings.showIntro}</button>
     <p className="notice">{t.settings.backupNote}</p>
 
+    <EncryptionPanel storage={storage} status={vault} onStatus={onVault} notify={notify} confirm={confirm} lock={lock} />
     <RulesPanel storage={storage} rules={rules} notify={notify} onChange={onRules} />
     <BlocklistPanel storage={storage} entries={blocklist} notify={notify} onChange={onBlocklist} />
     {/* Backup has its own page now. The link stays because this is where it used to be. */}

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Binding, BlocklistEntry, LanguageId, Settings, Version } from '../types/models';
 import { languages } from '../types/models';
-import type { StorageProvider } from '../storage/StorageProvider';
+import type { StorageProvider, VaultStatus } from '../storage/StorageProvider';
+import type { VaultSecret } from '../storage/crypto';
+import { Unlock } from './pages/Unlock';
 import { resolveBinding, resolveValue, suggestBinding, suggestNameForRule, freeName, defaults, BindingRefusal } from '../domain/bindings';
 import { takenAiValues, uniqueExample } from '../domain/bindings/examples';
 import { expandToLiteral } from '../domain/bindings/literal';
@@ -147,6 +149,7 @@ export function App({ storage }: { storage: StorageProvider }) {
    * guess, so the card is shown only while the text is the one it was clicked in. */
   const [chip, setChip] = useState<{ name: string; start: number; end: number; x: number; y: number; text: string } | null>(null);
   const [hold, setHold] = useState<ClipboardHold | null>(null), [armed, setArmed] = useState(false);
+  const [vault, setVault] = useState<VaultStatus | null>(null);
   const overview = useRef<HTMLDivElement>(null), overviewScroll = useRef(0);
   const navigateRef = useRef<(hash: string, replace?: boolean) => Promise<void>>(async () => {});
   /** File ids whose language came from the user or from a filename. Detection never overrides
@@ -188,13 +191,35 @@ export function App({ storage }: { storage: StorageProvider }) {
     });
   }
   navigateRef.current = navigate;
+  /** Everything the app reads at startup and again after an unlock. A locked vault answers none of
+   * it, so it is not asked: `vaultStatus` is the one question that works without a key. */
+  const openVault = async () => {
+    const status = await storage.vaultStatus();
+    setVault(status);
+    applyTheme(status.theme);
+    if (status.locked) return status;
+    await controller.initialize();
+    const stored = controller.getSnapshot().settings!;
+    setDeviceName(stored.deviceName); setTheme(stored.theme); applyTheme(stored.theme);
+    setBindings(await storage.listBindings());
+    // Not awaited: the rules, profiles and blocklist are for panels, and making the first paint —
+    // and the project the address bar asks for — wait on three more reads only delays the editor.
+    void storage.listScannerRules().then(setRules).catch(() => {});
+    void storage.listProfiles().then(setProfiles).catch(() => {});
+    void storage.listBlocklist().then(setBlocklist).catch(() => {});
+    return status;
+  };
+  /** The project the address bar names, once there is a key to read it with. A locked vault
+   * answers nothing, so asking would only raise a storage error behind the lock screen. */
+  const openRoutedProject = async (status: VaultStatus) => {
+    if (status.locked || !routeRef.current.startsWith('#/project/')) return;
+    await navigateRef.current(routeRef.current, true);
+  };
   useEffect(() => {
     let alive = true;
-    void controller.initialize().then(async () => {
+    void openVault().then(async status => {
       if (!alive) return;
-      const stored = controller.getSnapshot().settings!;
-      setDeviceName(stored.deviceName); setTheme(stored.theme); applyTheme(stored.theme); setBindings(await storage.listBindings());
-      if (routeRef.current.startsWith('#/project/')) await navigateRef.current(routeRef.current, true);
+      await openRoutedProject(status);
     }).catch(() => {});
     const changed = () => { const target = location.hash || '#/'; history.replaceState(null, '', routeRef.current); void navigateRef.current(target, true); };
     const unload = (e: BeforeUnloadEvent) => { if (controller.isDirty()) { e.preventDefault(); e.returnValue = ''; } };
@@ -203,9 +228,35 @@ export function App({ storage }: { storage: StorageProvider }) {
   }, [controller, storage]);
   useEffect(() => watchSystemTheme(setSystemDark), []);
   useEffect(() => { void storageState().then(setStorageInfo); }, []);
-  useEffect(() => { void storage.listScannerRules().then(setRules).catch(() => {}); }, [storage]);
-  useEffect(() => { void storage.listProfiles().then(setProfiles).catch(() => {}); }, [storage]);
-  useEffect(() => { void storage.listBlocklist().then(setBlocklist).catch(() => {}); }, [storage]);
+  /** Invariant 8 in the lock's terms: unsaved text is written first, and a vault whose text could
+   * not be saved is not locked at all — locking it would drop what the tab still holds. */
+  async function lockVault(silent = false) {
+    if (!vault?.encrypted || vault.locked) return;
+    try { await controller.flush(); }
+    catch { warn(t.vault.lockFailed); return; }
+    controller.forget();
+    storage.lock();
+    setBindings([]); setProfiles([]); setBlocklist([]); setRules([]);
+    setChip(null); setBindingDialog(null); setCopyMode(null); setViewing(null); setDrawer(false);
+    setVault({ ...vault, locked: true });
+    if (!silent) setNotice(t.vault.locked);
+  }
+  async function unlockVault(secret: VaultSecret) {
+    await storage.unlock(secret);
+    // The address bar survived the lock, so the project it names is opened again rather than
+    // leaving the user on a blank workspace with the right URL.
+    await openRoutedProject(await openVault());
+  }
+  // Auto-lock counts from the last key or pointer event, so reading a long file is not locking.
+  // A hidden tab stops producing those events, which is what makes a forgotten tab lock itself.
+  useEffect(() => {
+    const minutes = vault?.encrypted && !vault.locked ? vault.autoLockMinutes : 0;
+    if (!minutes) return;
+    let timer = setTimeout(() => void lockVault(true), minutes * 60_000);
+    const restart = () => { clearTimeout(timer); timer = setTimeout(() => void lockVault(true), minutes * 60_000); };
+    for (const event of ['keydown', 'pointerdown'] as const) window.addEventListener(event, restart, { passive: true });
+    return () => { clearTimeout(timer); for (const event of ['keydown', 'pointerdown'] as const) window.removeEventListener(event, restart); };
+  }, [vault]);
   // Asking on an empty first visit would prompt Firefox users before they have anything to lose.
   useEffect(() => {
     if (!project || asked.current) return;
@@ -834,9 +885,14 @@ export function App({ storage }: { storage: StorageProvider }) {
       if (match(e, 'copyAi')) { e.preventDefault(); void copy('ai'); }
       if (match(e, 'copyLocal')) { e.preventDefault(); void copy('local'); }
       if (match(e, 'save')) { e.preventDefault(); if (project && template.trim()) setLabelling(true); }
+      if (match(e, 'lock') && vault?.encrypted) { e.preventDefault(); void lockVault(); }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   });
+
+  // Nothing else is rendered while the vault is locked: not a shell, not a stale project list.
+  // What is on screen is what has been read, and nothing has been read.
+  if (vault?.locked) return <div className="app-shell code-first"><Unlock unlock={unlockVault} />{toasts}</div>;
 
   return <div className="app-shell code-first"><a className="skip-link" href="#huvudinnehall">{t.nav.skip}</a><div className="main-shell">
     <header className="topbar"><a className="brand" href="#/" onClick={e => { e.preventDefault(); void navigate('#/'); }}><span className="brand-icon">{'</>'}</span><span>AI Code Vault</span></a>
@@ -854,6 +910,7 @@ export function App({ storage }: { storage: StorageProvider }) {
           onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} />
         <label className="theme-choice">{t.app.theme}<select aria-label={t.app.theme} value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">{t.app.themeSystem}</option><option value="light">{t.app.themeLight}</option><option value="dark">{t.app.themeDark}</option></select></label>
         <button className="icon-button" onClick={() => setShowShortcuts(true)} aria-label={t.nav.showShortcuts} title={t.nav.shortcuts}>?</button>
+        {vault?.encrypted && <button className="icon-button" onClick={() => void lockVault()} aria-label={t.nav.lock} title={t.nav.lock}>🔒</button>}
         <span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span>
       </div></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>{t.dialog.retrySave}</button></div>}
@@ -939,7 +996,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         onEdit={b => setBindingDialog({ binding: b })} onDelete={b => void removeBinding(b)} onCreate={newBinding} /></div>
       {/* Its own page rather than the last section of a long settings page. It is the only way back
           after a browser clears its storage, and it was three scroll-lengths below the fold. */}
-      <div className="overview-scroll" hidden={route !== '#/backup'}><BackupPanel storage={storage} notify={setNotice} confirm={confirm}
+      <div className="overview-scroll" hidden={route !== '#/backup'}><BackupPanel storage={storage} notify={setNotice} confirm={confirm} vault={vault}
         lastExportAt={settings?.lastExportAt} onExported={() => void controller.reloadSettings()} /></div>
       <div hidden={route !== '#/security'}><Security /></div>
       <div hidden={route !== '#/sanitize'}><SanitizePage bindings={bindings} blocklist={blocklist} rules={rules} notify={(text, tone) => toast(text, tone)} onBind={bindFromSanitize} /></div>
@@ -947,6 +1004,8 @@ export function App({ storage }: { storage: StorageProvider }) {
         onStorageInfo={setStorageInfo} deviceName={deviceName} onDeviceName={setDeviceName} rules={rules}
         onRules={() => void storage.listScannerRules().then(setRules)} save={patch => changeEditor(patch)} notify={setNotice}
         blocklist={blocklist} onBlocklist={() => void storage.listBlocklist().then(setBlocklist)}
+        vault={vault} onVault={async () => { setVault(await storage.vaultStatus()); await controller.reloadSettings(); }}
+        confirm={confirm} lock={() => void lockVault()}
         showIntro={() => setIntro(true)} /></div>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>{t.app.footerNote}</span></footer>
   </div>

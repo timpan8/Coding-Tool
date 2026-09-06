@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import type { ImportMode, ImportResolution, ImportResult } from '../../types/models';
-import type { StorageProvider } from '../../storage/StorageProvider';
+import type { StorageProvider, VaultStatus } from '../../storage/StorageProvider';
 import { canDuplicate, parseSnapshot, planImport, toSnapshot, type ImportPlan, type Snapshot, type SnapshotKind } from '../../domain/snapshot';
+import { isEncryptedSnapshot, looksLikeRecoveryKey, openSnapshot, WrongPasswordError, type EncryptedSnapshotFile } from '../../storage/crypto';
 import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
 import { clearBrowserTraces } from '../../storage/persistence';
+import { SecretInput } from './SecretInput';
+import { Modal } from './Modal';
 import { download } from '../download';
 import { t } from '../text';
 
@@ -16,6 +19,7 @@ export function BackupPanel({
   onExported,
   notify,
   confirm,
+  vault,
 }: {
   storage: StorageProvider;
   /** When the vault was last exported, so the page can say how long ago that was. */
@@ -23,6 +27,9 @@ export function BackupPanel({
   onExported: () => void;
   notify: (message: string) => void;
   confirm: (request: ConfirmRequest) => Promise<ConfirmResult>;
+  /** An encrypted vault writes an encrypted file by default: a backup that leaves the protection
+   * behind is the hole the encryption was meant to close. */
+  vault: VaultStatus | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ snapshot: Snapshot; plan: ImportPlan } | null>(null);
@@ -30,6 +37,7 @@ export function BackupPanel({
   const [resolution, setResolution] = useState<ImportResolution>('duplicate');
   const [mode, setMode] = useState<ImportMode>('merge');
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [locked, setLocked] = useState<{ file: EncryptedSnapshotFile } | null>(null), [secret, setSecret] = useState('');
 
   const conflicts = pending?.plan.entities.filter((e) => e.action === 'conflict') ?? [];
   // Named so the dialog can say which kinds "keep both" will not apply to, rather than downgrading
@@ -40,7 +48,7 @@ export function BackupPanel({
   const full = pending?.snapshot.kind === 'full' ? pending.snapshot : null;
   const replacing = mode === 'replace' && full !== null;
 
-  async function exportVault(kind: SnapshotKind) {
+  async function exportVault(kind: SnapshotKind, plaintext = false) {
     setBusy(true);
     try {
       const workspace = await storage.exportAll();
@@ -50,7 +58,9 @@ export function BackupPanel({
         deviceId: settings.deviceId,
         deviceName: settings.deviceName,
       });
-      download(`ai-code-vault-${kind}-${stamp()}.acv.json`, JSON.stringify(snapshot, null, 2));
+      const sealing = vault?.encrypted && !plaintext;
+      const body = sealing ? JSON.stringify(await storage.sealSnapshot(JSON.stringify(snapshot))) : JSON.stringify(snapshot, null, 2);
+      download(`ai-code-vault-${kind}-${stamp()}.acv${sealing ? '.enc' : ''}.json`, body);
       // Written after the file is handed over, so a failed export does not reset the reminder.
       await storage.saveSettings({ ...settings, lastExportAt: new Date().toISOString() });
       onExported();
@@ -62,6 +72,16 @@ export function BackupPanel({
     }
   }
 
+  async function accept(text: string) {
+    const parsed = parseSnapshot(text);
+    if (!parsed.ok) {
+      setProblems(parsed.problems);
+      return;
+    }
+    const current = await storage.exportAll();
+    setPending({ snapshot: parsed.snapshot, plan: planImport(parsed.snapshot, current) });
+  }
+
   async function choose(event: React.ChangeEvent<HTMLInputElement>) {
     const chosen = event.target.files?.[0];
     event.target.value = '';
@@ -70,15 +90,31 @@ export function BackupPanel({
     setResult(null);
     setBusy(true);
     try {
-      const parsed = parseSnapshot(await chosen.text());
-      if (!parsed.ok) {
-        setProblems(parsed.problems);
-        return;
-      }
-      const current = await storage.exportAll();
-      setPending({ snapshot: parsed.snapshot, plan: planImport(parsed.snapshot, current) });
+      const text = await chosen.text();
+      // An encrypted file is recognised by its own envelope, not by its name: the secret that
+      // opens it is the one the vault had when it was written, which need not be this vault's.
+      let head: unknown;
+      try { head = JSON.parse(text); } catch { head = null; }
+      if (isEncryptedSnapshot(head)) { setLocked({ file: head }); return; }
+      await accept(text);
     } catch {
       setProblems([t.backup.fileUnreadable]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openLocked() {
+    if (!locked) return;
+    setBusy(true);
+    setProblems([]);
+    try {
+      const json = await openSnapshot(locked.file, looksLikeRecoveryKey(secret) ? { recoveryKey: secret } : { password: secret });
+      setLocked(null);
+      setSecret('');
+      await accept(json);
+    } catch (problem) {
+      setProblems([problem instanceof WrongPasswordError ? t.vault.importWrong : problem instanceof Error ? problem.message : t.backup.fileUnreadable]);
     } finally {
       setBusy(false);
     }
@@ -174,10 +210,35 @@ export function BackupPanel({
           Exportera bara privata värden
         </button>
       </div>
-      <p className="notice">
-        <b>{t.backup.plaintextWarning}</b> Skillnaden är att den privata utelämnar
-        projektkoden, inte att den är ofarlig. Förvara dem som du förvarar lösenorden de innehåller.
-      </p>
+      {vault?.encrypted ? (
+        <>
+          <p className="notice">{t.vault.exportEncrypted}</p>
+          <button
+            className="text-button"
+            disabled={busy}
+            onClick={() =>
+              void confirm({
+                title: t.vault.exportPlaintextTitle,
+                danger: true,
+                confirmLabel: t.vault.exportPlaintextConfirm,
+                body: (
+                  <>
+                    <p>{t.vault.exportPlaintextLead}</p>
+                    <p>{t.backup.plaintextWarning}</p>
+                  </>
+                ),
+              }).then(async (ok) => { if (ok) await exportVault('full', true); })
+            }
+          >
+            {t.vault.exportPlaintextAnyway}
+          </button>
+        </>
+      ) : (
+        <p className="notice">
+          <b>{t.backup.plaintextWarning}</b> Skillnaden är att den privata utelämnar
+          projektkoden, inte att den är ofarlig. Förvara dem som du förvarar lösenorden de innehåller.
+        </p>
+      )}
       {/* Nothing nags, and nothing is scheduled: the page says how old the last file is and leaves
           the judgement to the person who knows what has changed since. */}
       <p className={lastExportAt && daysSince(lastExportAt) < 30 ? 'muted' : 'inline-warning'} role="status">
@@ -190,7 +251,25 @@ export function BackupPanel({
         <input type="file" accept=".json,.acv.json,application/json" disabled={busy} onChange={(e) => void choose(e)} />
       </label>
 
-      {problems.length > 0 && (
+      {locked && (
+        <Modal title={t.backup.restore} close={() => { setLocked(null); setSecret(''); setProblems([]); }}>
+          <p>{t.vault.importPassword}</p>
+          <SecretInput label={t.vault.password} value={secret} onChange={setSecret} autoFocus />
+          {problems.length > 0 && (
+            <p className="danger-text" role="alert">
+              {problems[0]}
+            </p>
+          )}
+          <div className="dialog-actions">
+            <button onClick={() => { setLocked(null); setSecret(''); setProblems([]); }}>{t.dialog.cancel}</button>
+            <button className="primary" disabled={busy || !secret} onClick={() => void openLocked()}>
+              {t.vault.importOpen}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {!locked && problems.length > 0 && (
         <div className="import-problems" role="alert">
           <strong>{t.backup.fileRejected}</strong>
           <ul>

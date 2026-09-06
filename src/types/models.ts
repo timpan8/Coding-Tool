@@ -60,6 +60,9 @@ export interface Settings {
   activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean; aiPromptText: string;
   clipboardAutoClearSeconds: number; maskSecretsInUi: boolean; theme: 'system' | 'light' | 'dark';
   editorFontSize: number; editorWordWrap: boolean; introSeen: boolean;
+  /** Minutes of inactivity before an encrypted vault locks itself; 0 or absent means never. Kept
+   * in plaintext with the other lock-screen settings, since it has to be read to arm the timer. */
+  autoLockMinutes?: number;
   /** When the vault was last exported. The only way back from cleared browser data is a file the
    * user made, so the app has to be able to say how old that file is. Absent means never. */
   lastExportAt?: Iso;

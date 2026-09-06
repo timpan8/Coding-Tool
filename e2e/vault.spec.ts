@@ -1476,3 +1476,114 @@ test('labels an unlabelled version with its line diff', async ({ page }) => {
   await expect(page.locator('.version-item').first()).toContainText('+2 −0');
   await expect(page.locator('.version-item').first().locator('.version-stats')).toContainText('+2 −0');
 });
+
+/** Turns encryption on through the settings page and hands back the recovery key it showed. */
+async function encrypt(page: Page, password: string) {
+  await go(page, 'Inställningar', '.encryption-panel');
+  await page.getByRole('button', { name: 'Kryptera valvet' }).click();
+  const dialog = page.locator('dialog[open]');
+  await dialog.getByLabel('Nytt lösenord', { exact: true }).fill(password);
+  await dialog.getByLabel('Upprepa lösenordet', { exact: true }).fill(password);
+  await dialog.getByRole('button', { name: 'Kryptera', exact: true }).click();
+  await expect(dialog).toContainText('Din återställningsnyckel');
+  const key = (await dialog.locator('.recovery-key code').innerText()).replace(/-/g, '').toLowerCase();
+  await dialog.getByLabel(/Jag har sparat nyckeln/).check();
+  await dialog.getByRole('button', { name: 'Stäng', exact: true }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  return key;
+}
+
+// PR 4. Encryption is optional and off by default. Turning it on re-encrypts what is already
+// there, a reload asks for the password, and the wrong one gets nowhere.
+test('encrypts the vault, locks it and opens it again with the password', async ({ page }) => {
+  await type(page, '$password = "Hunter2-Very-Secret!"\n');
+  await bind(page, 'Hunter2-Very-Secret!', 'Hunter2-Very-Secret!', 'secret');
+  // '#/' is "new code", so coming back to this project is through its own route.
+  const projectUrl = page.url();
+  const recoveryKey = await encrypt(page, 'ett-langt-losenord');
+  expect(recoveryKey).toMatch(/^[0-9a-f]{32}$/);
+  await expect(page.locator('.encryption-panel')).toContainText('Valvet är krypterat');
+
+  // What is on disk carries no private value any more, only the ids the database indexes.
+  const stored = await page.evaluate(async () => {
+    const name = (await indexedDB.databases()).map(d => d.name!).find(n => n?.startsWith('ai-code-vault'))!;
+    const db = await new Promise<IDBDatabase>(resolve => { const open = indexedDB.open(name); open.onsuccess = () => resolve(open.result); });
+    const rows = await Promise.all([...db.objectStoreNames].map(store => new Promise<unknown>(resolve => {
+      const request = db.transaction(store, 'readonly').objectStore(store).getAll();
+      request.onsuccess = () => resolve(request.result);
+    })));
+    return JSON.stringify(rows);
+  });
+  expect(stored).not.toContain('Hunter2-Very-Secret!');
+  expect(stored).not.toContain('PASSWORD');
+  expect(stored).toContain('enc');
+
+  // A reload meets the lock screen, and nothing of the vault is on it. The hash is put back
+  // first: changing only the hash never reloads, so the reload has to come after it.
+  await page.goto(projectUrl);
+  await page.reload();
+  await expect(page.locator('.unlock-page')).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('Hunter2');
+  await expect(page.locator('.work-grid')).toHaveCount(0);
+  await page.getByLabel('Lösenord', { exact: true }).fill('fel-losenord');
+  await page.getByRole('button', { name: 'Lås upp' }).click();
+  await expect(page.locator('.unlock-card')).toContainText('Fel lösenord');
+  await page.getByLabel('Lösenord', { exact: true }).fill('ett-langt-losenord');
+  await page.getByRole('button', { name: 'Lås upp' }).click();
+  await expect(page.locator('.work-grid')).toBeVisible();
+  await expect(page.locator('.editor-body')).toContainText('{{PASSWORD}}');
+
+  // The lock button empties the app again, and the recovery key opens it just as the password does.
+  await page.getByRole('button', { name: 'Lås valvet' }).click();
+  await expect(page.locator('.unlock-page')).toBeVisible();
+  await page.getByRole('button', { name: 'Använd återställningsnyckel i stället' }).click();
+  await page.getByLabel('Återställningsnyckel', { exact: true }).fill(recoveryKey);
+  await page.getByRole('button', { name: 'Lås upp' }).click();
+  await expect(page.locator('.editor-body')).toContainText('{{PASSWORD}}');
+});
+
+// The backup from an encrypted vault is encrypted too, and restoring it asks for the same secret.
+test('exports an encrypted backup and restores it with the password', async ({ page }) => {
+  await type(page, '$password = "Hunter2-Very-Secret!"\n');
+  await bind(page, 'Hunter2-Very-Secret!', 'Hunter2-Very-Secret!', 'secret');
+  await encrypt(page, 'ett-langt-losenord');
+
+  await go(page, 'Backup', '.backup-panel');
+  await expect(page.locator('.backup-panel')).toContainText('Exportfilen krypteras');
+  const download = await Promise.race([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Exportera hela valvet' }).click().then(() => page.waitForEvent('download')),
+  ]);
+  const file = test.info().outputPath('encrypted-backup.json');
+  await download.saveAs(file);
+  expect(await readFile(file, 'utf8')).not.toContain('Hunter2-Very-Secret!');
+
+  await page.getByLabel('Välj en exporterad fil').setInputFiles(file);
+  await expect(page.locator('dialog[open]')).toContainText('Filen är krypterad');
+  await page.locator('dialog[open]').getByLabel('Lösenord', { exact: true }).fill('fel-losenord');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Öppna filen' }).click();
+  await expect(page.locator('dialog[open]')).toContainText('Fel lösenord');
+  await page.locator('dialog[open]').getByLabel('Lösenord', { exact: true }).fill('ett-langt-losenord');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Öppna filen' }).click();
+  await expect(page.locator('.import-plan')).toBeVisible();
+  await expect(page.locator('.import-plan')).toContainText('redan identiska');
+});
+
+// Encryption comes off again, with the password, and the vault is readable in the clear.
+test('turns encryption off again and goes back to plaintext', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  const projectUrl = page.url();
+  await encrypt(page, 'ett-langt-losenord');
+  await page.getByRole('button', { name: 'Stäng av kryptering' }).click();
+  await page.getByRole('button', { name: 'Stäng av kryptering', exact: true }).last().click();
+  const dialog = page.locator('dialog[open]');
+  await dialog.getByLabel('Lösenord', { exact: true }).fill('ett-langt-losenord');
+  await dialog.getByRole('button', { name: 'Stäng av kryptering', exact: true }).click();
+  await expect(page.locator('.toast', { hasText: 'Krypteringen är avstängd' })).toBeVisible();
+  await expect(page.locator('.encryption-panel')).toContainText('klartext');
+  await page.goto(projectUrl);
+  await page.reload();
+  await expect(page.locator('.unlock-page')).toHaveCount(0);
+  await expect(page.locator('.editor-body')).toContainText('{{P_VALUE}}');
+});

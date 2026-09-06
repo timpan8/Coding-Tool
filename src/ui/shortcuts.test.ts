@@ -38,6 +38,6 @@ describe('shortcuts', () => {
       expect(shortcut.keys.length).toBeGreaterThan(0);
       expect(shortcut.label).toBeTruthy();
     }
-    expect(shortcuts.map((s) => s.id)).toEqual(['projects', 'copyAi', 'copyLocal', 'save', 'help']);
+    expect(shortcuts.map((s) => s.id)).toEqual(['projects', 'copyAi', 'copyLocal', 'save', 'lock', 'help']);
   });
 });

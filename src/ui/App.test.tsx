@@ -76,6 +76,10 @@ it('masks local secrets and requires a second deliberate action to copy them', a
   mount(<App storage={storage} />);
   const editor = await screen.findByLabelText('Testkod');
   await waitFor(() => expect((editor as HTMLTextAreaElement).value).toContain('{{ADMIN_PASSWORD}}'));
+  // Opening the project runs through the same guard as any other write, and a copy asked for
+  // while that is in flight is refused rather than queued. Waiting for the workspace to settle is
+  // what the other tests do; without it this one races the startup read of the vault.
+  await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Sparat lokalt'));
   fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
   expect((editor as HTMLTextAreaElement).value).toContain('••••••••');
   expect((editor as HTMLTextAreaElement).value).not.toContain('SuperSecret123!');

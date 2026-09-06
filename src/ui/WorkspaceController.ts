@@ -226,6 +226,16 @@ export class WorkspaceController {
     }
     await this.flush();
   }
+  /** Everything read from the vault, forgotten. Locking has to leave nothing behind — not the
+   * open file, not the project list, not the settings — and the next unlock has to read it all
+   * again, so the memoised initialization goes too. */
+  forget() {
+    clearTimeout(this.timer);
+    this.sessions.clear();
+    this.lastProjectId = null;
+    this.initialization = null;
+    this.publish({ session: blank(), settings: null, projects: [], phase: 'loading', error: '' });
+  }
   /** Drops the in-memory session without writing it back. Needed after the open project is deleted
    * or the vault is replaced by an import: the session still holds a draft revision for a project
    * that no longer exists, so any later flush would throw. */
