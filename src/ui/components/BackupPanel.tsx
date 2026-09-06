@@ -3,18 +3,7 @@ import type { ImportResolution, ImportResult } from '../../types/models';
 import type { StorageProvider } from '../../storage/StorageProvider';
 import { parseSnapshot, planImport, toSnapshot, type ImportPlan, type Snapshot, type SnapshotKind } from '../../domain/snapshot';
 import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
-
-function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  // Revoked on the next tick so the download has started reading it.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
+import { download } from '../download';
 
 const stamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
 

@@ -26,6 +26,7 @@ import { BindingPanel, toRows } from './components/BindingPanel';
 import { ProfileManager, ProfilePicker } from './components/ProfilePicker';
 import { IngestDialog } from './components/IngestDialog';
 import { match, shortcuts } from './shortcuts';
+import { detectLanguage, languageForFile } from '../domain/detect';
 // Also lazy: it pulls in the same editor bundle, and version history is not on the first screen.
 const DiffEditor = lazy(() => import('./editor/DiffEditor').then(m => ({ default: m.DiffEditor })));
 import { scan, type Finding } from '../domain/scanner';
@@ -34,6 +35,7 @@ import { Security } from './pages/Security';
 import { applyTheme, paintHint, resolveTheme, systemPrefersDark, watchSystemTheme, type ThemeChoice } from './theme';
 import { formatBytes, requestPersistence, storageState, type StorageState } from '../storage/persistence';
 import { clearClipboard } from './clipboard';
+import { download } from './download';
 import './code-first.css';
 
 type Mode = 'template' | 'local' | 'ai';
@@ -152,12 +154,15 @@ export function App({ storage }: { storage: StorageProvider }) {
   const [storageInfo, setStorageInfo] = useState<StorageState | null>(null), asked = useRef(false);
   const [confirm, confirmDialog] = useConfirm();
   const [rules, setRules] = useState<ScannerRule[]>([]), [profiles, setProfiles] = useState<Profile[]>([]), [managingProfiles, setManagingProfiles] = useState(false);
-  const [ingesting, setIngesting] = useState(false), [showShortcuts, setShowShortcuts] = useState(false);
+  const [ingesting, setIngesting] = useState(false), [showShortcuts, setShowShortcuts] = useState(false), [dropping, setDropping] = useState(false);
   const [dismissed, refreshDismissals] = useDismissals(() => project ? storage.listDismissals(project.id) : Promise.resolve([]), project?.id ?? '');
   const findings = useScanner(mode === 'template' ? template : '', rules, dismissed);
   const [countdown, setCountdown] = useState<number | null>(null), pendingClear = useRef<string | null>(null);
   const overview = useRef<HTMLDivElement>(null), overviewScroll = useRef(0);
   const navigateRef = useRef<(hash: string, replace?: boolean) => Promise<void>>(async () => {});
+  /** File ids whose language came from the user or from a filename. Detection never overrides
+   * one of those, and the memory is per file because the language is. */
+  const languageChosen = useRef(new Set<string>());
   const workspaceVisible = route === '#/' || route.startsWith('#/project/');
 
   async function run(action: () => Promise<void>) {
@@ -330,6 +335,35 @@ export function App({ storage }: { storage: StorageProvider }) {
       setBindingDialog({ binding, selection });
     });
   }
+  /** Fires on a paste, not on typing: a guess from the first character is worthless, and after
+   * that the file is no longer empty. A large jump in one change is what a paste looks like from
+   * here, and it works for both editors. Never overrides a language the user picked, and stays
+   * quiet unless the guess is unambiguous — the language decides how values are escaped. */
+  function noteLanguage(text: string) {
+    if (languageChosen.current.has(session.activeFileId) || text.length - template.length < 20) return;
+    const guess = detectLanguage(text);
+    if (guess && guess !== language) {
+      controller.changeLanguage(guess);
+      setNotice(`Språket sattes till ${guess}. Ändra i väljaren om det blev fel.`);
+    }
+  }
+  async function openFiles(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    await run(async () => {
+      const text = await file.text();
+      const guess = languageForFile(file.name) ?? detectLanguage(text);
+      if (template.trim()) await controller.addFile(guess ?? language);
+      else if (guess && guess !== language) controller.changeLanguage(guess);
+      controller.changeText(text);
+      const fileId = controller.getSnapshot().session.activeFileId;
+      if (languageForFile(file.name)) languageChosen.current.add(fileId);
+      // Renaming goes through the same edit path as the text, so it works before the project
+      // exists too; the first save writes both. The name is what a drop carries that typing does not.
+      await controller.renameFile(fileId, file.name);
+      setNotice(`${file.name} inläst. Inget skickas någonstans.`);
+    });
+  }
   function newBinding() {
     const current = controller.getSnapshot();
     if (!current.session.project || !current.settings) return;
@@ -393,6 +427,16 @@ export function App({ storage }: { storage: StorageProvider }) {
     const block = promptBlock(settings.aiPromptText, language);
     return block ? `${block}\n\n${text}` : text;
   }
+  /** Saving to a file goes through the same gate as the clipboard: a file is just as easy to hand
+   * to an AI, so it must not be a way around the audit. */
+  function downloadCopy(which: 'local' | 'ai') {
+    const result = auditForCopy(template, bindings, { ...options, mode: which });
+    if (!result.canCopy) { setError('Nedladdning blockerad. Åtgärda problemen i panelen.'); return; }
+    const name = session.files.find(f => f.id === session.activeFileId)?.name ?? 'kod.txt';
+    download(`${which}-${name}`, withPrompt(result.text, which), 'text/plain');
+    setCopyMode(null);
+    setNotice(which === 'local' ? 'Filen är nedladdad · den innehåller riktiga värden.' : 'Filen är nedladdad.');
+  }
   async function writeClipboard(text: string, which: 'local' | 'ai') {
     try {
       await navigator.clipboard.writeText(text); setCopyMode(null);
@@ -448,9 +492,12 @@ export function App({ storage }: { storage: StorageProvider }) {
     <main id="huvudinnehall" inert={busy}>
       <div className="workspace" hidden={!workspaceVisible}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : 'BÖRJA DIREKT'}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
-        <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => controller.changeLanguage(e.target.value as LanguageId)}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? `${session.files.length} ${session.files.length === 1 ? 'fil' : 'filer'}` : 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
+        <div className="file-info"><label>Språk <select aria-label="Språk" value={language} onChange={e => { languageChosen.current.add(session.activeFileId); controller.changeLanguage(e.target.value as LanguageId); }}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? `${session.files.length} ${session.files.length === 1 ? 'fil' : 'filer'}` : 'Nytt projekt skapas när du börjar'}{session.baseVersionId && ` · baserad på v${versions.find(v => v.id === session.baseVersionId)?.number ?? '?'}`}</span></div>
       </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>Tillbaka till pågående projekt</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button className="primary" disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
-        <div className="work-grid"><section className={`editor-panel mode-${mode}`}>
+        <div className="work-grid" onDragOver={e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDropping(true); } }}
+          onDragLeave={e => { if (e.currentTarget === e.target) setDropping(false); }}
+          onDrop={e => { e.preventDefault(); setDropping(false); void openFiles(e.dataTransfer.files); }}>
+          {dropping && <div className="drop-hint" aria-hidden="true">Släpp filen för att läsa in den</div>}<section className={`editor-panel mode-${mode}`}>
           <FileTabs files={session.files} activeId={session.activeFileId} disabled={busy}
             onSelect={id => { controller.selectFile(id); changeMode('template'); }}
             onAdd={() => void run(async () => { await controller.addFile(); changeMode('template'); })}
@@ -467,7 +514,7 @@ export function App({ storage }: { storage: StorageProvider }) {
           <div className="view-banner" key={mode}><strong>{mode === 'template' ? '▤ MALL — KAN INNEHÅLLA KÄNSLIGA VÄRDEN' : mode === 'local' ? '⚠ LOCAL — INNEHÅLLER RIKTIGA VÄRDEN' : '◇ AI — SANERAD'}</strong><span>{mode === 'template' ? 'Redigerbar källa' : 'Skrivskyddad projektion'}</span></div>
           {mode === 'local' && <div className="local-tools"><button onClick={() => { setMode('template'); setFocusLine(currentLine.current); }}>Redigera som mall</button><button onClick={() => setShowSecrets(!showSecrets)}>{showSecrets ? 'Dölj värden' : 'Visa värden'}</button></div>}
           <div className="editor-body" id="kodvy" role="tabpanel" aria-labelledby={`vy-${mode}`}>{!template && mode === 'template' && <div className="paste-prompt"><strong>Klistra in din kod här</strong><span>Projektet skapas automatiskt och sparas lokalt.</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>eller prova med exempelkod</button>}</div>}
-            <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => controller.changeText(text)} onBinding={createBinding}
+            <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { noteLanguage(text); controller.changeText(text); }} onBinding={createBinding}
               onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} focusName={focusName} focusLine={focusLine} onLine={line => { currentLine.current = line; }} />
           </div><div className="editor-footer"><span>{visible.split('\n').length} rader · {used.length} bindings</span><span>{mode === 'local' ? 'Använd endast i din lokala kodmiljö' : 'Utkast sparas automatiskt · ingen kod körs'}</span></div>
         </section><aside className="binding-panel"><BindingPanel rows={toRows(activeBindings, used, options.profileId)} canCreate={Boolean(project)}
@@ -509,7 +556,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         return { before: line, after: line.slice(0, s.start - lineStart) + `{{${bindingDialog.binding.name}}}` + line.slice(s.end - lineStart) };
       })() || undefined}
       save={storeBinding} close={() => setBindingDialog(null)} />}
-    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} findings={copyFindings} />}{copyMode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.</label>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound && !seriousFindings ? 'primary' : ''} disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(withPrompt(result.text, copyMode), copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound && !seriousFindings ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
+    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} findings={copyFindings} />}{copyMode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.</label>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => downloadCopy(copyMode)}>Ladda ned som fil</button><button className={copyMode === 'local' ? 'danger' : cover.bound && !seriousFindings ? 'primary' : ''} disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(withPrompt(result.text, copyMode), copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound && !seriousFindings ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
     {viewing && <Modal title={viewing.compareTo ? `v${viewing.compareTo.number} → v${viewing.version.number}` : `v${viewing.version.number}${viewing.version.label ? ` · ${viewing.version.label}` : ''}`} close={() => setViewing(null)}>
       <div className="version-view">
         <Suspense fallback={<p className="muted">Laddar jämförelsen…</p>}><DiffEditor language={language} theme={resolvedTheme}

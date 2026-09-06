@@ -919,3 +919,21 @@ dialog:has(.version-view) {
 .skip-link:focus {
   top: 0;
 }
+
+.drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  background: var(--accent-surface);
+  color: var(--accent-text);
+  font-weight: 600;
+  pointer-events: none;
+}
+.work-grid {
+  position: relative;
+}

@@ -8,7 +8,7 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['list']] : [['list']],
-  use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure' },
+  use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure', permissions: ['clipboard-read', 'clipboard-write'] },
   projects: [{ name: 'chromium', use: devices['Desktop Chrome'] }],
   webServer: {
     command: 'pnpm build && pnpm preview --port 4173',

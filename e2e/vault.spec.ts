@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
 /** Browser-level tests against the real Monaco editor.
@@ -505,4 +506,57 @@ test('lists its shortcuts and uses combinations the browser leaves alone', async
   // Ctrl+S asks for a version label.
   await page.keyboard.press('Control+s');
   await expect(page.getByLabel('Versionsetikett')).toBeVisible();
+});
+
+// Report U14 and F11. The language was always PowerShell until changed by hand, and code could
+// only arrive by paste and only leave through the clipboard.
+// Report F11. A dropped file is the shortest way in for code that already lives on disk, and the
+// extension is a better signal for the language than any guess from the contents.
+test('reads a file dropped onto the workspace', async ({ page }) => {
+  await page.evaluate(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['$db = "sql01.corp.local"\n'], 'deploy.ps1', { type: 'text/plain' }));
+    const grid = document.querySelector('.work-grid')!;
+    grid.dispatchEvent(new DragEvent('dragover', { dataTransfer: transfer, bubbles: true }));
+    grid.dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true }));
+  });
+  await expect(page.locator('.inline-notice')).toContainText('deploy.ps1 inläst');
+  await expect(page.getByLabel('Språk', { exact: true })).toHaveValue('powershell');
+  await expect(page.locator('.file-tabs')).toContainText('deploy.ps1');
+  await expect(page.locator('.editor-body')).toContainText('sql01.corp.local');
+});
+
+test('recognises the language of pasted code and can write the result to a file', async ({ page }) => {
+  await expect(page.getByLabel('Språk', { exact: true })).toHaveValue('powershell');
+  // A real paste, not typing: a guess from the first character would be worthless.
+  await page.locator('.code-editor').click();
+  await page.evaluate(() => navigator.clipboard.writeText('def main():\n    password = "Hunter2!"\n'));
+  await page.keyboard.press('Control+v');
+  await expect(page.getByLabel('Språk', { exact: true })).toHaveValue('python');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+
+  await bind(page, 'Hunter2', 'Hunter2!', 'secret');
+  await page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ }).click();
+  const download = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('dialog[open]').getByRole('button', { name: 'Ladda ned som fil' }).click(),
+  ]).then(([d]) => d);
+
+  expect(download.suggestedFilename()).toContain('ai-');
+  const file = test.info().outputPath('ai-copy.py');
+  await download.saveAs(file);
+  const written = await readFile(file, 'utf8');
+  expect(written).toContain('<PASSWORD>');
+  expect(written).not.toContain('Hunter2!');
+});
+
+// A file is as easy to paste into a chat as the clipboard is, so it goes through the same gate.
+test('holds the download behind the same review as the clipboard', async ({ page }) => {
+  await type(page, '$db = "AKIAIOSFODNN7EXAMPLE"\n');
+  await page.locator('.copy-actions').getByRole('button', { name: /Copy for AI/ }).click();
+  const dialog = page.locator('dialog[open]');
+  const save = dialog.getByRole('button', { name: 'Ladda ned som fil' });
+  await expect(save).toBeDisabled();
+  await dialog.getByRole('checkbox').check();
+  await expect(save).toBeEnabled();
 });
