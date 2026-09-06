@@ -9,6 +9,7 @@ import { applyBlocklist } from '../domain/blocklist';
 import { render, usage } from '../domain/render';
 import { auditForCopy, auditSelection, promptBlock, type CopyAudit } from '../domain/render/audit';
 import { buildValueIndex } from '../domain/render/leak';
+import { diffTemplates, formatStats } from '../domain/diff';
 import { WorkspaceController } from './WorkspaceController';
 import { Editor, type Selection } from './editor/Editor';
 import { BindingDialog } from './components/BindingDialog';
@@ -36,6 +37,7 @@ import { IngestDialog } from './components/IngestDialog';
 import { Exits } from './components/Exits';
 import { useToasts } from './components/Toasts';
 import { ClipboardBanner, type ClipboardHold } from './components/ClipboardBanner';
+import { ChipPopover } from './components/ChipPopover';
 import { editorShortcuts, match, shortcuts } from './shortcuts';
 import { t } from './text';
 import { detectLanguage, languageForFile } from '../domain/detect';
@@ -88,7 +90,7 @@ function ProjectName({ name, change }: { name: string; change: (name: string) =>
  * which made the default paste-and-copy path read as a clean bill of health. */
 /** Every version was previously saved with no label, so the history read "Sparad version" all the
  * way down and two saves on the same day were impossible to tell apart. */
-function SaveVersionDialog({ next, save, close }: { next: number; save: (label: string) => void; close: () => void }) {
+function SaveVersionDialog({ next, auto, save, close }: { next: number; auto: string; save: (label: string) => void; close: () => void }) {
   const [label, setLabel] = useState('');
   return (
     <Modal title={`Spara v${next}`} close={close}>
@@ -97,7 +99,7 @@ function SaveVersionDialog({ next, save, close }: { next: number; save: (label: 
         <input autoFocus aria-label="Versionsetikett" value={label} onChange={e => setLabel(e.target.value)}
           placeholder="t.ex. innan omskrivningen av inloggningen"
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(label); } }} />
-        <small>{t.version.labelHint}</small>
+        <small>{t.version.labelHint} {t.version.autoLabelHint(auto)}</small>
       </label>
       <div className="dialog-actions">
         <button onClick={close}>Avbryt</button>
@@ -141,6 +143,9 @@ export function App({ storage }: { storage: StorageProvider }) {
   const findings = useScanner(mode === 'template' ? template : '', rules, dismissed, language);
   const [pasteRange, setPasteRange] = useState<PasteRange | null>(null), [hoverFinding, setHoverFinding] = useState<Finding | null>(null);
   const [focusRange, setFocusRange] = useState<{ start: number; end: number; nonce: number }>();
+  /** The pill card, with the text it was opened in: an edit or a view change makes its span a
+   * guess, so the card is shown only while the text is the one it was clicked in. */
+  const [chip, setChip] = useState<{ name: string; start: number; end: number; x: number; y: number; text: string } | null>(null);
   const [hold, setHold] = useState<ClipboardHold | null>(null), [armed, setArmed] = useState(false);
   const overview = useRef<HTMLDivElement>(null), overviewScroll = useRef(0);
   const navigateRef = useRef<(hash: string, replace?: boolean) => Promise<void>>(async () => {});
@@ -233,6 +238,14 @@ export function App({ storage }: { storage: StorageProvider }) {
   const copyFindings = copyMode === 'ai' ? scan(template, rules).filter(f => !dismissed.has(f.fingerprint)) : [];
   const seriousFindings = copyFindings.filter(f => f.severity === 'critical' || f.severity === 'high').length;
   const visible = mode === 'template' ? template : mode === 'ai' ? ai.text : local.text;
+  const openChip = chip && chip.text === visible ? chip : null;
+  /** What "Spara version" writes when the label is left empty: the line diff against the version
+   * the draft builds on, or the size of the file when there is nothing to diff against. */
+  const autoLabel = useMemo(() => {
+    const base = versions.find(v => v.id === session.baseVersionId);
+    if (base) return formatStats(diffTemplates(base.templates, session.texts));
+    return t.version.firstLabel(Object.values(session.texts).reduce((n, text) => n + (text ? text.split('\n').length : 0), 0));
+  }, [versions, session.baseVersionId, session.texts]);
   const issues = useMemo(() => collectIssues(template, local, ai), [template, local, ai]);
   const used = useMemo(() => usage(template), [template]);
   /** Where the review panel is pointing: every candidate faintly, the hovered one clearly. Only
@@ -302,7 +315,17 @@ export function App({ storage }: { storage: StorageProvider }) {
   }
   async function saveVersion(label: string) {
     setLabelling(false);
-    await run(() => controller.saveVersion(label.trim()));
+    await run(() => controller.saveVersion(label.trim() || autoLabel));
+  }
+  /** Writes the value back where one placeholder stands — this occurrence, not every one, which
+   * is what deleting the binding does. Only in the template, where the span is the text's own. */
+  function unbindChip(target: { name: string; start: number; end: number }, value: string) {
+    if (mode !== 'template' || template.slice(target.start, target.end) !== `{{${target.name}}}`) return;
+    const before = template;
+    setChip(null);
+    controller.changeText(template.slice(0, target.start) + value + template.slice(target.end));
+    setNotice(t.chip.unbound(target.name));
+    offerUndo({ label: t.chip.unboundUndo(target.name), restore: async () => { controller.changeText(before); await controller.flush(); } });
   }
   function changeTheme(next: ThemeChoice) {
     setTheme(next); applyTheme(next);
@@ -880,7 +903,7 @@ export function App({ storage }: { storage: StorageProvider }) {
           <div className="editor-body" id="kodvy" role="tabpanel" aria-labelledby={`vy-${mode}`}>{!template && mode === 'template' && <div className="paste-prompt"><strong>{t.workspace.pasteHere}</strong><span>{t.workspace.pasteHereHint}</span>{samples[language] && <button className="text-button" onClick={() => controller.changeText(samples[language]!)}>{t.workspace.trySample}</button>}</div>}
             <Editor key="primary-editor" documentKey={`${session.key}:${session.activeFileId}:${mode}`} active={workspaceVisible} autoFocus value={visible} language={language} readOnly={busy || mode !== 'template'} onChange={text => { if (pasted(text)) { noteLanguage(text); notePaste(template, text); void screenForBlocklist(text); } controller.changeText(text); }} onBinding={createBinding}
               onPlaceholder={name => { setFocusName(name); const b = resolveBinding(name, bindings, options.projectId, options.versionId); if (b) setBindingDialog({ binding: b }); }} describePlaceholder={name => { const b = resolveBinding(name, bindings, options.projectId, options.versionId); return b && { category: b.category, aiReplacement: b.aiReplacement, hasValue: Boolean(resolveValue(b, options.profileId)) }; }} theme={resolvedTheme} placeholderNames={activeBindings.map(b => b.name)} substitutions={mode === 'template' ? noSubstitutions : mode === 'ai' ? ai.substitutions : local.substitutions} highlights={highlights} focusName={focusName} focusLine={focusLine} focusRange={focusRange} onLine={line => { currentLine.current = line; }}
-              fontSize={fontSize} wordWrap={wrap} onSelectionChange={setSelected} onFocused={() => setFocusName('')} />
+              fontSize={fontSize} wordWrap={wrap} onSelectionChange={setSelected} onFocused={() => setFocusName('')} onChip={c => setChip({ ...c, text: visible })} />
           </div><div className="editor-footer"><span>{t.workspace.lines(visible.split('\n').length)} · {t.workspace.bindingCount(used.length)}</span>
             <div className="editor-tools" role="group" aria-label={t.workspace.editorSettings}>
               <button aria-label={t.workspace.smallerText} title={t.workspace.smallerText} disabled={fontSize <= 10} onClick={() => void changeEditor({ editorFontSize: fontSize - 1 }).catch(() => {})}>A−</button>
@@ -985,7 +1008,14 @@ export function App({ storage }: { storage: StorageProvider }) {
         await storage.deleteProfile(profile.id);
         setProfiles(await storage.listProfiles()); setBindings(await storage.listBindings()); await controller.reloadSettings();
       }} />}
-    {labelling && <SaveVersionDialog next={Math.max(0, ...versions.map(v => v.number)) + 1} save={label => void saveVersion(label)} close={() => setLabelling(false)} />}
+    {labelling && <SaveVersionDialog next={Math.max(0, ...versions.map(v => v.number)) + 1} auto={autoLabel} save={label => void saveVersion(label)} close={() => setLabelling(false)} />}
+    {openChip && (() => {
+      const binding = resolveBinding(openChip.name, bindings, options.projectId, options.versionId);
+      const value = binding && resolveValue(binding, options.profileId);
+      return <ChipPopover chip={openChip} binding={binding} value={value} line={visible.slice(0, openChip.start).split('\n').length}
+        close={() => setChip(null)} edit={() => { setChip(null); if (binding) setBindingDialog({ binding }); }}
+        unbind={mode === 'template' && value ? () => unbindChip(openChip, value) : undefined} />;
+    })()}
     {confirmDialog}
     {undoBar}
     {toasts}

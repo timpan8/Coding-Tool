@@ -42,4 +42,7 @@ export interface EditorProps {
   /** Fires once `focusName` has actually been revealed, so the caller can clear the request.
    * `focusName` is a command, not state: left standing it would be re-applied on every edit. */
   onFocused?: () => void;
+  /** A click on the badge a placeholder or a substituted value carries, with the placeholder's
+   * span in the current text and where on screen the click was, so a card can open beside it. */
+  onChip?: (chip: { name: string; start: number; end: number; x: number; y: number }) => void;
 }

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from
 import type { LanguageId, ProjectFile, Version } from '../../types/models';
 import { Editor } from '../editor/Editor';
 import { Modal } from './Modal';
-import { changedLines } from './VersionPanel';
+import { changedLineCount, diffStats, formatStats } from '../../domain/diff';
 import type { ResolvedTheme } from '../theme';
 import { t } from '../text';
 
@@ -64,7 +64,8 @@ export function VersionViewer({
   const file = files.find(f => f.id === fileId);
   const modified = version.templates[fileId] ?? '';
   const original = compareTo ? (compareTo.templates[fileId] ?? '') : modified;
-  const delta = compareTo ? changedLines({ [fileId]: original }, { [fileId]: modified }) : 0;
+  const stats = compareTo ? diffStats(original, modified) : null;
+  const delta = stats ? changedLineCount(stats) : 0;
 
   // A six-line diff in a fixed 480px box left two thirds of it blank. Monaco lays out to its
   // container, so the container is what has to know how tall the content is. Word wrap means
@@ -95,7 +96,7 @@ export function VersionViewer({
           <span className="version-file-name">{file?.name ?? ''}</span>
         )}
         <span className="version-delta">
-          {compareTo ? (delta ? t.version.changedLines(delta) : t.version.identical) : t.version.readOnlyView(version.number)}
+          {stats ? (delta ? `${formatStats(stats)} · ${t.version.changedLines(delta)}` : t.version.identical) : t.version.readOnlyView(version.number)}
         </span>
       </div>
 
