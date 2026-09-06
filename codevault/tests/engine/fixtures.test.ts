@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { applyProposals, reapply, type ReapplyInput, type SlotProposal } from '@engine/reapply'
 import { parseTemplate, render } from '@engine/template'
+import { guard } from '@engine/guard'
 import { createField } from '@engine/fields'
 import type { Field, FieldKind } from '@engine/types'
 
@@ -177,8 +178,32 @@ describe('re-apply fixture corpus', () => {
         expect(render(segments, 'example', { fields: allFields, plain }).text).toBe(fx.paste)
       }
       if (fx.real !== undefined) {
-        expect(render(segments, 'real', { fields: allFields, real: realMap, plain }).text).toBe(fx.real)
+        const realText = render(segments, 'real', { fields: allFields, real: realMap, plain }).text
+        expect(realText).toBe(fx.real)
+        // The guard must catch the real values in the real rendering.
+        const g = guard({ text: realText, fields: [...allFields.values()], real: realMap, language: plain ? 'plain' : 'powershell' })
+        expect(g.findings.filter((f) => f.pass === 1).length).toBeGreaterThan(0)
       }
+      // Corpus invariant: once every unknown real value is resolved, the sanitized
+      // rendering never contains a real value or a residual marker. Editor-mode
+      // fixtures with unresolved unknowns are exactly the case the guard must block.
+      const exampleText = render(segments, 'example', { fields: allFields, plain }).text
+      if (result.unknown.length > 0) {
+        const blocked = guard({ text: exampleText, fields: [...allFields.values()], real: realMap, language: plain ? 'plain' : 'powershell' })
+        expect(blocked.blocked, 'guard must block while unknown real values remain').toBe(true)
+        return
+      }
+      const g = guard({
+        text: exampleText,
+        fields: [...allFields.values()],
+        real: realMap,
+        ...(fx.config.retired ? { retired: fx.config.retired } : {}),
+        language: plain ? 'plain' : 'powershell',
+      })
+      expect(
+        g.findings.filter((f) => f.pass !== 2).map((f) => `${f.pass}:${f.reason}:${f.matched}`),
+        `guard on sanitized rendering:\n${exampleText}`,
+      ).toEqual([])
     })
   }
 
