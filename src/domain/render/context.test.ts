@@ -241,6 +241,10 @@ function referenceContextAt(source: string, position: number, language: Language
 }
 
 describe('contextAt · the single pass agrees with the old scan-per-position', () => {
+  // Frozen on purpose: these are the languages the reference implementation knew. A language added
+  // after it cannot be compared against it — the reference has no opinion about C#'s verbatim
+  // strings or Go's backticks, so adding one here would fail for a reason that is not a bug. New
+  // languages are covered by their own case tests and by the batching property below.
   const languages: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'dotenv', 'hcl', 'sql', 'plaintext'];
   // Chosen for what the lexer branches on, so a random source lands inside strings, comments,
   // here-documents and escapes rather than in plain prose.
@@ -275,5 +279,30 @@ describe('contextAt · the single pass agrees with the old scan-per-position', (
     expect(batch[0]).toEqual({ quote: '"' });
     expect(batch[1].blocked).toBeTruthy();
     expect(batch[2]).toEqual(batch[0]);
+  });
+});
+
+/** The half of the rewrite that does apply to every language, old and new: asking for many
+ * positions in one pass must give the same answers as asking for each on its own. */
+describe('contextsAt · batching is invisible, in every language', () => {
+  const all: LanguageId[] = ['powershell', 'javascript', 'typescript', 'python', 'json', 'xml', 'yaml', 'shell', 'dotenv', 'hcl', 'sql', 'csharp', 'go', 'java', 'dockerfile', 'ini', 'toml', 'plaintext'];
+  const pieces = ['"', SQ, '`', BS, '@"', '$"', '"""', '#', ';', '//', '/*', '*/', '--', 'x = ', NL, '  ', '${', '}', 'a', 'RUN ', 'ENV K=', '[s]'];
+
+  it('agrees with one call per position', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom(...pieces), { minLength: 1, maxLength: 40 }).map((parts) => parts.join('')),
+        fc.constantFrom(...all),
+        fc.array(fc.nat(300), { minLength: 1, maxLength: 12 }),
+        (source, language, raw) => {
+          const positions = raw.map((n) => n % (source.length + 1));
+          const batch = contextsAt(source, positions, language);
+          positions.forEach((position, index) => {
+            expect(batch[index]).toEqual(contextAt(source, position, language));
+          });
+        },
+      ),
+      { numRuns: 5000 },
+    );
   });
 });

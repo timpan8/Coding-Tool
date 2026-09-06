@@ -23,6 +23,11 @@ describe('detectLanguage', () => {
     ['DATABASE_URL=postgres://localhost/app\nAPI_KEY=abc123\n', 'dotenv'],
     ['resource "aws_db_instance" "main" {\n  password = "hunter2"\n}\n', 'hcl'],
     ['SELECT id, name FROM users WHERE token = \'abc\';\n', 'sql'],
+    ['using System;\n\nnamespace App { }\n', 'csharp'],
+    ['package main\n\nfunc main() {}\n', 'go'],
+    ['package com.example;\n\nimport java.util.List;\n', 'java'],
+    ['FROM node:22-alpine\nENV KEY=value\nRUN npm ci\n', 'dockerfile'],
+    ['[database]\nuser = "app"\nport = 5432\n', 'toml'],
   ])('recognises %s', (code, expected) => {
     expect(detectLanguage(code)).toBe(expected);
   });
@@ -38,6 +43,19 @@ describe('detectLanguage', () => {
     for (const name of ['.env', '.env.local', '.env.production']) expect(languageForFile(name)).toBe('dotenv');
     expect(languageForFile('main.tf')).toBe('hcl');
     expect(languageForFile('seed.sql')).toBe('sql');
+    expect(languageForFile('Program.cs')).toBe('csharp');
+    expect(languageForFile('main.go')).toBe('go');
+    expect(languageForFile('App.java')).toBe('java');
+    expect(languageForFile('pyproject.toml')).toBe('toml');
+    expect(languageForFile('setup.cfg')).toBe('ini');
+    for (const name of ['Dockerfile', 'Dockerfile.prod', 'api.Dockerfile']) expect(languageForFile(name)).toBe('dockerfile');
+  });
+
+  it('does not call a Java import Python', () => {
+    // `import ` matched Python's marker first, so a Java file was detected as Python — and the
+    // language is what decides how a value is escaped.
+    expect(detectLanguage('import java.util.List;\n\nclass A {}\n')).toBe('java');
+    expect(detectLanguage('import os\n\ndef main():\n    pass\n')).toBe('python');
   });
 
   it('does not mistake a single shell assignment for a dotenv file', () => {

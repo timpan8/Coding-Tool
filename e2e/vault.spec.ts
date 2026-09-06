@@ -689,6 +689,36 @@ test('lists every binding in the vault, including global ones', async ({ page })
   await expect(page.locator('.empty-binding-list')).toBeVisible();
 });
 
+// Report F13, the config half. A Dockerfile is where a build secret gets written down, and RUN is
+// the line where escaping cannot be promised — the shell parses it after the builder has.
+test('refuses a placeholder on a Dockerfile RUN line but takes one in ENV', async ({ page }) => {
+  await page.getByLabel('Språk', { exact: true }).selectOption('dockerfile');
+  await type(page, 'FROM alpine\nENV TOKEN="abc123"\n');
+  await bind(page, 'abc123', 'real-token-value', 'secret');
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.locator('.editor-body')).not.toContainText('real-token-value');
+
+  await page.getByRole('tab', { name: 'Mall' }).click();
+  await page.locator('.code-editor').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('RUN echo "{{TOKEN}}"\n');
+  await expect(page.locator('.issue-panel')).toContainText('RUN, CMD, ENTRYPOINT och SHELL');
+});
+
+// Report F13, the C family. A verbatim string is where a Windows path lives, and it is the one
+// place in C# where escaping the backslash would corrupt the value rather than protect it.
+test('leaves the backslash alone in a C# verbatim string', async ({ page }) => {
+  await page.getByLabel('Språk', { exact: true }).selectOption('csharp');
+  await type(page, 'var path = @"C:\\Temp\\Secret";\n');
+  await bind(page, 'Secret', 'C:\\Temp\\Real Value', 'infrastructure');
+
+  await page.getByRole('tab', { name: 'Local' }).click();
+  await page.getByRole('button', { name: 'Visa värden' }).click();
+  const shown = (await page.locator('.editor-body').innerText()).replace(/\u00a0/g, ' ');
+  // Not C:\\Temp: a verbatim string has no escape sequences, so doubling would be written literally.
+  expect(shown).toContain('C:\\Temp\\Real Value');
+});
+
 // Report F13. Adding a language means adding its escaping rule, or values fall through to the
 // generic one and are escaped for the wrong syntax. This is the end-to-end half of that.
 test('handles a Terraform file end to end, interpolation and all', async ({ page }) => {

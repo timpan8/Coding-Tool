@@ -1,7 +1,13 @@
 /* eslint-disable no-control-regex -- Escaping control characters is this module's purpose. */
 import type { LanguageId } from '../../types/models';
 
-export interface Context { quote: string; blocked?: string }
+export interface Context {
+  quote: string;
+  blocked?: string;
+  /** A string where a backslash is literal and the quote is escaped by doubling it: C#'s @"…".
+   * Go's raw string is told apart by its backtick, so it needs no flag. */
+  verbatim?: boolean;
+}
 /** A conservative lexer over original source (never over substituted private values).
  * Comments, escaped quotes, PS here strings and Python raw/triple strings are tracked.
  * Contexts we cannot reliably escape are blocked rather than guessed.
@@ -33,13 +39,20 @@ export function contextsAt(source: string, positions: number[], language: Langua
       results[index] = resolve(state, source, position, language);
     }
   };
-  const state: State = { here: '', quote: '', lineComment: false, blockComment: false, raw: false, triple: false, regex: false, dollarUntil: -1 };
+  const state: State = { here: '', quote: '', lineComment: false, blockComment: false, raw: false, triple: false, regex: false, dollarUntil: -1, verbatim: false, stringBlock: '' };
   scan(source, language, Math.min(Math.max(0, ...positions), source.length), state, record);
   record(state, Infinity);
   return results;
 }
 
-interface State { here: string; quote: string; lineComment: boolean; blockComment: boolean; raw: boolean; triple: boolean; regex: boolean; dollarUntil: number }
+interface State {
+  here: string; quote: string; lineComment: boolean; blockComment: boolean; raw: boolean; triple: boolean;
+  regex: boolean; dollarUntil: number;
+  /** Inside a string a backslash does not escape: C# @"…" and Go `…`. */
+  verbatim: boolean;
+  /** Why the string currently open cannot be substituted into, cleared when it closes. */
+  stringBlock: string;
+}
 
 function xmlContext(source: string, position: number): Context {
   // XML has no strings to be inside, but it does have two regions where escaping would be wrong:
@@ -61,13 +74,20 @@ function scan(source: string, language: LanguageId, until: number, s: State, rec
   // Which characters actually open a string differs, and getting it wrong is not cosmetic: an
   // apostrophe in an HCL comment would otherwise open a string that never closes, and a SQL double
   // quote encloses an identifier rather than a value.
-  const quotes = language === 'hcl' ? '"' : language === 'sql' ? "'" : language === 'dotenv' ? '"\'' : null;
+  const cFamily = language === 'csharp' || language === 'go' || language === 'java';
+  const quotes = language === 'hcl' ? '"' : language === 'sql' ? "'" : language === 'dotenv' ? '"\''
+    // In C#, Go and Java an apostrophe opens a character literal, not a string. Treating it as a
+    // quote would leave the lexer inside a string that never closes and misread the rest of the file.
+    : language === 'go' ? '"`' : cFamily ? '"'
+      // Quoting is a convention in INI, not syntax: a parser may strip the quotes or keep them, and
+      // there is no escape either way. Nothing opens a string, so a quote is an ordinary character.
+      : language === 'ini' ? '' : language === 'toml' ? '"\'' : language === 'dockerfile' ? '"\'' : null;
   for (let i = 0; i < until; i++) {
     record(s, i);
       const c = source[i], next = source[i + 1];
       const lineStart = i === 0 || source[i - 1] === '\n';
       if (s.here) {
-        // PowerShell closes with "@ or '@; a shell s.here-document closes with the word alone on a line.
+        // PowerShell closes with "@ or '@; a shell here-document closes with the word alone on a line.
         if (lineStart && language === 'powershell' && source.startsWith(s.here + '@', i)) { s.here = ''; i++; }
         else if (lineStart && language === 'shell') {
           const line = source.slice(i, source.indexOf('\n', i) === -1 ? undefined : source.indexOf('\n', i));
@@ -89,13 +109,15 @@ function scan(source: string, language: LanguageId, until: number, s: State, rec
         // Where a backslash escapes the next character. Not in a POSIX single-quoted string, not in
         // a dotenv single-quoted string, and not in SQL, where the standard escape is a doubled
         // apostrophe and a backslash stands for itself.
-        const literal = (language === 'shell' || language === 'dotenv') && s.quote === "'";
+        const literal = ((language === 'shell' || language === 'dotenv' || language === 'toml') && s.quote === "'") || s.verbatim;
         if ((language === 'powershell' && s.quote === '"' && c === '`')
           || (language !== 'powershell' && language !== 'sql' && !literal && c === '\\')) { i++; continue; }
         if ((language === 'powershell' || language === 'yaml' || language === 'sql') && s.quote === "'" && c === "'" && next === "'") { i++; continue; }
+        // @"…" writes a quote by doubling it, so "" is one character rather than a close and reopen.
+        if (language === 'csharp' && s.verbatim && c === '"' && next === '"') { i++; continue; }
         if (c === s.quote) {
-          if (s.triple) { if (source.slice(i, i + 3) === s.quote.repeat(3)) { i += 2; s.quote = ''; s.triple = false; s.raw = false; } }
-          else { s.quote = ''; s.raw = false; }
+          if (s.triple) { if (source.slice(i, i + 3) === s.quote.repeat(3)) { i += 2; s.quote = ''; s.triple = false; s.raw = false; s.verbatim = false; s.stringBlock = ''; } }
+          else { s.quote = ''; s.raw = false; s.verbatim = false; s.stringBlock = ''; }
         }
         continue;
       }
@@ -125,25 +147,91 @@ function scan(source: string, language: LanguageId, until: number, s: State, rec
       if (language === 'powershell' && c === '<' && next === '#') { s.blockComment = true; i++; continue; }
       if (['javascript', 'typescript'].includes(language) && c === '/' && next === '*') { s.blockComment = true; i++; continue; }
       if (['javascript', 'typescript'].includes(language) && c === '/' && next === '/') { s.lineComment = true; i++; continue; }
-      if (['powershell', 'python', 'shell', 'yaml', 'dotenv', 'hcl'].includes(language) && c === '#') { s.lineComment = true; continue; }
+      if (['powershell', 'python', 'shell', 'yaml', 'dotenv', 'hcl', 'toml'].includes(language) && c === '#') { s.lineComment = true; continue; }
+      // INI takes both markers. A Dockerfile takes a comment only where the line begins, so a hash
+      // inside a value stays an ordinary character.
+      if (language === 'ini' && (c === '#' || c === ';')) { s.lineComment = true; continue; }
+      if (language === 'dockerfile' && c === '#' && /^[ \t]*$/.test(source.slice(source.lastIndexOf('\n', i - 1) + 1, i))) { s.lineComment = true; continue; }
       if (language === 'hcl' && c === '/' && next === '*') { s.blockComment = true; i++; continue; }
       if (language === 'hcl' && c === '/' && next === '/') { s.lineComment = true; i++; continue; }
       if (language === 'sql' && c === '/' && next === '*') { s.blockComment = true; i++; continue; }
       if (language === 'sql' && c === '-' && next === '-') { s.lineComment = true; i++; continue; }
-      if (quotes ? quotes.includes(c) : c === '"' || c === "'" || (['javascript', 'typescript'].includes(language) && c === '`')) {
+      if (cFamily && c === '/' && next === '*') { s.blockComment = true; i++; continue; }
+      if (cFamily && c === '/' && next === '/') { s.lineComment = true; i++; continue; }
+      if (quotes !== null ? quotes.includes(c) : c === '"' || c === "'" || (['javascript', 'typescript'].includes(language) && c === '`')) {
         s.quote = c;
         if (language === 'python') {
-          const prefix = /([rRuUfFbB]{1,2})$/.exec(source.slice(0, i))?.[1] || '';
+          // The two characters before the quote, not a slice of the whole prefix: the pattern is
+          // anchored at the end and matches at most two, so this is the same answer without the
+          // O(n) copy that made every string in a long file cost the file's length.
+          const prefix = /([rRuUfFbB]{1,2})$/.exec(source.slice(Math.max(0, i - 2), i))?.[1] || '';
           s.raw = /[rfb]/i.test(prefix);
           s.triple = source.slice(i, i + 3) === c.repeat(3);
           if (s.triple) i += 2;
         }
+        if (cFamily) openCFamilyString(source, i, language, c, s);
+        if (language === 'toml' && source.slice(i, i + 3) === c.repeat(3)) {
+          s.triple = true;
+          s.stringBlock = 'Flerradig TOML-sträng: den trimmar en inledande radbrytning och tolkar bakstreck vid radslut. Använd en enradig sträng.';
+        }
+        // A triple quote consumes its two extra characters whatever the language.
+        if (s.triple && language !== 'python') i += 2;
       }
   }
 }
 
+/** The C family's string prefixes, which decide whether a backslash escapes and whether the string
+ * can be substituted into at all.
+ *
+ * C# has four openers that all start a string of some kind, and they matter:
+ *   "…"    ordinary, backslash escapes
+ *   @"…"   verbatim, backslash is literal, a quote is written by doubling it
+ *   $"…"   interpolated — and C# reads {{ as an escaped {, so a placeholder written {{NAME}} would
+ *          be read by the language as the literal text {NAME}. The tool's own syntax collides with
+ *          the language's, which is not something escaping can fix, so it is refused.
+ *   """…""" raw, whose delimiter length is decided by the opening run. Refused.
+ *
+ * Java has "…" and the """…""" text block, whose value depends on the indentation of the closing
+ * delimiter. Refused. Go's raw string is opened by a backtick and needs nothing here. */
+function openCFamilyString(source: string, i: number, language: LanguageId, quote: string, s: State) {
+  if (quote === '`') { s.verbatim = true; return; }
+
+  if ((language === 'csharp' || language === 'java') && source.slice(i, i + 3) === '"""') {
+    s.triple = true;
+    s.stringBlock = language === 'csharp'
+      ? 'Rå stränglitteral i C#: avgränsarens längd bestäms av öppningen. Använd en vanlig eller verbatim sträng.'
+      : 'Java text block: värdet beror på indraget vid den avslutande avgränsaren. Använd en vanlig sträng.';
+    return;
+  }
+  if (language !== 'csharp') return;
+
+  const before = source[i - 1], twoBefore = source[i - 2];
+  const interpolated = before === '$' || (before === '@' && twoBefore === '$');
+  if (before === '@' || (before === '$' && twoBefore === '@')) s.verbatim = true;
+  if (interpolated) {
+    s.stringBlock = 'Interpolerad C#-sträng: språket läser {{ som ett escapat {, så platshållaren skulle sväljas. Använd en vanlig sträng.';
+  }
+}
+
 /** The old function's tail: turn the state at a position into an answer. */
+/** RUN, CMD, ENTRYPOINT and SHELL hand their line to a shell, which parses it a second time after
+ * the builder has expanded variables and joined continuations. Escaping correctly for both at once
+ * is not something this lexer can promise, so a placeholder there is refused. */
+function dockerShellLine(source: string, position: number): boolean {
+  let start = source.lastIndexOf('\n', position - 1) + 1;
+  // A backslash at the end of the previous line continues it, so walk back to the instruction.
+  while (start > 0) {
+    const previous = source.slice(source.lastIndexOf('\n', start - 2) + 1, start - 1);
+    if (!previous.trimEnd().endsWith('\\')) break;
+    start = source.lastIndexOf('\n', start - 2) + 1;
+  }
+  return /^\s*(RUN|CMD|ENTRYPOINT|SHELL)\b/i.test(source.slice(start, position));
+}
+
 function resolve(s: State, source: string, position: number, language: LanguageId): Context {
+  if (language === 'dockerfile' && dockerShellLine(source, position)) {
+    return { quote: s.quote, blocked: 'RUN, CMD, ENTRYPOINT och SHELL tolkas av ett skal efter byggaren. Lägg värdet i ett ENV eller ARG i stället.' };
+  }
   if (language === 'yaml') {
     const block = yamlBlockScalar(source, position);
     if (block) return block;
@@ -153,6 +241,7 @@ function resolve(s: State, source: string, position: number, language: LanguageI
     ? 'Here-document: inget är citerat där, så escaping skulle förvanska värdet. Flytta det till en citerad sträng.'
     : 'PowerShell here-string: flytta värdet till en vanlig citerad sträng.' };
   if (s.regex) return { quote: '', blocked: 'Platshållare i ett reguljärt uttryck stöds inte. Bygg uttrycket av en citerad sträng i stället.' };
+  if (s.stringBlock) return { quote: s.quote, blocked: s.stringBlock };
   if (s.raw || s.triple) return { quote: s.quote, blocked: 'Python raw-, f-, byte- eller trippelsträng: använd en vanlig sträng.' };
   if (s.blockComment || s.lineComment) return { quote: '', blocked: 'Platshållaren finns i en kommentar. Använd raw-läge endast efter granskning.' };
   // Do not attempt to parse nested template expressions or Bash command substitutions. Both look
@@ -160,7 +249,7 @@ function resolve(s: State, source: string, position: number, language: LanguageI
   // the other half of the quadratic cost.
   if (s.quote === '`' && unclosed(source, position, '${', '}')) return { quote: s.quote, blocked: 'Platshållare inuti JavaScript-uttryck stöds inte automatiskt.' };
   if (language === 'shell' && s.quote === '"' && unclosed(source, position, '$(', ')')) return { quote: s.quote, blocked: 'Platshållare i kommandosubstitution stöds inte.' };
-  return { quote: s.quote };
+  return s.verbatim ? { quote: s.quote, verbatim: true } : { quote: s.quote };
 }
 
 /** True when `open` appears before `position` with no `close` between: the equivalent of the
@@ -217,6 +306,53 @@ export function escapeValue(value: string, language: LanguageId, context: Contex
     if (q === '"') return { text: JSON.stringify(value).slice(1, -1) };
     if (q === "'") return /[\r\n]/.test(value) ? { text: '', error: 'YAML med radbrytning behöver en dubbelciterad sträng.' } : { text: value.replace(/'/g, "''") };
     return { text: JSON.stringify(value) };
+  }
+  if (language === 'csharp' || language === 'java') {
+    if (q !== '"') return { text: '', error: 'Värdet måste ligga i en sträng. En apostrof omger ett teckenliterall, inte ett värde.' };
+    // @"…" has no escape sequences at all; a quote is written by doubling it, which is exactly why
+    // it is used for Windows paths. Escaping the backslash there would write it into the value.
+    if (context.verbatim) return { text: value.replace(/"/g, '""') };
+    return { text: backslash(value, '"') };
+  }
+  if (language === 'go') {
+    // Everything between backticks is literal, so a value goes in as it stands — but a raw string
+    // has no way to write a backtick, and Go discards a carriage return inside one.
+    if (q === '`') {
+      if (value.includes('`')) return { text: '', error: 'En rå Go-sträng kan inte innehålla ett bakåtcitat. Använd en vanlig sträng med citattecken.' };
+      if (value.includes('\r')) return { text: '', error: 'Go tar bort vagnretur i en rå sträng. Använd en vanlig sträng med citattecken.' };
+      return { text: value };
+    }
+    if (q !== '"') return { text: '', error: 'Värdet måste ligga i en sträng. En apostrof omger ett teckenliterall, inte ett värde.' };
+    return { text: backslash(value, '"') };
+  }
+  if (language === 'toml') {
+    if (q === '"') return { text: backslash(value, '"') };
+    // '…' is a literal string: no escape sequences at all, which also means it can hold neither an
+    // apostrophe nor a newline.
+    if (q === "'") {
+      if (/['\r\n]/.test(value)) return { text: '', error: 'En TOML-litteralsträng kan varken innehålla apostrof eller radbrytning. Använd en dubbelciterad sträng.' };
+      return { text: value };
+    }
+    if (!/^-?\d+(?:\.\d+)?$/.test(value)) return { text: '', error: 'Ett ociterat TOML-värde måste vara ett tal, en boolean eller ett datum. Citera platshållaren.' };
+    return { text: value };
+  }
+  if (language === 'ini') {
+    // INI has no specification and no escaping. A parser may strip surrounding quotes or keep them,
+    // may end the value at a comment marker or not, and always trims trailing space. Only a value
+    // that survives every one of those readings can be substituted.
+    if (/["']/.test(value)) return { text: '', error: 'INI har ingen escaping, och olika läsare hanterar citattecken olika. Värdet kan inte skrivas säkert här.' };
+    if (/[\r\n]/.test(value)) return { text: '', error: 'Ett INI-värde slutar vid radslutet och kan inte innehålla radbrytning.' };
+    if (/[;#]/.test(value)) return { text: '', error: 'Många INI-läsare avslutar värdet vid ; eller #. Värdet kan inte skrivas säkert här.' };
+    if (value !== value.trim()) return { text: '', error: 'INI-läsare trimmar blanksteg runt värdet, så inledande eller avslutande mellanslag går förlorade.' };
+    return { text: value };
+  }
+  if (language === 'dockerfile') {
+    // The builder expands $VAR and ${VAR} in an ENV or ARG value whichever quotes surround it, so
+    // unlike a shell the single quote is no refuge and a dollar is refused outright.
+    if (value.includes('$')) return { text: '', error: 'Byggaren expanderar $ i ett ENV- eller ARG-värde oavsett citattecken. Värdet kan inte skrivas säkert här.' };
+    if (q) return { text: value.replace(/\\/g, '\\\\').replace(new RegExp(q, 'g'), `\\${q}`).replace(/\r/g, '\\r').replace(/\n/g, '\\n') };
+    if (/[\s"'\\#]/.test(value)) return { text: '', error: 'Ett ociterat Dockerfile-värde får inte innehålla blanksteg, citattecken, bakstreck eller #. Citera platshållaren.' };
+    return { text: value };
   }
   if (language === 'dotenv') {
     // Double quotes: most parsers expand $VAR and ${VAR} here, and which ones do is not knowable
