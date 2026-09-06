@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkspaceSnapshot } from '../../types/models';
 import { binding, project, version } from '../../test/fixtures/factories';
-import { parseSnapshot, planImport, toSnapshot, SNAPSHOT_VERSION } from './index';
+import { canDuplicate, parseSnapshot, planImport, toSnapshot, SNAPSHOT_VERSION, type EntityKind } from './index';
 
 const app = { version: '0.1.0', deviceId: 'device', deviceName: 'Test' };
 const settings = {
@@ -36,6 +36,11 @@ function workspace(): WorkspaceSnapshot {
     settings,
   };
 }
+const dataset = (): WorkspaceSnapshot['datasets'][number] => ({
+  id: '11111111-2222-3333-4444-555555555555', name: 'Kunder', description: '', scope: 'global', projectId: null,
+  sensitive: false, columns: [{ name: 'namn', type: 'string' }], rows: [['Anna']],
+  createdAt: '2026-09-05T12:00:00.000Z', updatedAt: '2026-09-05T12:00:00.000Z',
+});
 const empty = (): WorkspaceSnapshot => ({ projects: [], versions: [], drafts: [], bindings: [], profiles: [], datasets: [], rules: [], dismissals: [], settings });
 
 describe('export', () => {
@@ -108,6 +113,26 @@ describe('planImport', () => {
     const changed = { ...source, projects: [{ ...source.projects[0], name: 'Renamed' }] };
     const plan = planImport(toSnapshot(changed, 'full', app), source);
     expect(plan.entities.find((e) => e.kind === 'projekt')?.action).toBe('conflict');
+  });
+
+  // Datasets were written by importAll but never classified, so a dataset that differed from the
+  // vault's was neither counted nor offered as a choice: it resolved to 'keep' by default and the
+  // plan said nothing about it at all.
+  it('classifies a dataset the way it classifies everything else it will write', () => {
+    const source = workspace();
+    const withData = { ...source, datasets: [dataset()] };
+    expect(planImport(toSnapshot(withData, 'full', app), source).entities.find((e) => e.kind === 'dataset')?.action).toBe('add');
+    const changed = { ...withData, datasets: [{ ...dataset(), name: 'Andra namnet' }] };
+    expect(planImport(toSnapshot(changed, 'full', app), withData).entities.find((e) => e.kind === 'dataset')?.action).toBe('conflict');
+  });
+
+  // "Keep both" needs a fresh id nothing else points at. Where there is none the import keeps the
+  // vault's copy, and the dialog has to be able to say so — which it can only do if this list and
+  // IndexedDbProvider's rekeys agree. contract.test.ts pins the other half.
+  it('is honest about which kinds can be kept as a copy', () => {
+    const copyable: EntityKind[] = ['projekt', 'binding'], kept: EntityKind[] = ['version', 'utkast', 'profil', 'dataset', 'regel'];
+    expect(copyable.every(canDuplicate)).toBe(true);
+    expect(kept.some(canDuplicate)).toBe(false);
   });
 
   it('blocks a version whose project exists nowhere', () => {

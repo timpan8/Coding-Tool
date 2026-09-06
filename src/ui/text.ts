@@ -17,6 +17,18 @@
  *
  * shortcuts.ts is already one table, where each label belongs beside the key it describes. Moving
  * only the labels here would split one thing across two files. */
+/** The plan names its entity kinds in the singular, and a sentence that lists several of them needs
+ * the plural. Swedish makes four different plurals out of these seven words, so the forms are written
+ * down rather than derived. */
+const plurals: Record<string, string> = {
+  projekt: 'projekt', version: 'versioner', utkast: 'utkast', binding: 'bindings',
+  profil: 'profiler', dataset: 'dataset', regel: 'regler',
+};
+const plural = (kind: string) => plurals[kind] ?? kind;
+const swedishList = (items: string[]) => items.length < 2 ? items.join('')
+  : `${items.slice(0, -1).join(', ')} och ${items[items.length - 1]}`;
+const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 export const sv = {
   nav: {
     newCode: '＋ Ny kod',
@@ -24,6 +36,7 @@ export const sv = {
     shortcuts: 'Genvägar',
     showShortcuts: 'Visa kortkommandon',
     bindings: 'Bindings',
+    backup: 'Backup',
     security: 'Säkerhet',
     settings: 'Inställningar',
     main: 'Huvudnavigation',
@@ -164,7 +177,7 @@ export const sv = {
   },
   binding: {
     selectInTemplate: 'Markera värdet i Mall-vyn så att rätt förekomst kan identifieras.',
-    templateChanged: 'Mallen har ändrats. Bindingen är sparad; markera rätt text igen.',
+    templateChanged: 'Mallen har ändrats sedan du markerade. Ingenting sparades; markera värdet igen.',
     deleteTitle: (name: string) => `Radera ${name}?`,
     deleteConfirm: 'Radera bindingen',
     valueGone: 'Det privata värdet försvinner ur valvet.',
@@ -229,7 +242,10 @@ export const sv = {
     clearHint: 'Skriver över urklippet när tiden gått. Nedräkningen visas och går att avbryta. Urklippshistorik och molnsynk ligger utanför appens kontroll.',
     save: 'Spara inställningar',
     showIntro: 'Visa introduktionen igen',
-    backupNote: 'Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil nedan.',
+    backupNote: 'Utkast sparas automatiskt på den här datorn. Automatisk sparning är ingen backup — exportera en fil.',
+    backupHeading: 'Backup',
+    backupMoved: 'Export, återställning och rensning har en egen sida:',
+    backupLink: 'Backup',
   },
   bindingsPage: {
     title: 'Alla bindings',
@@ -398,6 +414,17 @@ export const sv = {
     fileUnreadable: 'Filen kunde inte läsas.',
     importDone: 'Importen är klar.',
     importFailed: 'Importen misslyckades. Valvet är oförändrat.',
+    clearHeading: 'Rensa',
+    clearIntro:
+      'Tar bort allt som hör till den här appen i den här webbläsaren: valvet, temavalet och den offline-kopia av appen som ligger i webbläsarens cache. Använd det innan du lämnar en delad dator, och exportera först om något ska sparas.',
+    clearButton: 'Rensa hela valvet',
+    clearTitle: 'Rensa hela valvet?',
+    clearConfirm: 'Rensa valvet',
+    clearProjects: (count: number) => `${count} projekt med all versionshistorik`,
+    clearBindings: (count: number) => `${count} ${count === 1 ? 'binding' : 'bindings'}, med sina privata värden`,
+    clearBrowser: 'Temavalet, avregistrering av service workern och dess cachade kopia av appen',
+    clearNotCovered:
+      'Det här ligger utanför: filer du redan exporterat, det som ligger i urklippet, och samma app på en annan adress, i en annan webbläsare eller på en annan dator.',
     clearLead: 'Allt på den här datorn raderas för alltid:',
     clearNoUndo: 'Det finns ingen ångra. Exportera en backup först om du kan behöva något av det igen.',
     cleared: 'Valvet är rensat.',
@@ -409,6 +436,27 @@ export const sv = {
     blocked: 'Importen är blockerad',
     keepBoth: 'Behåll båda — importera som kopia',
     keepVault: 'Behåll det som finns i valvet',
+    takeFile: 'Ta filens version',
+    onConflict: 'Vid krock',
+    applyMerge: 'Slå ihop med valvet',
+    applyReplace: 'Ersätt valvet med filen',
+    /** Only a project and a binding can be imported as a copy; the rest are pointed at by id or
+     * numbered within their project, so a second copy would refer to the wrong thing. The kinds
+     * come from the plan, so the sentence names exactly the ones this file would hit. */
+    keepBothLimited: (kinds: string[]) =>
+      `Behåll båda gäller projekt och bindings. ${capitalise(swedishList(kinds.map(plural)))} kan inte importeras som kopior — där behålls valvets version.`,
+    replaceMode: 'Ersätt hela valvet med filen i stället för att slå ihop',
+    replaceUnavailable:
+      'Filen innehåller bara privata värden. Att ersätta valvet med den skulle radera projekt, versioner och utkast utan att lägga tillbaka något, så ersätt-läget gäller bara en full export.',
+    replaceWarning:
+      'Valvet töms först. Allt som inte finns i filen är borta efteråt, och inga krockar uppstår eftersom ingenting finns kvar att krocka med.',
+    replaceTitle: 'Ersätta hela valvet?',
+    replaceConfirm: 'Ersätt valvet',
+    replaceLead: 'Valvet töms och fylls med filens innehåll:',
+    replaceProjects: (now: number, incoming: number) =>
+      `${now} projekt i valvet raderas, ${incoming} kommer från filen`,
+    replaceBindings: (now: number, incoming: number) =>
+      `${now} ${now === 1 ? 'binding' : 'bindings'} i valvet raderas, ${incoming} kommer från filen`,
   },
   versionPanel: {
     draftBasedOnThis: ' · utkastet bygger på den här',

@@ -9,7 +9,15 @@ export interface AppIdentity {
   deviceId: string;
   deviceName: string;
 }
-export type EntityKind = 'projekt' | 'version' | 'utkast' | 'binding' | 'profil' | 'regel';
+export type EntityKind = 'projekt' | 'version' | 'utkast' | 'binding' | 'profil' | 'dataset' | 'regel';
+/** The kinds an import can keep both copies of. A duplicate needs a fresh id that nothing else
+ * points at, and only these two have one: a project carries its own name, a binding its own
+ * placeholder. A version is numbered within its project and pointed at by `currentVersionId`; a
+ * draft is keyed by its project; a profile's values live inside the bindings that key them by its
+ * id; a dataset belongs to a project by id; a rule copied twice reports every finding twice. For
+ * those, "keep both" cannot mean what it says — so the import keeps the vault's copy, and the
+ * dialog says which kinds that applies to instead of quietly doing it. */
+export const canDuplicate = (kind: EntityKind) => kind === 'projekt' || kind === 'binding';
 export interface PlannedEntity {
   kind: EntityKind;
   id: string;
@@ -76,6 +84,7 @@ export function planImport(snapshot: Snapshot, current: WorkspaceSnapshot): Impo
   classify('version', versions, current.versions, (v) => `v${v.number}`);
   classify('binding', payload.bindings, current.bindings, (b) => b.name);
   classify('profil', payload.profiles, current.profiles, (p) => p.name);
+  classify('dataset', 'datasets' in payload ? payload.datasets : [], current.datasets, (d) => d.name);
   classify('regel', payload.rules, current.rules, (r) => r.name);
   for (const draft of drafts) {
     const match = current.drafts.find((d) => d.projectId === draft.projectId);

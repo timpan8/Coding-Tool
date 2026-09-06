@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { open } from './app';
+import { go, open } from './app';
 
 /** Browser-level tests against the real Monaco editor.
  *
@@ -126,7 +126,7 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await expect(page.locator('dialog[open]')).toHaveCount(0);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 
-  await page.evaluate(() => (location.hash = '#/settings'));
+  await go(page, 'Backup', '.backup-panel');
   const download = await Promise.race([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Exportera hela valvet' }).click().then(() => page.waitForEvent('download')),
@@ -144,7 +144,7 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await fresh.evaluate(() => (location.hash = '#/projects'));
   await expect(fresh.locator('.project-cards')).not.toContainText('Backup-provet');
 
-  await fresh.evaluate(() => (location.hash = '#/settings'));
+  await go(fresh, 'Backup', '.backup-panel');
   await fresh.getByLabel('Välj en exporterad fil').setInputFiles(file);
   await expect(fresh.locator('.import-plan')).toContainText('0 krockar');
   await fresh.getByRole('button', { name: 'Slå ihop med valvet' }).click();
@@ -155,6 +155,117 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await fresh.evaluate(() => (location.hash = '#/projects'));
   await expect(fresh.locator('.project-cards')).toContainText('Backup-provet');
   await restored.close();
+});
+
+// Punkt 8. Ersätt-läget fanns i lagret men UI:t skickade hårdkodat 'merge', så en fil kunde bara
+// slås ihop: det gick inte att komma tillbaka till exakt det valv filen beskriver. "Behåll båda"
+// föll dessutom tillbaka till "behåll valvets" för allt utom projekt och bindings, utan ett ord.
+test('replaces the vault with a file instead of merging into it', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await open(page);
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.getByRole('button', { name: 'Ändra projektnamn' }).click();
+  await page.getByLabel('Projektnamn').fill('Fanns i filen');
+  await page.getByLabel('Projektnamn').press('Enter');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await page.getByLabel('Versionsetikett').fill('exporterad');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  // '#/' means "new code", so getting back to this project has to be through its own route.
+  const projectUrl = page.url();
+
+  await go(page, 'Backup', '.backup-panel');
+  const download = await Promise.race([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Exportera hela valvet' }).click().then(() => page.waitForEvent('download')),
+  ]);
+  const file = test.info().outputPath('replace-source.json');
+  await download.saveAs(file);
+
+  // The vault moves on after the export: this project's draft changes, and a second project appears.
+  await page.goto(projectUrl);
+  await type(page, '$q = "efter exporten"\n');
+  await page.evaluate(() => (location.hash = '#/'));
+  await type(page, '$r = "annat projekt"\n');
+  await page.getByRole('button', { name: 'Ändra projektnamn' }).click();
+  await page.getByLabel('Projektnamn').fill('Fanns inte i filen');
+  await page.getByLabel('Projektnamn').press('Enter');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+
+  await go(page, 'Backup', '.backup-panel');
+  await page.getByLabel('Välj en exporterad fil').setInputFiles(file);
+  // "Keep both" says which kinds it will not apply to instead of quietly keeping the vault's copy.
+  await expect(page.locator('.import-plan')).toContainText('Utkast kan inte importeras som kopior');
+
+  await page.getByLabel('Ersätt hela valvet med filen i stället för att slå ihop').check();
+  await expect(page.locator('.import-plan')).toContainText('Valvet töms först');
+  await expect(page.locator('.import-plan')).not.toContainText('Vid krock');
+
+  await page.getByRole('button', { name: 'Ersätt valvet med filen' }).click();
+  const dialog = page.locator('dialog[open]');
+  await expect(dialog).toContainText('Ersätta hela valvet?');
+  await dialog.getByLabel(/Skriv ERSÄTT/).fill('ERSÄTT');
+  await dialog.getByRole('button', { name: 'Ersätt valvet' }).click();
+  await expect(page.locator('.import-result')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Ladda om appen' }).click();
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.evaluate(() => (location.hash = '#/projects'));
+  await expect(page.locator('.project-cards')).toContainText('Fanns i filen');
+  await expect(page.locator('.project-cards')).not.toContainText('Fanns inte i filen');
+  await context.close();
+});
+
+// Replacing the vault with a private export would clear the projects, versions and drafts and put
+// nothing back, because the file does not carry them.
+test('refuses to replace the vault with a file that holds only private values', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await go(page, 'Backup', '.backup-panel');
+  const download = await Promise.race([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Exportera bara privata värden' }).click().then(() => page.waitForEvent('download')),
+  ]);
+  const file = test.info().outputPath('private-only.json');
+  await download.saveAs(file);
+
+  await page.getByLabel('Välj en exporterad fil').setInputFiles(file);
+  await expect(page.getByLabel('Ersätt hela valvet med filen i stället för att slå ihop')).toBeDisabled();
+  await expect(page.locator('.import-plan')).toContainText('bara privata värden');
+});
+
+// Punkt 9. "Tar bort allt som hör till den här appen i den här webbläsaren" var inte sant: clearAll()
+// tömmer Dexie-tabellerna och ingenting annat. Temavalet låg kvar i localStorage och service workern
+// med sin cachade kopia av appen var kvar registrerad.
+test('clears what it says it clears, and says what it does not', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.getByLabel('Tema').selectOption('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect(await page.evaluate(() => localStorage.getItem('acv:theme'))).toBe('dark');
+
+  await go(page, 'Backup', '.backup-panel');
+  await page.getByRole('button', { name: 'Rensa hela valvet' }).click();
+  const dialog = page.locator('dialog[open]');
+  // The boundary of the claim belongs in the dialog rather than in the user's guess.
+  await expect(dialog).toContainText('Temavalet');
+  await expect(dialog).toContainText('filer du redan exporterat');
+  await dialog.getByLabel(/Skriv RENSA/).fill('RENSA');
+  await dialog.getByRole('button', { name: 'Rensa valvet' }).click();
+
+  // The clear reloads the page, and a vault with no settings meets the introduction again — which
+  // is the signal that the reload has landed and the assertions below read the new page.
+  await page.getByRole('button', { name: 'Hoppa över' }).click();
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  expect(await page.evaluate(() => localStorage.getItem('acv:theme'))).not.toBe('dark');
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'dark');
+  await page.evaluate(() => (location.hash = '#/projects'));
+  await expect(page.locator('.project-card')).toHaveCount(0);
+  await expect(page.locator('.empty-project-list')).toBeVisible();
 });
 
 // Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did
@@ -312,6 +423,48 @@ test('labels versions, compares them and deletes one', async ({ page }) => {
   await page.locator('dialog[open]').getByRole('button', { name: 'Radera versionen' }).click();
   await expect(page.locator('.version-history')).not.toContainText('första');
   await expect(page.locator('.version-history')).toContainText('andra');
+});
+
+// Punkt 11a. The name is derived from the variable to the left of the selection, so two lines that
+// assign to the same variable produced the same name twice. The second one was proposed anyway and
+// then rejected on save with "Namnet används redan i detta scope." — an error the user had not
+// caused and could not clear without inventing a name themselves.
+test('proposes a name that is free when the obvious one is taken', async ({ page }) => {
+  await type(page, '$username = "anna"\n$username = "bertil"\n');
+  await bind(page, 'anna', 'anna');
+
+  await page.getByText('bertil', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+  await expect(page.getByLabel('Bindingnamn', { exact: true })).toHaveValue('USERNAME_2');
+
+  // The preview follows the field. It used to keep showing the suggestion the dialog opened with,
+  // so a renamed binding previewed a placeholder that was never written.
+  await page.getByLabel('Bindingnamn', { exact: true }).fill('USERNAME_ALT');
+  await expect(page.locator('.binding-preview .after')).toContainText('{{USERNAME_ALT}}');
+
+  await page.getByLabel('Privat värde · standard').fill('bertil');
+  await page.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await expect(page.locator('.editor-body')).toContainText('{{USERNAME_ALT}}');
+  await expect(page.locator('.editor-body')).not.toContainText('bertil');
+});
+
+// The name rule is checked while the user types, not only when they press save, and a rejection
+// clears as soon as they start correcting it.
+test('says a name is taken while it is being typed, and stops saying so once it is fixed', async ({ page }) => {
+  await type(page, '$username = "anna"\n$host = "srv1"\n');
+  await bind(page, 'anna', 'anna');
+
+  await page.getByText('srv1', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+  await page.getByLabel('Bindingnamn', { exact: true }).fill('USERNAME');
+  await expect(page.locator('dialog[open]')).toContainText('Namnet används redan i detta scope.');
+
+  await page.getByLabel('Bindingnamn', { exact: true }).fill('HOSTNAME');
+  await expect(page.locator('dialog[open]')).not.toContainText('Namnet används redan i detta scope.');
+  await page.getByLabel('Privat värde · standard').fill('srv1');
+  await page.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
 });
 
 // Report F20. Double-clicking a value stops at a word boundary, so `Hunter2!` selected `Hunter2`

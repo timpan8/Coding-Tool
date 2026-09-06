@@ -2,8 +2,6 @@ import type { ScannerRule, Settings } from '../../types/models';
 import type { StorageProvider } from '../../storage/StorageProvider';
 import { formatBytes, requestPersistence, type StorageState } from '../../storage/persistence';
 import { RulesPanel } from './RulesPanel';
-import { BackupPanel } from './BackupPanel';
-import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
 import { t } from '../text';
 
 /** Report K-a. This lived as one 3.5 kB line inside App.tsx, which is why every settings change made
@@ -13,7 +11,7 @@ import { t } from '../text';
  * this asks for one through `save` and never touches storage for settings itself. */
 export function SettingsPage({
   settings, storage, storageInfo, onStorageInfo, deviceName, onDeviceName,
-  rules, onRules, save, notify, confirm, showIntro,
+  rules, onRules, save, notify, showIntro,
 }: {
   settings: Settings | null;
   storage: StorageProvider;
@@ -25,7 +23,6 @@ export function SettingsPage({
   onRules: () => void;
   save: (patch: Partial<Settings>) => Promise<void>;
   notify: (message: string) => void;
-  confirm: (request: ConfirmRequest) => Promise<ConfirmResult>;
   showIntro: () => void;
 }) {
   const persistence = !storageInfo ? t.settings.persistenceReading
@@ -89,6 +86,8 @@ export function SettingsPage({
     <p className="notice">{t.settings.backupNote}</p>
 
     <RulesPanel storage={storage} rules={rules} notify={notify} onChange={onRules} />
-    <BackupPanel storage={storage} notify={notify} confirm={confirm} />
+    {/* Backup has its own page now. The link stays because this is where it used to be. */}
+    <h3>{t.settings.backupHeading}</h3>
+    <p>{t.settings.backupMoved} <a href="#/backup">{t.settings.backupLink}</a></p>
   </article>;
 }
