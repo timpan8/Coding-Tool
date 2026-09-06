@@ -133,3 +133,10 @@ rätta det: bindingen måste gå att lösa upp här och värdet måste finnas kv
 med den markerade förekomsten, så ett unikt värde erbjöd sig att ersätta "alla identiska förekomster
 (1 st)". Att skriva om varje förekomst i filen är dessutom ett beslut, och förhandsvisningen ovanför
 rutan visar bara en rad av det.
+
+**Återmatchningen jämför mot mallen den ersätter.** Kod som kommer tillbaka med det riktiga värdet där
+platshållaren stod matchar ingen nivå, så rapporten löd "0 platshållare på plats, 0 att granska" och
+"Ersätt mallen" tog bort skyddet utan ett ord — den farligaste händelsen i hela rundturen, och den enda
+helt tysta. `ingest` tar nu emot den gamla mallen och räknar vilka platshållare som inte kom hem.
+Ersättningen tillåts fortfarande: koden är användarens, och en varning som blockerar är en varning som
+kringgås. Knappen säger däremot vad den gör.

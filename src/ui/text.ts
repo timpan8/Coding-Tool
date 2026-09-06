@@ -411,6 +411,13 @@ export const sv = {
     codeLabel: 'Kod från AI',
     summary: (applied: number, suggestions: number) => `${applied} platshållare på plats, ${suggestions} att granska`,
     replacesTemplate: 'Den öppna filens mall ersätts. Spara en version först om du vill kunna gå tillbaka.',
+    replace: 'Ersätt mallen',
+    replaceAnyway: 'Ersätt mallen ändå',
+    lostTitle: (count: number) => count === 1 ? 'En platshållare försvinner' : `${count} platshållare försvinner`,
+    lostItem: (name: string, occurrences: number) =>
+      `${name} — ${occurrences} ${occurrences === 1 ? 'förekomst' : 'förekomster'} i mallen, ingen i den nya koden`,
+    lostLead:
+      'Där platshållaren stod står nu något annat. Ersätter du mallen är värdet inte längre skyddat, och nästa Copy for AI skickar det som står där i stället.',
   },
   backup: {
     privateExported: 'Privata värden exporterade.',

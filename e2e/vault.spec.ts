@@ -368,6 +368,31 @@ test('puts a known value back behind its placeholder from the issue panel', asyn
   await expect(page.locator('.inline-notice')).toContainText('byttes mot platshållaren');
 });
 
+// Punkt 4. Den farligaste händelsen i hela rundturen, och tidigare helt tyst: AI:n ger tillbaka det
+// riktiga värdet där platshållaren stod. Ingenting matchar någon nivå, så rapporten löd "0
+// platshållare på plats, 0 att granska" och "Ersätt mallen" tog bort skyddet utan ett ord.
+test('says which placeholders the code from the AI no longer has', async ({ page }) => {
+  await type(page, '$host = "sql01.corp.local"\n');
+  await bind(page, 'sql01', 'sql01.corp.local', 'infrastructure');
+  await expect(page.locator('.editor-body')).toContainText('{{HOST}}');
+
+  await page.getByRole('button', { name: 'Klistra in från AI ↙' }).click();
+  await page.locator('textarea[aria-label="Kod från AI"]').fill('$host = "prod-sql-07.acme.internal"\n');
+  await expect(page.locator('dialog[open]')).toContainText('En platshållare försvinner');
+  await expect(page.locator('dialog[open]')).toContainText('HOST');
+
+  // The button says what it would do rather than reading like the ordinary path.
+  await page.getByRole('button', { name: 'Ersätt mallen ändå' }).click();
+  await expect(page.locator('.editor-body')).toContainText('prod-sql-07.acme.internal');
+
+  // And when everything comes home it says nothing at all.
+  await page.getByRole('button', { name: 'Klistra in från AI ↙' }).click();
+  await page.locator('textarea[aria-label="Kod från AI"]').fill('$host = "{{HOST}}"\n$port = 1433\n');
+  await expect(page.locator('dialog[open]')).not.toContainText('försvinner');
+  await page.getByRole('button', { name: 'Ersätt mallen', exact: true }).click();
+  await expect(page.locator('.editor-body')).toContainText('{{HOST}}');
+});
+
 // Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did
 // exist were native dialogs, two of which opened on top of an already open <dialog>.
 test('requires a typed confirmation before deleting a project', async ({ page }) => {

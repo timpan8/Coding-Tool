@@ -14,15 +14,19 @@ const tierLabel: Record<IngestDecision['tier'], string> = {
  * back by hand, which is where they get lost. */
 export function IngestDialog({
   bindings,
+  template,
   apply,
   close,
 }: {
   bindings: Binding[];
+  /** The template about to be replaced. Without it the dialog cannot tell that a placeholder went
+   * missing, which is the one outcome here that quietly undoes the protection. */
+  template: string;
   apply: (template: string) => void;
   close: () => void;
 }) {
   const [incoming, setIncoming] = useState('');
-  const result = useMemo(() => (incoming.trim() ? ingest(incoming, bindings) : null), [incoming, bindings]);
+  const result = useMemo(() => (incoming.trim() ? ingest(incoming, bindings, template) : null), [incoming, bindings, template]);
   const applied = result?.decisions.filter((d) => d.accepted).length ?? 0;
   const suggestions = result?.decisions.filter((d) => d.tier === 3) ?? [];
   const unknown = result?.decisions.filter((d) => d.tier === 1 && !d.accepted) ?? [];
@@ -59,6 +63,17 @@ export function IngestDialog({
               {result.decisions.length > 12 && <li>och {result.decisions.length - 12} till</li>}
             </ul>
           )}
+          {result.lost.length > 0 && (
+            <div className="import-problems" role="alert">
+              <strong>{t.ingest.lostTitle(result.lost.length)}</strong>
+              <ul>
+                {result.lost.map((lost) => (
+                  <li key={lost.bindingName}>{t.ingest.lostItem(lost.bindingName, lost.occurrences)}</li>
+                ))}
+              </ul>
+              <p>{t.ingest.lostLead}</p>
+            </div>
+          )}
           {suggestions.length > 0 && (
             <p className="inline-warning">
               Det som bara liknar ett AI-värde lämnas orört. En automatisk gissning här skulle skriva om din kod kring
@@ -71,8 +86,8 @@ export function IngestDialog({
       <p className="notice">{t.ingest.replacesTemplate}</p>
       <div className="dialog-actions">
         <button onClick={close}>Avbryt</button>
-        <button className="primary" disabled={!result} onClick={() => result && apply(result.template)}>
-          Ersätt mallen
+        <button className={result?.lost.length ? 'danger' : 'primary'} disabled={!result} onClick={() => result && apply(result.template)}>
+          {result?.lost.length ? t.ingest.replaceAnyway : t.ingest.replace}
         </button>
       </div>
     </Modal>

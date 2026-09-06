@@ -1,5 +1,5 @@
 import type { Binding, IngestReport } from '../../types/models';
-import { placeholderRegex } from '../render';
+import { placeholderRegex, usage } from '../render';
 
 export interface IngestDecision {
   bindingName: string;
@@ -16,6 +16,9 @@ export interface Ingest {
   /** The template as it would be, with tier 1 and 2 applied and tier 3 left alone. */
   template: string;
   decisions: IngestDecision[];
+  /** Placeholders the previous template had and this one does not: the protection the round trip
+   * would remove. Empty when no previous template was given. */
+  lost: { bindingName: string; occurrences: number }[];
   report: IngestReport;
 }
 
@@ -29,8 +32,13 @@ const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, Stri
  *
  * DECISIONS.md §8.1 and §8.4: tier 3 is always a suggestion, never an automatic match. It is
  * reported and left in place, because a wrong automatic match here would silently rewrite the
- * user's code around a value that was never theirs. */
-export function ingest(incoming: string, bindings: Binding[]): Ingest {
+ * user's code around a value that was never theirs.
+ *
+ * `previous` is the template being replaced, and is what makes the most dangerous case in the whole
+ * round trip visible: code that comes back with the real value where the placeholder was. Nothing
+ * matches, so the report was "0 placeholders in place, 0 to review" — and replacing the template
+ * then removed the protection without a word. */
+export function ingest(incoming: string, bindings: Binding[], previous?: string): Ingest {
   const decisions: IngestDecision[] = [];
   let template = incoming;
 
@@ -86,5 +94,9 @@ export function ingest(incoming: string, bindings: Binding[]): Ingest {
     }
   }
 
-  return { template, decisions, report: { decisions } };
+  const after = new Map(usage(template).map(u => [u.bindingName, u.occurrences]));
+  const lost = previous === undefined ? []
+    : usage(previous).map(u => ({ bindingName: u.bindingName, occurrences: u.occurrences - (after.get(u.bindingName) ?? 0) }))
+      .filter(u => u.occurrences > 0);
+  return { template, decisions, lost, report: { decisions } };
 }

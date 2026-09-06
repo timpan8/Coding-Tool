@@ -752,7 +752,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <table className="shortcut-table"><tbody>{editorShortcuts.map(s => <tr key={s.label}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}</tbody></table>
       <div className="dialog-actions"><button className="primary" onClick={() => setShowShortcuts(false)}>{t.dialog.close}</button></div>
     </Modal>}
-    {ingesting && <IngestDialog bindings={bindings} close={() => setIngesting(false)} apply={next => {
+    {ingesting && <IngestDialog bindings={bindings} template={template} close={() => setIngesting(false)} apply={next => {
       controller.changeText(next); setIngesting(false); changeMode('template');
       setNotice(t.version.templateReplaced);
     }} />}
