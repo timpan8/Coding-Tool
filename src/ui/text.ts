@@ -392,6 +392,17 @@ export const sv = {
     fileUnreadable: 'Filen kunde inte läsas.',
     importDone: 'Importen är klar.',
     importFailed: 'Importen misslyckades. Valvet är oförändrat.',
+    clearHeading: 'Rensa',
+    clearIntro:
+      'Tar bort allt som hör till den här appen i den här webbläsaren: valvet, temavalet och den offline-kopia av appen som ligger i webbläsarens cache. Använd det innan du lämnar en delad dator, och exportera först om något ska sparas.',
+    clearButton: 'Rensa hela valvet',
+    clearTitle: 'Rensa hela valvet?',
+    clearConfirm: 'Rensa valvet',
+    clearProjects: (count: number) => `${count} projekt med all versionshistorik`,
+    clearBindings: (count: number) => `${count} ${count === 1 ? 'binding' : 'bindings'}, med sina privata värden`,
+    clearBrowser: 'Temavalet, avregistrering av service workern och dess cachade kopia av appen',
+    clearNotCovered:
+      'Det här ligger utanför: filer du redan exporterat, det som ligger i urklippet, och samma app på en annan adress, i en annan webbläsare eller på en annan dator.',
     clearLead: 'Allt på den här datorn raderas för alltid:',
     clearNoUndo: 'Det finns ingen ångra. Exportera en backup först om du kan behöva något av det igen.',
     cleared: 'Valvet är rensat.',

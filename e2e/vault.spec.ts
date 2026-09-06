@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { open } from './app';
+import { go, open } from './app';
 
 /** Browser-level tests against the real Monaco editor.
  *
@@ -126,7 +126,7 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await expect(page.locator('dialog[open]')).toHaveCount(0);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 
-  await page.evaluate(() => (location.hash = '#/backup'));
+  await go(page, 'Backup', '.backup-panel');
   const download = await Promise.race([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Exportera hela valvet' }).click().then(() => page.waitForEvent('download')),
@@ -144,7 +144,7 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await fresh.evaluate(() => (location.hash = '#/projects'));
   await expect(fresh.locator('.project-cards')).not.toContainText('Backup-provet');
 
-  await fresh.evaluate(() => (location.hash = '#/backup'));
+  await go(fresh, 'Backup', '.backup-panel');
   await fresh.getByLabel('Välj en exporterad fil').setInputFiles(file);
   await expect(fresh.locator('.import-plan')).toContainText('0 krockar');
   await fresh.getByRole('button', { name: 'Slå ihop med valvet' }).click();
@@ -178,7 +178,7 @@ test('replaces the vault with a file instead of merging into it', async ({ brows
   // '#/' means "new code", so getting back to this project has to be through its own route.
   const projectUrl = page.url();
 
-  await page.evaluate(() => (location.hash = '#/backup'));
+  await go(page, 'Backup', '.backup-panel');
   const download = await Promise.race([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Exportera hela valvet' }).click().then(() => page.waitForEvent('download')),
@@ -196,7 +196,7 @@ test('replaces the vault with a file instead of merging into it', async ({ brows
   await page.getByLabel('Projektnamn').press('Enter');
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 
-  await page.evaluate(() => (location.hash = '#/backup'));
+  await go(page, 'Backup', '.backup-panel');
   await page.getByLabel('Välj en exporterad fil').setInputFiles(file);
   // "Keep both" says which kinds it will not apply to instead of quietly keeping the vault's copy.
   await expect(page.locator('.import-plan')).toContainText('Utkast kan inte importeras som kopior');
@@ -225,7 +225,7 @@ test('replaces the vault with a file instead of merging into it', async ({ brows
 test('refuses to replace the vault with a file that holds only private values', async ({ page }) => {
   await type(page, '$p = "Hunter2"\n');
   await bind(page, 'Hunter2', 'Hunter2', 'secret');
-  await page.evaluate(() => (location.hash = '#/backup'));
+  await go(page, 'Backup', '.backup-panel');
   const download = await Promise.race([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Exportera bara privata värden' }).click().then(() => page.waitForEvent('download')),
@@ -236,6 +236,36 @@ test('refuses to replace the vault with a file that holds only private values', 
   await page.getByLabel('Välj en exporterad fil').setInputFiles(file);
   await expect(page.getByLabel('Ersätt hela valvet med filen i stället för att slå ihop')).toBeDisabled();
   await expect(page.locator('.import-plan')).toContainText('bara privata värden');
+});
+
+// Punkt 9. "Tar bort allt som hör till den här appen i den här webbläsaren" var inte sant: clearAll()
+// tömmer Dexie-tabellerna och ingenting annat. Temavalet låg kvar i localStorage och service workern
+// med sin cachade kopia av appen var kvar registrerad.
+test('clears what it says it clears, and says what it does not', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.getByLabel('Tema').selectOption('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect(await page.evaluate(() => localStorage.getItem('acv:theme'))).toBe('dark');
+
+  await go(page, 'Backup', '.backup-panel');
+  await page.getByRole('button', { name: 'Rensa hela valvet' }).click();
+  const dialog = page.locator('dialog[open]');
+  // The boundary of the claim belongs in the dialog rather than in the user's guess.
+  await expect(dialog).toContainText('Temavalet');
+  await expect(dialog).toContainText('filer du redan exporterat');
+  await dialog.getByLabel(/Skriv RENSA/).fill('RENSA');
+  await dialog.getByRole('button', { name: 'Rensa valvet' }).click();
+
+  // The clear reloads the page, and a vault with no settings meets the introduction again — which
+  // is the signal that the reload has landed and the assertions below read the new page.
+  await page.getByRole('button', { name: 'Hoppa över' }).click();
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  expect(await page.evaluate(() => localStorage.getItem('acv:theme'))).not.toBe('dark');
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'dark');
+  await page.evaluate(() => (location.hash = '#/projects'));
+  await expect(page.locator('.project-card')).toHaveCount(0);
+  await expect(page.locator('.empty-project-list')).toBeVisible();
 });
 
 // Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did

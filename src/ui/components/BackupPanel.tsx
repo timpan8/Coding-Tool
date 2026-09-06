@@ -3,6 +3,7 @@ import type { ImportMode, ImportResolution, ImportResult } from '../../types/mod
 import type { StorageProvider } from '../../storage/StorageProvider';
 import { canDuplicate, parseSnapshot, planImport, toSnapshot, type ImportPlan, type Snapshot, type SnapshotKind } from '../../domain/snapshot';
 import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
+import { clearBrowserTraces } from '../../storage/persistence';
 import { download } from '../download';
 import { t } from '../text';
 
@@ -117,17 +118,21 @@ export function BackupPanel({
   async function clearVault() {
     const workspace = await storage.exportAll();
     const ok = await confirm({
-      title: 'Rensa hela valvet?',
+      title: t.backup.clearTitle,
       danger: true,
-      confirmLabel: 'Rensa valvet',
+      confirmLabel: t.backup.clearConfirm,
       typeToConfirm: 'RENSA',
       body: (
         <>
           <p>{t.backup.clearLead}</p>
           <ul>
-            <li>{workspace.projects.length} projekt med all versionshistorik</li>
-            <li>{workspace.bindings.length} bindings, med sina privata värden</li>
+            <li>{t.backup.clearProjects(workspace.projects.length)}</li>
+            <li>{t.backup.clearBindings(workspace.bindings.length)}</li>
+            <li>{t.backup.clearBrowser}</li>
           </ul>
+          {/* The claim above the button is "everything belonging to this app in this browser", so
+              the boundary of that sentence belongs in the dialog rather than in the user's guess. */}
+          <p>{t.backup.clearNotCovered}</p>
           <p>{t.backup.clearNoUndo}</p>
         </>
       ),
@@ -135,7 +140,9 @@ export function BackupPanel({
     if (!ok) return;
     setBusy(true);
     try {
+      // The vault first: if that write fails the reload never happens and the failure is reported.
       await storage.clearAll();
+      await clearBrowserTraces();
       notify(t.backup.cleared);
       location.reload();
     } finally {
@@ -194,13 +201,10 @@ export function BackupPanel({
         </div>
       )}
 
-      <h2>Rensa</h2>
-      <p>
-        Tar bort allt som hör till den här appen i den här webbläsaren. Använd det innan du lämnar en delad dator, och
-        exportera först om något ska sparas.
-      </p>
+      <h2>{t.backup.clearHeading}</h2>
+      <p>{t.backup.clearIntro}</p>
       <button className="danger" disabled={busy} onClick={() => void clearVault()}>
-        Rensa hela valvet
+        {t.backup.clearButton}
       </button>
 
       {pending && (
