@@ -12,5 +12,6 @@ export default defineConfig({
   build: { modulePreload: { polyfill: false } },
   server: { strictPort: true },
   // Playwright owns e2e/; without this vitest claims those files and fails on its missing globals.
-  test: { exclude: [...configDefaults.exclude, 'e2e/**'] },
+  // codevault/ is a separate app with its own Vitest config and path aliases.
+  test: { exclude: [...configDefaults.exclude, 'e2e/**', 'codevault/**'] },
 });

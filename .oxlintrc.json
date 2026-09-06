@@ -2,7 +2,7 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "unicorn", "oxc"],
   "env": { "browser": true, "es2024": true },
-  "ignorePatterns": ["dist/", "coverage/", "node_modules/"],
+  "ignorePatterns": ["dist/", "coverage/", "node_modules/", "codevault/"],
   "rules": {
     "eslint/no-eval": "error",
     "eslint/no-new-func": "error",
