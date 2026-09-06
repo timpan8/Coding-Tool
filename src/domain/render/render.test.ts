@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { binding } from '../../test/fixtures/factories';
 import { render } from './index';
+import { auditForCopy } from './audit';
 import { contextAt, escapeValue } from './escape';
 import { resolveBinding, resolveValue, validateBinding } from '../bindings';
 import type { LanguageId } from '../../types/models';
@@ -45,23 +46,50 @@ describe('render safety', () => {
   });
   it('AI text and issue reports do not contain private profile values', () => {
     const b = binding();
-    const result = render('$p = "{{ADMIN_PASSWORD}}"', [b], { ...opts, mode: 'ai' });
+    const result = auditForCopy('$p = "{{ADMIN_PASSWORD}}"', [b], { ...opts, mode: 'ai' });
     for (const value of Object.values(b.values)) expect(JSON.stringify(result)).not.toContain(value);
     expect(result.issues).toEqual([]);
+    expect(result.canCopy).toBe(true);
   });
+  // The exact-value check moved out of render() so it no longer runs on every keystroke. The
+  // guarantee is unchanged, so these now test the gate the copy path actually calls.
   it('blocks known values elsewhere in AI code, even from unrelated scope or profile', () => {
-    const result = render('# OtherSecret987!\n$p="{{ADMIN_PASSWORD}}"', [binding()], { ...opts, mode: 'ai' });
+    const result = auditForCopy('# OtherSecret987!\n$p="{{ADMIN_PASSWORD}}"', [binding()], { ...opts, mode: 'ai' });
     expect(result.issues.some(i => i.kind === 'leak')).toBe(true);
+    expect(result.canCopy).toBe(false);
     expect(JSON.stringify(result.issues)).not.toContain('OtherSecret987!');
+  });
+  it('render alone is a projection, not a gate', () => {
+    // Guards against a future caller copying render()'s output directly.
+    const bare = render('# OtherSecret987!\n$p="{{ADMIN_PASSWORD}}"', [binding()], { ...opts, mode: 'ai' });
+    expect(bare.issues).toEqual([]);
   });
   it('property: AI substitution cannot expose random private profile values', () => {
     fc.assert(fc.property(fc.array(fc.integer({ min: 33, max: 126 }), { minLength: 8, maxLength: 40 }), fc.integer({ min: 1, max: 20 }), (codes, repetitions) => {
       const secret = 'PRIVATE-' + String.fromCharCode(...codes);
       const b = binding({ values: { __default__: secret, profile: secret + '-profile' } });
       const template = Array.from({ length: repetitions }, (_, i) => `$p${i} = "{{ADMIN_PASSWORD}}"`).join('\n');
-      const result = render(template, [b], { ...opts, mode: 'ai' });
+      const result = auditForCopy(template, [b], { ...opts, mode: 'ai' });
       expect(result.text).not.toContain(secret); expect(result.issues).toEqual([]);
     }), { numRuns: 150 });
+  });
+  it('property: a copy the gate permits contains no value from any binding in the vault', () => {
+    fc.assert(fc.property(
+      fc.array(fc.integer({ min: 33, max: 126 }), { minLength: 6, maxLength: 30 }),
+      fc.boolean(),
+      (codes, leakIt) => {
+        const secret = 'PRIVATE-' + String.fromCharCode(...codes);
+        const b = binding({ values: { __default__: secret } });
+        // A binding from another project entirely: its value must still block.
+        const stranger = binding({ name: 'OTHER_BINDING', scopeRef: 'a-different-project', values: { __default__: secret + '-x' } });
+        const template = `$p = "{{ADMIN_PASSWORD}}"` + (leakIt ? `\n# ${secret}-x` : '');
+        const result = auditForCopy(template, [b, stranger], { ...opts, mode: 'ai' });
+        if (!result.canCopy) return;
+        for (const value of [...Object.values(b.values), ...Object.values(stranger.values)]) {
+          expect(result.text).not.toContain(value);
+        }
+      },
+    ), { numRuns: 200 });
   });
 });
 describe('escaping', () => {

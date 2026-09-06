@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Binding, LanguageId, Version } from '../types/models';
 import { languages } from '../types/models';
 import type { StorageProvider } from '../storage/StorageProvider';
 import { resolveBinding, resolveValue, suggestBinding, defaults } from '../domain/bindings';
 import { render, usage } from '../domain/render';
-import { coverage, type Coverage } from '../domain/render/coverage';
+import { auditForCopy } from '../domain/render/audit';
+import { buildValueIndex } from '../domain/render/leak';
+import { type Coverage } from '../domain/render/coverage';
 import { WorkspaceController } from './WorkspaceController';
 import { CodeEditor, type Selection } from './editor/CodeEditor';
 import { BindingDialog } from './components/BindingDialog';
@@ -146,11 +148,18 @@ export function App({ storage }: { storage: StorageProvider }) {
 
   const resolvedTheme = resolveTheme(theme, systemDark);
   const options = { language, projectId: project?.id ?? '', versionId: session.baseVersionId, profileId: settings?.activeProfileId ?? null };
-  const ai = render(template, bindings, { ...options, mode: 'ai' });
-  const local = render(template, bindings, { ...options, mode: 'local', maskSecrets: !showSecrets });
-  const cover = coverage(template, language);
+  // Every derived value below used to be recomputed on each keystroke, twice over the whole
+  // template. The value index is the expensive part and only changes when the bindings do.
+  const valueIndex = useMemo(() => buildValueIndex(bindings), [bindings]);
+  const optionsKey = `${language}|${options.projectId}|${options.versionId}|${options.profileId}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- optionsKey stands in for options.
+  const ai = useMemo(() => auditForCopy(template, bindings, { ...options, mode: 'ai' }, valueIndex), [template, bindings, optionsKey, valueIndex]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- optionsKey stands in for options.
+  const local = useMemo(() => render(template, bindings, { ...options, mode: 'local', maskSecrets: !showSecrets }), [template, bindings, optionsKey, showSecrets]);
+  const cover = ai.coverage;
   const visible = mode === 'template' ? template : mode === 'ai' ? ai.text : local.text;
-  const issues = collectIssues(template, local, ai), used = usage(template);
+  const issues = useMemo(() => collectIssues(template, local, ai), [template, local, ai]);
+  const used = useMemo(() => usage(template), [template]);
   const activeBindings = bindings.filter(b => resolveBinding(b.name, bindings, options.projectId, options.versionId)?.id === b.id)
     .sort((a, b) => Number(Boolean(resolveValue(a, options.profileId))) - Number(Boolean(resolveValue(b, options.profileId))) || a.name.localeCompare(b.name));
   const saveStatus = phase === 'loading' ? 'Öppnar lokalt valv…' : phase === 'error' ? 'Fel vid sparning' : phase === 'saved' ? 'Sparat lokalt' : 'Sparar lokalt…';
@@ -215,10 +224,13 @@ export function App({ storage }: { storage: StorageProvider }) {
   }
   async function removeBinding(binding: Binding) {
     await run(async () => {
-      await controller.flush(); const snapshot = await storage.exportAll();
-      const locations = [...snapshot.versions, ...snapshot.drafts].filter(item => Object.values(item.templates).some(t => t.includes(`{{${binding.name}}}`)));
+      await controller.flush();
+      // Version.bindingUsage is computed and stored on every save, so counting no longer needs to
+      // read the entire vault back out.
+      const versions = project ? await storage.listVersions(project.id) : [];
+      const locations = versions.filter(v => v.bindingUsage.some(u => u.bindingName === binding.name));
       if (!await confirm({ title: `Radera ${binding.name}?`, danger: true, confirmLabel: 'Radera bindingen',
-        body: <><p>Bindingen används i {locations.length} versioner och utkast.</p><p>Platshållarna blir kvar i koden men får inget värde, så kopiering blockeras tills du åtgärdar dem.</p></> })) return;
+        body: <><p>Bindingen används i {locations.length} sparade versioner av det här projektet.</p><p>Platshållarna blir kvar i koden men får inget värde, så kopiering blockeras tills du åtgärdar dem.</p></> })) return;
       await storage.deleteBinding(binding.id); setBindings(await storage.listBindings());
     });
   }
@@ -249,8 +261,10 @@ export function App({ storage }: { storage: StorageProvider }) {
   }, [countdown]);
   async function copy(which: 'local' | 'ai') {
     if (!workspaceVisible || !template.trim() || busyRef.current) return;
-    const result = render(template, bindings, { ...options, mode: which });
-    if (result.issues.length) { setError('Kopiering blockerad. Åtgärda renderingsfelen i panelen.'); return; }
+    // Re-audited here rather than reusing the memoised value: the gate must have run on the text
+    // being copied, not on whatever it last saw.
+    const result = auditForCopy(template, bindings, { ...options, mode: which });
+    if (!result.canCopy) { setError('Kopiering blockerad. Åtgärda problemen i panelen.'); return; }
     if (which === 'ai' || result.secretRanges.length) { setCopyMode(which); return; }
     await writeClipboard(result.text, which);
   }
@@ -307,7 +321,7 @@ export function App({ storage }: { storage: StorageProvider }) {
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
     {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0} save={storeBinding} close={() => setBindingDialog(null)} />}
-    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} />}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound ? 'primary' : ''} onClick={() => { const result = render(template, bindings, { ...options, mode: copyMode }); if (!result.issues.length) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
+    {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} />}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound ? 'primary' : ''} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
     {confirmDialog}
     {error && <Modal title="Åtgärden behöver uppmärksamhet" close={() => setError('')}><p role="alert">{error}</p><div className="dialog-actions"><button className="primary" onClick={() => setError('')}>Stäng</button></div></Modal>}
   </div>;
