@@ -126,7 +126,7 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await expect(page.locator('dialog[open]')).toHaveCount(0);
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
 
-  await page.evaluate(() => (location.hash = '#/settings'));
+  await page.evaluate(() => (location.hash = '#/backup'));
   const download = await Promise.race([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'Exportera hela valvet' }).click().then(() => page.waitForEvent('download')),
@@ -144,7 +144,7 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await fresh.evaluate(() => (location.hash = '#/projects'));
   await expect(fresh.locator('.project-cards')).not.toContainText('Backup-provet');
 
-  await fresh.evaluate(() => (location.hash = '#/settings'));
+  await fresh.evaluate(() => (location.hash = '#/backup'));
   await fresh.getByLabel('Välj en exporterad fil').setInputFiles(file);
   await expect(fresh.locator('.import-plan')).toContainText('0 krockar');
   await fresh.getByRole('button', { name: 'Slå ihop med valvet' }).click();
@@ -155,6 +155,87 @@ test('restores a vault from an exported file', async ({ browser }) => {
   await fresh.evaluate(() => (location.hash = '#/projects'));
   await expect(fresh.locator('.project-cards')).toContainText('Backup-provet');
   await restored.close();
+});
+
+// Punkt 8. Ersätt-läget fanns i lagret men UI:t skickade hårdkodat 'merge', så en fil kunde bara
+// slås ihop: det gick inte att komma tillbaka till exakt det valv filen beskriver. "Behåll båda"
+// föll dessutom tillbaka till "behåll valvets" för allt utom projekt och bindings, utan ett ord.
+test('replaces the vault with a file instead of merging into it', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await open(page);
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.getByRole('button', { name: 'Ändra projektnamn' }).click();
+  await page.getByLabel('Projektnamn').fill('Fanns i filen');
+  await page.getByLabel('Projektnamn').press('Enter');
+  await page.getByRole('button', { name: 'Spara version' }).click();
+  await page.getByLabel('Versionsetikett').fill('exporterad');
+  await page.locator('dialog[open]').getByRole('button', { name: 'Spara version' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  // '#/' means "new code", so getting back to this project has to be through its own route.
+  const projectUrl = page.url();
+
+  await page.evaluate(() => (location.hash = '#/backup'));
+  const download = await Promise.race([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Exportera hela valvet' }).click().then(() => page.waitForEvent('download')),
+  ]);
+  const file = test.info().outputPath('replace-source.json');
+  await download.saveAs(file);
+
+  // The vault moves on after the export: this project's draft changes, and a second project appears.
+  await page.goto(projectUrl);
+  await type(page, '$q = "efter exporten"\n');
+  await page.evaluate(() => (location.hash = '#/'));
+  await type(page, '$r = "annat projekt"\n');
+  await page.getByRole('button', { name: 'Ändra projektnamn' }).click();
+  await page.getByLabel('Projektnamn').fill('Fanns inte i filen');
+  await page.getByLabel('Projektnamn').press('Enter');
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+
+  await page.evaluate(() => (location.hash = '#/backup'));
+  await page.getByLabel('Välj en exporterad fil').setInputFiles(file);
+  // "Keep both" says which kinds it will not apply to instead of quietly keeping the vault's copy.
+  await expect(page.locator('.import-plan')).toContainText('Utkast kan inte importeras som kopior');
+
+  await page.getByLabel('Ersätt hela valvet med filen i stället för att slå ihop').check();
+  await expect(page.locator('.import-plan')).toContainText('Valvet töms först');
+  await expect(page.locator('.import-plan')).not.toContainText('Vid krock');
+
+  await page.getByRole('button', { name: 'Ersätt valvet med filen' }).click();
+  const dialog = page.locator('dialog[open]');
+  await expect(dialog).toContainText('Ersätta hela valvet?');
+  await dialog.getByLabel(/Skriv ERSÄTT/).fill('ERSÄTT');
+  await dialog.getByRole('button', { name: 'Ersätt valvet' }).click();
+  await expect(page.locator('.import-result')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Ladda om appen' }).click();
+  await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
+  await page.evaluate(() => (location.hash = '#/projects'));
+  await expect(page.locator('.project-cards')).toContainText('Fanns i filen');
+  await expect(page.locator('.project-cards')).not.toContainText('Fanns inte i filen');
+  await context.close();
+});
+
+// Replacing the vault with a private export would clear the projects, versions and drafts and put
+// nothing back, because the file does not carry them.
+test('refuses to replace the vault with a file that holds only private values', async ({ page }) => {
+  await type(page, '$p = "Hunter2"\n');
+  await bind(page, 'Hunter2', 'Hunter2', 'secret');
+  await page.evaluate(() => (location.hash = '#/backup'));
+  const download = await Promise.race([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Exportera bara privata värden' }).click().then(() => page.waitForEvent('download')),
+  ]);
+  const file = test.info().outputPath('private-only.json');
+  await download.saveAs(file);
+
+  await page.getByLabel('Välj en exporterad fil').setInputFiles(file);
+  await expect(page.getByLabel('Ersätt hela valvet med filen i stället för att slå ihop')).toBeDisabled();
+  await expect(page.locator('.import-plan')).toContainText('bara privata värden');
 });
 
 // Report F8 and U5. Deleting was not possible from the UI at all, and the confirmations that did

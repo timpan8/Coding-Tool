@@ -78,6 +78,27 @@ export function storageContract(factory: () => { storage: StorageProvider; clean
     expect(await storage.importAll(renamed, 'merge', { [p.id]: 'replace' })).toMatchObject({ replaced: 1 });
     expect((await storage.getProject(p.id))?.name).toBe('Från backup');
   });
+  // The dialog tells the user which kinds "keep both" cannot apply to. That sentence is only true
+  // while this matches canDuplicate() in domain/snapshot — snapshot.test.ts pins the other half.
+  it('keeps both copies only of the kinds that can carry a fresh id', async () => {
+    const p = project(); await storage.saveProject(p);
+    const b = binding({ scopeRef: p.id }); await storage.saveBinding(b);
+    const rule = { id: 'rule-1', name: 'Egen regel', pattern: 'hemlig', flags: 'gi', severity: 'high' as const,
+      category: 'secret' as const, enabled: true, builtIn: false, explanation: '' };
+    await storage.saveScannerRule(rule);
+    const snapshot = await storage.exportAll();
+    const changed = { ...snapshot, projects: [{ ...p, name: 'Annat namn' }], bindings: [{ ...b, description: 'ändrad' }],
+      rules: [...snapshot.rules.filter(r => r.id !== rule.id), { ...rule, pattern: 'annat' }] };
+
+    const result = await storage.importAll(changed, 'merge', { [p.id]: 'duplicate', [b.id]: 'duplicate', [rule.id]: 'duplicate' });
+    expect(result.duplicated).toBe(2);
+    expect(result.skipped).toBe(1);
+    expect((await storage.listProjects()).length).toBe(2);
+    expect((await storage.listBindings()).length).toBe(2);
+    // The rule kept the vault's pattern rather than becoming a second rule reporting the same finding.
+    expect((await storage.listScannerRules()).filter(r => r.id === rule.id || r.name === rule.name)).toHaveLength(1);
+    expect((await storage.listScannerRules()).find(r => r.id === rule.id)?.pattern).toBe('hemlig');
+  });
   it('writes nothing at all when any part of the import is invalid', async () => {
     const p = project(); await storage.saveProject(p);
     const other = project();

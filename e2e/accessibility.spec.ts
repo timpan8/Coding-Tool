@@ -28,6 +28,12 @@ test('the workspace stays clean with code, bindings and findings on screen', asy
 
 test('the settings page has no accessibility violations', async ({ page }) => {
   await open(page, '#/settings');
+  await expect(page.locator('.rules-panel')).toBeVisible();
+  expect(await audit(page)).toEqual([]);
+});
+
+test('the backup page has no accessibility violations', async ({ page }) => {
+  await open(page, '#/backup');
   await expect(page.locator('.backup-panel')).toBeVisible();
   expect(await audit(page)).toEqual([]);
 });

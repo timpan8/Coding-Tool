@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { ImportResolution, ImportResult } from '../../types/models';
+import type { ImportMode, ImportResolution, ImportResult } from '../../types/models';
 import type { StorageProvider } from '../../storage/StorageProvider';
-import { parseSnapshot, planImport, toSnapshot, type ImportPlan, type Snapshot, type SnapshotKind } from '../../domain/snapshot';
+import { canDuplicate, parseSnapshot, planImport, toSnapshot, type ImportPlan, type Snapshot, type SnapshotKind } from '../../domain/snapshot';
 import type { ConfirmRequest, ConfirmResult } from './ConfirmDialog';
 import { download } from '../download';
 import { t } from '../text';
@@ -21,7 +21,17 @@ export function BackupPanel({
   const [pending, setPending] = useState<{ snapshot: Snapshot; plan: ImportPlan } | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [resolution, setResolution] = useState<ImportResolution>('duplicate');
+  const [mode, setMode] = useState<ImportMode>('merge');
   const [result, setResult] = useState<ImportResult | null>(null);
+
+  const conflicts = pending?.plan.entities.filter((e) => e.action === 'conflict') ?? [];
+  // Named so the dialog can say which kinds "keep both" will not apply to, rather than downgrading
+  // them to "keep the vault's" without a word — the user chose one thing and got another.
+  const keptInstead = [...new Set(conflicts.filter((e) => !canDuplicate(e.kind)).map((e) => e.kind))];
+  // A private export carries no projects, versions or drafts. Replacing the vault with one would
+  // clear them and put nothing back, so the mode is not offered for that file at all.
+  const full = pending?.snapshot.kind === 'full' ? pending.snapshot : null;
+  const replacing = mode === 'replace' && full !== null;
 
   async function exportVault(kind: SnapshotKind) {
     setBusy(true);
@@ -66,13 +76,36 @@ export function BackupPanel({
 
   async function apply() {
     if (!pending) return;
+    if (full && replacing) {
+      const workspace = await storage.exportAll();
+      const ok = await confirm({
+        title: t.backup.replaceTitle,
+        danger: true,
+        confirmLabel: t.backup.replaceConfirm,
+        typeToConfirm: 'ERSÄTT',
+        body: (
+          <>
+            <p>{t.backup.replaceLead}</p>
+            <ul>
+              <li>{t.backup.replaceProjects(workspace.projects.length, full.payload.projects.length)}</li>
+              <li>{t.backup.replaceBindings(workspace.bindings.length, full.payload.bindings.length)}</li>
+            </ul>
+            <p>{t.backup.clearNoUndo}</p>
+          </>
+        ),
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     try {
+      // Resolved per entity rather than per dialog: the kinds an import cannot keep both copies of
+      // are written down as the vault's, so the record of what was chosen matches what happened.
       const resolutions = Object.fromEntries(
-        pending.plan.entities.filter((e) => e.action === 'conflict').map((e) => [e.id, resolution]),
+        conflicts.map((e) => [e.id, resolution === 'duplicate' && !canDuplicate(e.kind) ? 'keep' : resolution]),
       );
-      setResult(await storage.importAll(pending.snapshot.payload, 'merge', resolutions));
+      setResult(await storage.importAll(pending.snapshot.payload, replacing ? 'replace' : 'merge', resolutions));
       setPending(null);
+      setMode('merge');
       notify(t.backup.importDone);
     } catch (error) {
       setProblems([error instanceof Error ? error.message : t.backup.importFailed]);
@@ -188,20 +221,51 @@ export function BackupPanel({
             </div>
           ) : (
             <>
-              {pending.plan.summary.conflicts > 0 && (
-                <label>
-                  Vid krock
-                  <select value={resolution} onChange={(e) => setResolution(e.target.value as ImportResolution)}>
-                    <option value="duplicate">{t.backup.keepBoth}</option>
-                    <option value="keep">{t.backup.keepVault}</option>
-                    <option value="replace">Ta filens version</option>
-                  </select>
-                </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={replacing}
+                  disabled={!full}
+                  onChange={(e) => setMode(e.target.checked ? 'replace' : 'merge')}
+                />
+                {t.backup.replaceMode}
+              </label>
+              {!full && <p className="notice">{t.backup.replaceUnavailable}</p>}
+              {replacing ? (
+                <p className="inline-warning" role="status">
+                  {t.backup.replaceWarning}
+                </p>
+              ) : (
+                pending.plan.summary.conflicts > 0 && (
+                  <>
+                    <label>
+                      {t.backup.onConflict}
+                      <select value={resolution} onChange={(e) => setResolution(e.target.value as ImportResolution)}>
+                        <option value="duplicate">{t.backup.keepBoth}</option>
+                        <option value="keep">{t.backup.keepVault}</option>
+                        <option value="replace">{t.backup.takeFile}</option>
+                      </select>
+                    </label>
+                    {/* "Keep both" cannot be honoured for every kind. It used to fall back to the
+                        vault's copy without saying so, which is a different answer than the one
+                        the user gave. */}
+                    {resolution === 'duplicate' && keptInstead.length > 0 && (
+                      <p className="notice">{t.backup.keepBothLimited(keptInstead)}</p>
+                    )}
+                  </>
+                )
               )}
               <div className="dialog-actions">
-                <button onClick={() => setPending(null)}>Avbryt</button>
+                <button
+                  onClick={() => {
+                    setPending(null);
+                    setMode('merge');
+                  }}
+                >
+                  {t.dialog.cancel}
+                </button>
                 <button className="primary" disabled={busy} onClick={() => void apply()}>
-                  Slå ihop med valvet
+                  {replacing ? t.backup.applyReplace : t.backup.applyMerge}
                 </button>
               </div>
             </>

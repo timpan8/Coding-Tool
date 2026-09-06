@@ -24,6 +24,7 @@ import { ProjectDetails } from './components/ProjectDetails';
 import { BindingPanel, toRows } from './components/BindingPanel';
 import { BindingsPage, useBindingUses } from './components/BindingsPage';
 import { SettingsPage } from './components/SettingsPage';
+import { BackupPanel } from './components/BackupPanel';
 import { CopyDialog } from './components/CopyDialog';
 import { EditorToolbar, type Mode } from './components/EditorToolbar';
 import { ProfileManager, ProfilePicker } from './components/ProfilePicker';
@@ -166,7 +167,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       if (id) { await controller.open(id); setMode('template'); setFocusName(''); setFocusLine(undefined); }
       else if (hash === '#/' && (routeRef.current !== '#/' || controller.getSnapshot().session.project)) {
         await controller.newCode(); setMode('template'); setFocusName(''); setFocusLine(undefined);
-      } else if (!['#/', '#/projects', '#/bindings', '#/settings', '#/security'].includes(hash)) throw new Error(t.refusal.unknownPage);
+      } else if (!['#/', '#/projects', '#/bindings', '#/backup', '#/settings', '#/security'].includes(hash)) throw new Error(t.refusal.unknownPage);
       setShowSecrets(false); setDrawer(false); setNotice('');
       setBindings(await storage.listBindings()); setLocation(hash, replace);
     });
@@ -533,7 +534,7 @@ export function App({ storage }: { storage: StorageProvider }) {
 
   return <div className="app-shell code-first"><a className="skip-link" href="#huvudinnehall">{t.nav.skip}</a><div className="main-shell">
     <header className="topbar"><a className="brand" href="#/" onClick={e => { e.preventDefault(); void navigate('#/'); }}><span className="brand-icon">{'</>'}</span><span>AI Code Vault</span></a>
-      <nav className="top-navigation" aria-label={t.nav.main}><button disabled={busy} onClick={() => void navigate('#/')}>{t.nav.newCode}</button><button disabled={busy} onClick={openDrawer}>{t.nav.projects} <kbd>Ctrl P</kbd></button><button onClick={() => setShowShortcuts(true)} aria-label={t.nav.showShortcuts}>{t.nav.shortcuts}</button><button disabled={busy} onClick={() => void navigate('#/bindings')}>{t.nav.bindings}</button><button onClick={() => void navigate('#/security')}>{t.nav.security}</button><button onClick={() => void navigate('#/settings')}>{t.nav.settings}</button></nav>
+      <nav className="top-navigation" aria-label={t.nav.main}><button disabled={busy} onClick={() => void navigate('#/')}>{t.nav.newCode}</button><button disabled={busy} onClick={openDrawer}>{t.nav.projects} <kbd>Ctrl P</kbd></button><button onClick={() => setShowShortcuts(true)} aria-label={t.nav.showShortcuts}>{t.nav.shortcuts}</button><button disabled={busy} onClick={() => void navigate('#/bindings')}>{t.nav.bindings}</button><button disabled={busy} onClick={() => void navigate('#/backup')}>{t.nav.backup}</button><button onClick={() => void navigate('#/security')}>{t.nav.security}</button><button onClick={() => void navigate('#/settings')}>{t.nav.settings}</button></nav>
       <ProfilePicker profiles={profiles} activeId={settings?.activeProfileId ?? null} onManage={() => setManagingProfiles(true)}
         onSelect={id => void run(async () => { if (settings) { await storage.saveSettings({ ...settings, activeProfileId: id }); await controller.reloadSettings(); } })} /><label className="theme-choice">{t.app.theme}<select aria-label={t.app.theme} value={theme} onChange={e => changeTheme(e.target.value as ThemeChoice)}><option value="system">{t.app.themeSystem}</option><option value="light">{t.app.themeLight}</option><option value="dark">{t.app.themeDark}</option></select></label><span className={`save-state ${phase === 'error' ? 'danger-text' : ''}`} role="status">{saveStatus}</span></header>
     {state.error && <div className="persistence-error" role="alert"><strong>Fel vid sparning</strong><p>{state.error}</p><button onClick={() => { void controller.flush(true).catch(() => {}); }}>{t.dialog.retrySave}</button></div>}
@@ -607,11 +608,14 @@ export function App({ storage }: { storage: StorageProvider }) {
       </section></div>
       <div className="overview-scroll" hidden={route !== '#/bindings'}><BindingsPage bindings={bindings} uses={bindingUses} profileId={options.profileId}
         onEdit={b => setBindingDialog({ binding: b })} onDelete={b => void removeBinding(b)} onCreate={newBinding} /></div>
+      {/* Its own page rather than the last section of a long settings page. It is the only way back
+          after a browser clears its storage, and it was three scroll-lengths below the fold. */}
+      <div className="overview-scroll" hidden={route !== '#/backup'}><BackupPanel storage={storage} notify={setNotice} confirm={confirm} /></div>
       <div hidden={route !== '#/security'}><Security /></div>
       <div hidden={route !== '#/settings'}><SettingsPage settings={settings} storage={storage} storageInfo={storageInfo}
         onStorageInfo={setStorageInfo} deviceName={deviceName} onDeviceName={setDeviceName} rules={rules}
         onRules={() => void storage.listScannerRules().then(setRules)} save={patch => changeEditor(patch)} notify={setNotice}
-        confirm={confirm} showIntro={() => setIntro(true)} /></div>
+        showIntro={() => setIntro(true)} /></div>
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>{t.app.footerNote}</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={drawerQuery} onQuery={setDrawerQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
