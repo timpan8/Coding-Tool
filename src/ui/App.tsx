@@ -3,6 +3,7 @@ import type { Binding, LanguageId, Version } from '../types/models';
 import { languages } from '../types/models';
 import type { StorageProvider } from '../storage/StorageProvider';
 import { resolveBinding, resolveValue, suggestBinding, defaults } from '../domain/bindings';
+import { expandToLiteral } from '../domain/bindings/literal';
 import { render, usage } from '../domain/render';
 import { auditForCopy } from '../domain/render/audit';
 import { buildValueIndex } from '../domain/render/leak';
@@ -277,6 +278,12 @@ export function App({ storage }: { storage: StorageProvider }) {
       await controller.flush();
       const current = controller.getSnapshot();
       if (!current.session.project || !current.settings) return;
+      // A selection cut short by a word boundary leaves part of the value in the template, and
+      // everything after that looks like it worked. Widen it before anything else uses it.
+      if (mode !== 'ai') {
+        const widened = expandToLiteral(current.session.text, selection.start, selection.end, current.session.language);
+        if (widened.widened) selection = { ...selection, start: widened.start, end: widened.end, text: widened.text };
+      }
       const hint = suggestBinding(selection.lineBefore, selection.text), time = new Date().toISOString();
       // The name heuristic reads only the variable name, so `$p = "Hunter2"` came out as identity
       // and a password rendered unmasked. Running the rules over the value itself is the missing
@@ -424,7 +431,15 @@ export function App({ storage }: { storage: StorageProvider }) {
     </main><footer className="app-footer"><span>AI Code Vault · {__APP_VERSION__}</span><span>Lokalt valv · M1</span></footer>
   </div>
     {drawer && <ProjectBrowser projects={projects} currentId={currentId} query={query} onQuery={setQuery} close={() => setDrawer(false)} open={id => void navigate(`#/project/${id}`)} overview={() => void navigate('#/projects')} />}
-    {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0} save={storeBinding} close={() => setBindingDialog(null)} />}
+    {bindingDialog && <BindingDialog initial={bindingDialog.binding} bindings={bindings} count={bindingDialog.selection ? template.split(bindingDialog.selection.text).length - 1 : 0}
+      preview={bindingDialog.selection && (() => {
+        const s = bindingDialog.selection!;
+        const lineStart = template.lastIndexOf('\n', s.start - 1) + 1;
+        const lineEnd = template.indexOf('\n', s.end) === -1 ? template.length : template.indexOf('\n', s.end);
+        const line = template.slice(lineStart, lineEnd);
+        return { before: line, after: line.slice(0, s.start - lineStart) + `{{${bindingDialog.binding.name}}}` + line.slice(s.end - lineStart) };
+      })() || undefined}
+      save={storeBinding} close={() => setBindingDialog(null)} />}
     {copyMode && <Modal title={copyMode === 'local' ? '⚠ Kopiera riktiga värden' : 'AI-export · granska före kopiering'} close={() => setCopyMode(null)}>{copyMode === 'local' ? <><p>Den lokala koden innehåller secrets. Kopiera den endast till din lokala kodmiljö, aldrig till en AI-chatt.</p><p className="notice">Urklippshistorik och molnsynk kan lagra eller överföra innehållet. Appen kontrollerar inte dessa funktioner.</p></> : <AiCopyReview coverage={cover} issues={ai.issues.length} replaced={ai.used.length} findings={copyFindings} />}{copyMode === 'ai' && Boolean(seriousFindings) && <label className="check inline-warning"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Jag har tittat på de {seriousFindings} misstänkta värdena och vill ändå kopiera.</label>}<div className="dialog-actions"><button onClick={() => setCopyMode(null)}>Avbryt</button><button className={copyMode === 'local' ? 'danger' : cover.bound && !seriousFindings ? 'primary' : ''} disabled={copyMode === 'ai' && Boolean(seriousFindings) && !reviewed} onClick={() => { const result = auditForCopy(template, bindings, { ...options, mode: copyMode }); if (result.canCopy) void writeClipboard(result.text, copyMode); }}>{copyMode === 'local' ? 'Kopiera LOCAL med secrets' : cover.bound && !seriousFindings ? 'Jag har granskat · kopiera för AI' : 'Kopiera oskyddad kod ändå'}</button></div></Modal>}
     {viewing && <Modal title={viewing.compareTo ? `v${viewing.compareTo.number} → v${viewing.version.number}` : `v${viewing.version.number}${viewing.version.label ? ` · ${viewing.version.label}` : ''}`} close={() => setViewing(null)}>
       <div className="version-view">

@@ -3,8 +3,12 @@ import type { Binding, Category } from '../../types/models';
 import { categories } from '../../types/models';
 import { defaults, validateBinding } from '../../domain/bindings';
 import { Modal } from './Modal';
-export function BindingDialog({ initial, bindings, count, save, close }: {
-  initial: Binding; bindings: Binding[]; count: number; save: (binding: Binding, all: boolean) => Promise<void>; close: () => void;
+export function BindingDialog({ initial, bindings, count, preview, save, close }: {
+  initial: Binding; bindings: Binding[]; count: number;
+  /** The line as it stands and as it will read, so replacing the wrong span is visible before it
+   * happens rather than after. */
+  preview?: { before: string; after: string };
+  save: (binding: Binding, all: boolean) => Promise<void>; close: () => void;
 }) {
   const [value, setValue] = useState(initial), [show, setShow] = useState(false), [all, setAll] = useState(true), [error, setError] = useState(''), [busy, setBusy] = useState(false), [acknowledged, setAcknowledged] = useState(false);
   const existing = bindings.some(b => b.id === initial.id);
@@ -32,6 +36,7 @@ export function BindingDialog({ initial, bindings, count, save, close }: {
     {value.escapeMode === 'raw' && <p className="inline-warning" role="status">Raw stänger av escaping. Värdet läggs in ordagrant och kan ändra kodens syntax och betydelse.</p>}
     {vagueSecret && <label className="check inline-warning"><input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)} />AI-värdet ser inte ut som en tydlig platshållare, till exempel <code>&lt;PASSWORD&gt;</code>. Jag har granskat att det är ofarligt att dela.</label>}
     {count > 0 && <label className="check"><input type="checkbox" checked={all} onChange={e => setAll(e.target.checked)} />Ersätt alla identiska förekomster i filen ({count} st)</label>}
+    {preview && <div className="binding-preview"><code className="before">{preview.before}</code><code className="after">{preview.after}</code></div>}
     <p className="muted">Ange privata värden utan kodens escaping. Endast AI-värdet visas i den sanerade vyn.</p>
     {error && <p role="alert" className="error">{error}</p>}
     <div className="dialog-actions"><button onClick={close}>Avbryt</button><button className="primary" disabled={busy} onClick={() => void submit()}>{busy ? 'Sparar…' : 'Spara binding'}</button></div>

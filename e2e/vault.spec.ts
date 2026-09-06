@@ -285,3 +285,28 @@ test('labels versions, compares them and deletes one', async ({ page }) => {
   await expect(page.locator('.version-history')).not.toContainText('första');
   await expect(page.locator('.version-history')).toContainText('andra');
 });
+
+// Report F20. Double-clicking a value stops at a word boundary, so `Hunter2!` selected `Hunter2`
+// and the template kept the exclamation mark: half the password stayed, and everything after that
+// looked like it had worked.
+test('binds the whole string literal, not the part a double click caught', async ({ page }) => {
+  await type(page, '$password = "Hunter2!"\n');
+  await page.getByText('Hunter2', { exact: false }).first().dblclick();
+  await page.keyboard.press('Control+b');
+
+  // The dialog shows what the line will become before anything is replaced.
+  await expect(page.locator('.binding-preview .after')).toContainText('$password = "{{');
+  await expect(page.locator('.binding-preview .after')).not.toContainText('!"');
+
+  await page.getByLabel('Privat värde · standard').fill('Hunter2!');
+  await page.getByRole('button', { name: 'Spara binding' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+  // Nothing of the value is left beside the placeholder.
+  await expect(page.locator('.editor-body')).not.toContainText('Hunter2');
+  await expect(page.locator('.editor-body')).not.toContainText('}}!');
+
+  // And the AI projection carries the placeholder's value, not a fragment of the real one.
+  await page.getByRole('tab', { name: 'AI' }).click();
+  await expect(page.locator('.editor-body')).not.toContainText('Hunter2');
+});
