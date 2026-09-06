@@ -12,6 +12,11 @@ export interface ExampleNamespace {
   hostPrefix: string
   pathRoot: string
   tenant: string
+  userPrefix: string
+  mailUser: string
+  passwordWord: string
+  /** Marker word; the generic "example" check applies only to the default namespace. */
+  word: string
 }
 
 export const DEFAULT_NAMESPACE: ExampleNamespace = {
@@ -21,24 +26,36 @@ export const DEFAULT_NAMESPACE: ExampleNamespace = {
   hostPrefix: 'SRV-EXAMPLE',
   pathRoot: 'C:\\Example',
   tenant: 'example.onmicrosoft.com',
+  userPrefix: 'svc-example',
+  mailUser: 'anna.exempel',
+  passwordWord: 'Ex@mple',
+  word: 'example',
 }
 
 export const ALTERNATE_NAMESPACES: readonly ExampleNamespace[] = [
   {
-    mailDomain: 'example.net',
-    domain: 'corp.example.net',
+    mailDomain: 'exmpl.net',
+    domain: 'corp.exmpl',
     netbios: 'EXMPL',
     hostPrefix: 'SRV-EXMPL',
     pathRoot: 'C:\\Exmpl',
     tenant: 'exmpl.onmicrosoft.com',
+    userPrefix: 'svc-exmpl',
+    mailUser: 'anna.exmpl',
+    passwordWord: 'Ex@mpl',
+    word: 'exmpl',
   },
   {
-    mailDomain: 'example.org',
-    domain: 'corp.example.org',
+    mailDomain: 'sampleorg.test',
+    domain: 'corp.sampleorg',
     netbios: 'SAMPLEORG',
     hostPrefix: 'SRV-SAMPLE',
     pathRoot: 'C:\\SampleOrg',
     tenant: 'sampleorg.onmicrosoft.com',
+    userPrefix: 'svc-sample',
+    mailUser: 'anna.sample',
+    passwordWord: 'S@mple',
+    word: 'sample',
   },
 ]
 
@@ -60,7 +77,7 @@ export function generateExample(
   const shape = opts.shapeOf ?? ''
   switch (kind) {
     case 'email':
-      return `anna.exempel${n}@${ns.mailDomain}`
+      return `${ns.mailUser}${n}@${ns.mailDomain}`
     case 'domain': {
       const looksNetbios = shape !== '' && !shape.includes('.')
       if (looksNetbios) return n === 1 ? ns.netbios : `${ns.netbios}${n}`
@@ -68,8 +85,8 @@ export function generateExample(
     }
     case 'username': {
       const domainQualified = /^[^\\@]+\\[^\\]+$/.test(shape)
-      if (domainQualified) return `${ns.netbios}\\svc-example${pad(n, 2)}`
-      return `svc-example${pad(n, 2)}`
+      if (domainQualified) return `${ns.netbios}\\${ns.userPrefix}${pad(n, 2)}`
+      return `${ns.userPrefix}${pad(n, 2)}`
     }
     case 'server': {
       const short = shape !== '' && !shape.includes('.')
@@ -86,13 +103,13 @@ export function generateExample(
       return n === 1 ? `${ns.pathRoot}\\${project}` : `${ns.pathRoot}\\${project}\\Path${pad(n, 2)}`
     }
     case 'password':
-      return `Ex@mple-Passw0rd-${n}`
+      return `${ns.passwordWord}-Passw0rd-${n}`
     case 'apiKey':
-      return `EXAMPLE-KEY-${pad(n, 4)}`
+      return `${ns.netbios}-KEY-${pad(n, 4)}`
     case 'blob':
-      return `EXAMPLE-BLOCK-${pad(n, 2)}`
+      return `${ns.netbios}-BLOCK-${pad(n, 2)}`
     case 'custom':
-      return `EXAMPLE-VALUE-${pad(n, 2)}`
+      return `${ns.netbios}-VALUE-${pad(n, 2)}`
   }
 }
 
@@ -115,16 +132,28 @@ export function nextExample(
 const TEST_NET = /^(192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$/
 const FAKE_GUID = /^11111111-2222-4333-8444-\d{12}$/i
 
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 /** True when a value is recognisably inside the tool's fake namespace. */
 export function isInExampleNamespace(value: string, ns: ExampleNamespace = DEFAULT_NAMESPACE): boolean {
   const v = value.toLowerCase()
   if (TEST_NET.test(v) || FAKE_GUID.test(v)) return true
-  if (/^ex@mple-passw0rd-\d+$/.test(v) || /^example-(key|block|value)-\d+$/.test(v)) return true
-  if (/(^|[^a-z0-9])(example|exempel)\d*([^a-z0-9]|$)/.test(v)) return true
-  const needles = [ns.mailDomain, ns.domain, ns.hostPrefix, ns.pathRoot, ns.tenant].map((s) => s.toLowerCase())
+  const needles = [
+    ns.mailDomain,
+    ns.domain,
+    ns.hostPrefix,
+    ns.pathRoot,
+    ns.tenant,
+    ns.userPrefix,
+    ns.mailUser,
+    `${ns.passwordWord}-passw0rd-`,
+    `${ns.netbios}-key-`,
+    `${ns.netbios}-block-`,
+    `${ns.netbios}-value-`,
+  ].map((s) => s.toLowerCase())
   if (needles.some((needle) => v.includes(needle))) return true
-  const netbios = ns.netbios.toLowerCase()
-  return new RegExp(`(^|[^a-z0-9])${netbios.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`).test(v)
+  const words = ns.word === 'example' ? ['example', 'exempel', ns.netbios.toLowerCase()] : [ns.word, ns.netbios.toLowerCase()]
+  return words.some((w) => new RegExp(`(^|[^a-z0-9])${escapeRe(w)}\\d*([^a-z0-9]|$)`).test(v))
 }
 
 /**
