@@ -22,7 +22,7 @@ export function FileTabs({
   const [draft, setDraft] = useState('');
 
   return (
-    <div className="file-tabs" role="tablist" aria-label="Filer i projektet">
+    <nav className="file-tabs" aria-label="Filer i projektet">
       {files.map((file) => (
         <span key={file.id} className={`file-tab ${file.id === activeId ? 'current' : ''}`}>
           {editing === file.id ? (
@@ -42,8 +42,7 @@ export function FileTabs({
             />
           ) : (
             <button
-              role="tab"
-              aria-selected={file.id === activeId}
+              aria-current={file.id === activeId ? 'true' : undefined}
               disabled={disabled}
               onClick={() => onSelect(file.id)}
               onDoubleClick={() => {
@@ -70,6 +69,6 @@ export function FileTabs({
       <button className="file-add" aria-label="Lägg till fil" disabled={disabled} onClick={onAdd}>
         ＋
       </button>
-    </div>
+    </nav>
   );
 }

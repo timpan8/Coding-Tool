@@ -7,8 +7,8 @@ export const editorColors: Record<ResolvedTheme, Record<string, string>> = {
   light: {
     'editor.background': '#ffffff',
     'editor.foreground': '#21364a',
-    'editorLineNumber.foreground': '#a0b1bc',
-    'editorLineNumber.activeForeground': '#627488',
+    'editorLineNumber.foreground': '#5f7185',
+    'editorLineNumber.activeForeground': '#526375',
     'editor.lineHighlightBackground': '#f0f4f7',
     'editor.selectionBackground': '#bedfd1',
     'editorCursor.foreground': '#126956',
@@ -16,8 +16,8 @@ export const editorColors: Record<ResolvedTheme, Record<string, string>> = {
   dark: {
     'editor.background': '#16242f',
     'editor.foreground': '#d3e0e9',
-    'editorLineNumber.foreground': '#5f7383',
-    'editorLineNumber.activeForeground': '#93a7b6',
+    'editorLineNumber.foreground': '#91a4b3',
+    'editorLineNumber.activeForeground': '#a3b5c2',
     'editor.lineHighlightBackground': '#1c2c38',
     'editor.selectionBackground': '#24523f',
     'editorCursor.foreground': '#70dec3',

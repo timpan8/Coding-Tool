@@ -226,16 +226,16 @@ test('lets rules be turned off and a term of your own added', async ({ page }) =
 test('keeps several files in a project, each with its own text and language', async ({ page }) => {
   await type(page, '$first = "one"\n');
   await page.getByRole('button', { name: 'Lägg till fil' }).click();
-  await expect(page.getByRole('tab', { name: 'del2.ps1' })).toBeVisible();
+  await expect(page.locator('.file-tab').filter({ hasText: 'del2.ps1' })).toBeVisible();
 
   await page.locator('.code-editor').click();
   await page.keyboard.type('$second = "two"\n');
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
   await page.getByLabel('Språk', { exact: true }).selectOption('python');
-  await expect(page.getByRole('tab', { name: 'del2.py' })).toBeVisible();
+  await expect(page.locator('.file-tab').filter({ hasText: 'del2.py' })).toBeVisible();
 
   // Switching back shows the first file untouched, still PowerShell.
-  await page.getByRole('tab', { name: 'script.ps1' }).click();
+  await page.locator('.file-tab').filter({ hasText: 'script.ps1' }).click();
   await expect(page.locator('.editor-body')).toContainText('$first');
   await expect(page.locator('.editor-body')).not.toContainText('$second');
   await expect(page.getByLabel('Språk', { exact: true })).toHaveValue('powershell');
@@ -243,8 +243,8 @@ test('keeps several files in a project, each with its own text and language', as
   // And it survives a reload, which is where a session-only file list would show.
   await expect(page.getByRole('status').first()).toContainText('Sparat lokalt');
   await page.reload();
-  await expect(page.getByRole('tab', { name: 'script.ps1' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'del2.py' })).toBeVisible();
+  await expect(page.locator('.file-tab').filter({ hasText: 'script.ps1' })).toBeVisible();
+  await expect(page.locator('.file-tab').filter({ hasText: 'del2.py' })).toBeVisible();
 });
 
 // Report F22-F25. Every version was saved without a label, so the list read the same line all the

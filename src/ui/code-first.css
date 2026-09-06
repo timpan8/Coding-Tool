@@ -901,3 +901,21 @@ dialog:has(.version-view) {
   color: var(--text-muted);
   font-size: 0.6875rem;
 }
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 20;
+  padding: 10px 16px;
+  border-radius: 0 0 8px 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s;
+}
+.skip-link:focus {
+  top: 0;
+}
