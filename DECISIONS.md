@@ -348,3 +348,21 @@ som själv innehöll en platshållare vore rekursiv substitution igen. Det lagra
 så en kontext utan rot (en äldre export, en annan flik mitt i ändringen) fortfarande löser till något
 sant. En hittad filsökväg binds som sin katalog: mappen tillhör den här maskinen, filnamnet tillhör
 koden, och en AI som döper om loggfilen ska få göra det.
+
+## Offline-skalet får gå till nätet när cachen fattas
+
+Service workern svarade `Response.error()` när en fil ur app-skalet saknades i cachen. Tanken var
+att en fil utanför skalet aldrig ska hämtas, men följden blev värre än problemet: cachen är inte
+garanterad. Webbläsaren vräker CacheStorage när utrymmet tryter, och en installation som avbryts
+lämnar poster som aldrig skrevs. Då svarade workern fel på varje förfrågan, för alltid — appen gick
+inte att nå, och en omladdning hjälpte inte, eftersom det är workern själv som svarar. Enda vägen
+ut var att veta att man skulle avregistrera den i utvecklarverktygen, vilket ingen användare vet.
+
+Nu hämtas filen från samma origin som appen laddades från, och läggs tillbaka i cachen så nästa
+start fungerar offline igen. Det är exakt vad webbläsaren hade gjort utan worker. Gränsen är
+oförändrad: bara filer i `ASSETS` passerar, alltså appens eget skal — användarens kod och värden
+hamnar aldrig i CacheStorage och hämtas aldrig över nätet. `check-network.mjs` undantar `sw.js`
+från förbudet mot `fetch` just därför att en worker utan `fetch` inte kan laga sig själv.
+
+Ett e2e-test tömmer cachen som en webbläsare under utrymmesbrist gör och kräver att appen ändå
+startar. Utan rättningen faller det på `net::ERR_FAILED` vid omladdningen.

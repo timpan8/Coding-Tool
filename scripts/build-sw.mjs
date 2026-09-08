@@ -33,7 +33,24 @@ self.addEventListener('fetch', event => {
   const shell = new URL('./index.html', self.registration.scope).href;
   const key = request.mode === 'navigate' && url.origin === self.location.origin && url.pathname === new URL(self.registration.scope).pathname ? shell : url.href;
   if (!ASSETS.includes(key)) return;
-  event.respondWith(caches.open(CACHE).then(cache => cache.match(key)).then(response => response || Response.error()));
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    const cached = await cache.match(key);
+    if (cached) return cached;
+    // A miss used to answer Response.error(), which is a dead end: the worker keeps answering, so
+    // every reload fails the same way and the app is unreachable until someone knows to unregister
+    // it by hand. A miss is not exotic — the browser evicts CacheStorage under pressure, and an
+    // install interrupted midway leaves entries absent. Going to the origin the app was served
+    // from is what the browser would do with no worker at all, and it refills the shell so the
+    // next load is offline again. Still same-origin only: nothing outside ASSETS reaches here.
+    try {
+      const response = await fetch(request);
+      if (response.ok) await cache.put(key, response.clone());
+      return response;
+    } catch {
+      return Response.error();
+    }
+  })());
 });
 `;
 await writeFile('dist/sw.js', worker);
