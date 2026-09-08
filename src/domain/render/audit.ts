@@ -21,6 +21,35 @@ export function promptBlock(text: string, language: LanguageId): string {
     .join('\n');
 }
 
+/** What a leak hit is called on screen. Never the value and never the encoded text: invariant 5
+ * covers the message as much as the error object. */
+const encodingName: Record<LeakHit['encoding'], string> = {
+  exact: 'i klartext',
+  url: 'URL-kodat',
+  html: 'HTML-escapat',
+  json: 'JSON-escapat',
+  backtick: 'escapat med backtick',
+  'doubled-quote': 'med dubblerade apostrofer',
+  regex: 'escapat som reguljärt uttryck',
+  base64: 'base64-kodat',
+  'base64-utf16': 'base64-kodat (UTF-16)',
+  'inside-base64': 'inuti en base64-sträng',
+};
+const leakMessage = (hit: LeakHit, where: string) =>
+  `Ett känt privat värde står ${encodingName[hit.encoding]}${hit.retired ? ' — ett värde bindingen har haft tidigare' : ''} ${where}. Kopiering till AI är blockerad tills det är borta.`;
+
+/** The first line of a Copy Local, so the file it lands in says what it holds.
+ *
+ * Two jobs, both small: a person who finds the file later knows it carries real values, and the
+ * app recognises the line when such a file is pasted back in as an AI answer — which is a mistake
+ * worth catching, because the values in it were never sanitised. */
+export const SENTINEL = '[REAL VALUES - never paste into AI] v1';
+export const sentinelLine = (language: LanguageId) => {
+  const marker = lineComment[language];
+  return marker ? `${marker} ${SENTINEL}` : '';
+};
+export const hasSentinel = (text: string) => text.slice(0, 400).includes(SENTINEL);
+
 export interface CopyAudit extends RenderResult {
   leaks: LeakHit[];
   coverage: Coverage;
@@ -42,7 +71,7 @@ export function auditForCopy(template: string, bindings: Binding[], options: Ren
     name: hit.bindingName,
     start: hit.start,
     kind: 'leak',
-    message: 'Ett känt privat värde står i klartext här. Kopiering till AI är blockerad tills det är borta.',
+    message: leakMessage(hit, 'här'),
   }));
   const blocking = [...result.issues, ...leakIssues];
   return {
@@ -104,7 +133,7 @@ export function auditSelection(
     name: hit.bindingName,
     start: hit.start,
     kind: 'leak',
-    message: 'Ett känt privat värde står i klartext i markeringen. Kopiering till AI är blockerad tills det är borta.',
+    message: leakMessage(hit, 'i markeringen'),
   }));
   // Only problems inside the selection can block it; one further down the file is not being copied.
   const own = whole.issues.filter((issue) => issue.start >= range.start && issue.start < range.end);

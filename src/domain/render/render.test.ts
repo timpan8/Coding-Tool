@@ -143,3 +143,30 @@ describe('escaping', () => {
     expect(contextAt(js, js.indexOf('{{'), 'javascript').quote).toBe("'");
   });
 });
+
+// PR 5. A path written against the shared root follows it, so moving the working folder moves
+// every path at once instead of one edit per binding.
+describe('paths written against a root', () => {
+  const path = binding({ name: 'PROJECT_PATH', category: 'environment',
+    pathTemplate: '{{ROOT}}\\AdSync', values: { __default__: 'C:\\Temp\\AdSync' } });
+
+  it('resolves against the root it is given', () => {
+    expect(resolveValue(path, null, 'C:\\Work')).toBe('C:\\Work\\AdSync');
+    expect(resolveValue(path, null, 'D:\\Projekt\\')).toBe('D:\\Projekt\\AdSync');
+  });
+
+  it('falls back to the stored value where no root is known', () => {
+    expect(resolveValue(path, null)).toBe('C:\\Temp\\AdSync');
+  });
+
+  it('leaves an ordinary binding alone', () => {
+    expect(resolveValue(binding(), null, 'C:\\Work')).toBe('SuperSecret123!');
+  });
+
+  it('renders the resolved path into the local projection', () => {
+    const out = render('$log = "{{PROJECT_PATH}}\\run.log"', [path],
+      { mode: 'local', language: 'powershell', projectId: 'project', versionId: null, profileId: null, root: 'C:\\Work' });
+    expect(out.text).toBe('$log = "C:\\Work\\AdSync\\run.log"');
+    expect(out.issues).toEqual([]);
+  });
+});

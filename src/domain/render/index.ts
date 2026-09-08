@@ -16,7 +16,13 @@ export interface RenderResult {
    * the rendered text. */
   substitutions: { start: number; end: number; name: string; source: { start: number; end: number } }[];
 }
-export interface RenderOptions { mode: 'local' | 'ai'; language: LanguageId; projectId: string; versionId: string | null; profileId: string | null; maskSecrets?: boolean }
+export interface RenderOptions {
+  mode: 'local' | 'ai'; language: LanguageId; projectId: string; versionId: string | null;
+  profileId: string | null; maskSecrets?: boolean;
+  /** The working folder this machine uses, for bindings written against `{{ROOT}}`. Absent means
+   * the stored value is used, so every caller that does not know the root still renders. */
+  root?: string;
+}
 export const placeholderRegex = () => /\{\{([A-Z][A-Z0-9_]{1,63})\}\}/g;
 
 export function render(template: string, bindings: Binding[], options: RenderOptions): RenderResult {
@@ -33,7 +39,7 @@ export function render(template: string, bindings: Binding[], options: RenderOpt
     output += template.slice(cursor, start);
     const binding = resolveBinding(name, bindings, options.projectId, options.versionId);
     let replacement = match[0];
-    const value = binding ? options.mode === 'ai' ? binding.aiReplacement : resolveValue(binding, options.profileId) : undefined;
+    const value = binding ? options.mode === 'ai' ? binding.aiReplacement : resolveValue(binding, options.profileId, options.root) : undefined;
     if (!binding || value === undefined || value === '') issues.push({ name, start, kind: 'missing', message: 'Binding eller värde saknas.' });
     else {
       used.push(name);

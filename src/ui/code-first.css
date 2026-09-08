@@ -1530,3 +1530,44 @@ dialog:has(.version-view) {
   letter-spacing: 0.08em;
   user-select: all;
 }
+
+/* A binding whose real value has been seen in code coming back from an AI. Amber, like the real
+   copy: a fact to act on, not a failure. */
+.binding-exposed {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--real-border);
+  border-radius: 6px;
+  background: var(--real-surface);
+  color: var(--real);
+  font-size: 0.75rem;
+}
+.binding-exposed small {
+  color: var(--text-muted);
+}
+.binding-exposed .text-button {
+  align-self: flex-start;
+}
+
+/* The offer to write a path against the shared root, and what it resolves to. */
+.root-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--info-border);
+  border-radius: 6px;
+  background: var(--info-surface);
+  color: var(--info-text);
+  font-size: 0.8125rem;
+}
+.root-offer code {
+  font-family: var(--mono);
+}
+.root-offer button {
+  align-self: flex-start;
+}

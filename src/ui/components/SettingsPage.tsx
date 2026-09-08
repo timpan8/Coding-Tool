@@ -79,6 +79,22 @@ export function SettingsPage({
       <small>{t.settings.promptHint}</small>
     </label>}
 
+    <label>{t.paths.root}
+      {/* Written when the field is left, not per keystroke: changing the root rewrites every
+          path binding that follows it, which is not something to do letter by letter. */}
+      <input aria-label={t.paths.root} defaultValue={settings?.globalRootPath ?? ''} placeholder="C:\\Temp"
+        key={settings?.globalRootPath ?? ''} spellCheck={false}
+        onBlur={e => void save({ globalRootPath: e.target.value.trim() }).catch(() => {})} />
+      <small>{t.paths.rootHint}</small>
+    </label>
+
+    <label className="check">
+      <input type="checkbox" checked={settings?.localSentinel !== false}
+        onChange={e => void save({ localSentinel: e.target.checked }).catch(() => {})} />
+      {t.settings.sentinel}
+    </label>
+    <p className="notice">{t.settings.sentinelHint}</p>
+
     <label>{t.settings.clearClipboard}
       <select aria-label={t.settings.clearClipboard} value={settings?.clipboardAutoClearSeconds ?? 0}
         onChange={e => void save({ clipboardAutoClearSeconds: Number(e.target.value) }).catch(() => {})}>

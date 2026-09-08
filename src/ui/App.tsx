@@ -4,12 +4,13 @@ import { languages } from '../types/models';
 import type { StorageProvider, VaultStatus } from '../storage/StorageProvider';
 import type { VaultSecret } from '../storage/crypto';
 import { Unlock } from './pages/Unlock';
-import { resolveBinding, resolveValue, suggestBinding, suggestNameForRule, freeName, defaults, BindingRefusal } from '../domain/bindings';
+import { resolveBinding, resolveValue, suggestBinding, suggestNameForRule, freeName, defaults, underRoot, BindingRefusal } from '../domain/bindings';
 import { takenAiValues, uniqueExample } from '../domain/bindings/examples';
 import { expandToLiteral } from '../domain/bindings/literal';
+import { trimToDirectory } from '../domain/bindings/paths';
 import { applyBlocklist } from '../domain/blocklist';
 import { render, usage } from '../domain/render';
-import { auditForCopy, auditSelection, promptBlock, type CopyAudit } from '../domain/render/audit';
+import { auditForCopy, auditSelection, promptBlock, sentinelLine, type CopyAudit } from '../domain/render/audit';
 import { buildValueIndex } from '../domain/render/leak';
 import { diffTemplates, formatStats } from '../domain/diff';
 import { WorkspaceController } from './WorkspaceController';
@@ -274,7 +275,10 @@ export function App({ storage }: { storage: StorageProvider }) {
   }, []);
 
   const resolvedTheme = resolveTheme(theme, systemDark);
-  const options = { language, projectId: project?.id ?? '', versionId: session.baseVersionId, profileId: settings?.activeProfileId ?? null };
+  /** The working folder this machine uses. A project may override the global one, which is what
+   * makes two projects on the same machine able to live in different trees. */
+  const root = project?.paths.rootOverride || settings?.globalRootPath || '';
+  const options = { language, projectId: project?.id ?? '', versionId: session.baseVersionId, profileId: settings?.activeProfileId ?? null, root };
   // Every derived value below used to be recomputed on each keystroke, twice over the whole
   // template. The value index is the expensive part and only changes when the bindings do.
   const valueIndex = useMemo(() => buildValueIndex(bindings), [bindings]);
@@ -364,6 +368,33 @@ export function App({ storage }: { storage: StorageProvider }) {
       } });
     });
   }
+  /** The line that makes this project's folders, for pasting into a shell. It carries the real
+   * root, so it goes out through the same clipboard path as Copy Local, banner and all. */
+  async function copyNewItem() {
+    if (!project) return;
+    const folders = (project.paths.subfolders.length ? project.paths.subfolders : settings?.defaultSubfolders ?? [])
+      .map(folder => `'${root}\\${project.slug}\\${folder}'`);
+    const line = `New-Item -ItemType Directory -Force -Path ${folders.length ? folders.join(', ') : `'${root}\\${project.slug}'`}`;
+    await writeClipboard(line, 'local', t.paths.newItemCopied);
+  }
+  /** Records that a binding's real value was seen in code coming back from an AI. A fact, stored
+   * as a date; the panel shows it until the value is changed, which is what rotating it means. */
+  async function markExposed(names: string[]) {
+    const when = new Date().toISOString();
+    for (const name of names) {
+      const binding = bindings.find(b => b.name === name);
+      if (binding) await storage.saveBinding({ ...binding, exposedAt: when, updatedAt: when });
+    }
+    setBindings(await storage.listBindings());
+  }
+  /** "Rotated" is the user's word for "I have changed it elsewhere": the flag goes, the old value
+   * stays watched. The app cannot verify the claim and does not pretend to. */
+  async function markRotated(binding: Binding) {
+    const when = new Date().toISOString();
+    await storage.saveBinding({ ...binding, exposedAt: undefined, updatedAt: when });
+    setBindings(await storage.listBindings());
+    setNotice(t.exposure.rotated(binding.name));
+  }
   async function saveVersion(label: string) {
     setLabelling(false);
     await run(() => controller.saveVersion(label.trim() || autoLabel));
@@ -409,9 +440,12 @@ export function App({ storage }: { storage: StorageProvider }) {
       // The same rule the dialog applies: a rule that caught half a literal must not leave the
       // other half in the template. Widened only within one literal, never across another chosen
       // finding or over a placeholder, and never for a finding that already covers the literal.
+      // A file path is bound as its directory: the folder is what belongs to this machine, the
+      // file name is what the code talks about, and an AI that renames the file should be able to.
       const spans = chosen.map(finding => {
         const w = expandToLiteral(before, finding.start, finding.end, current.session.language);
-        return { finding, start: w.widened && !w.text.includes('{{') ? w.start : finding.start, end: w.widened && !w.text.includes('{{') ? w.end : finding.end };
+        const wide = w.widened && !w.text.includes('{{');
+        return { finding, ...trimToDirectory(before, wide ? w.start : finding.start, wide ? w.end : finding.end) };
       });
       for (const span of spans) {
         if (spans.some(other => other !== span && other.start < span.end && span.start < other.end)) { span.start = span.finding.start; span.end = span.finding.end; }
@@ -712,7 +746,13 @@ export function App({ storage }: { storage: StorageProvider }) {
       await controller.reloadTemplates();
       if (occurrences) setNotice(t.binding.renamed(previous.name, binding.name, occurrences));
     }
-    await storage.saveBinding({ ...binding, updatedAt: new Date().toISOString() }); setBindings(await storage.listBindings());
+    // A value that has been replaced is not gone: code written while it was current still carries
+    // it, so it moves to `retired` and the leak check keeps watching it. Changing the value is
+    // also what clears an exposure flag — that is what "rotated" means.
+    const replaced = previous ? Object.values(previous.values).filter(v => v && !Object.values(binding.values).includes(v)) : [];
+    const retired = [...new Set([...(binding.retired ?? []), ...replaced])];
+    const exposedAt = replaced.length ? undefined : binding.exposedAt;
+    await storage.saveBinding({ ...binding, retired, exposedAt, updatedAt: new Date().toISOString() }); setBindings(await storage.listBindings());
     if (selection) {
       const token = `{{${binding.name}}}`;
       const text = all ? source.split(/(\{\{[A-Z][A-Z0-9_]*\}\})/g).map((part, index) => index % 2 ? part : part.split(selection.text).join(token)).join('')
@@ -760,7 +800,18 @@ export function App({ storage }: { storage: StorageProvider }) {
   /** Returns the write so a caller that wants to say "saved" can wait for it to be true. */
   async function changeEditor(patch: Partial<Settings>) {
     if (!settings) return;
-    try { await storage.saveSettings({ ...settings, ...patch }); await controller.reloadSettings(); }
+    try {
+      await storage.saveSettings({ ...settings, ...patch }); await controller.reloadSettings();
+      // A new root moves every path written against it. The stored value is the fallback for a
+      // context that does not know the root, so it is rewritten here rather than left stale.
+      if (patch.globalRootPath !== undefined && patch.globalRootPath !== settings.globalRootPath) {
+        const following = bindings.filter(b => b.pathTemplate);
+        for (const binding of following) {
+          await storage.saveBinding({ ...binding, values: { ...binding.values, __default__: underRoot(binding.pathTemplate!, patch.globalRootPath) }, updatedAt: new Date().toISOString() });
+        }
+        if (following.length) { setBindings(await storage.listBindings()); setNotice(t.paths.rootMoved(following.length)); }
+      }
+    }
     catch { warn(t.refusal.settingNotSaved); throw new Error('save failed'); }
   }
   /** Only the AI copy gets the instruction block, and only when something was actually substituted:
@@ -768,7 +819,14 @@ export function App({ storage }: { storage: StorageProvider }) {
    * that has none states something untrue in the copied artifact. The local copy goes into an
    * editor and gets nothing. */
   function withPrompt(text: string, which: 'local' | 'ai', replaced: number) {
-    if (which !== 'ai' || !replaced || !settings?.includeAiPromptBlock || !settings.aiPromptText.trim()) return text;
+    // The local copy gets the sentinel line instead: it says what the file holds, and it is what
+    // lets the ingest dialog notice a file coming back from the editor rather than from an AI.
+    if (which === 'local') {
+      if (settings && settings.localSentinel === false) return text;
+      const line = sentinelLine(language);
+      return line ? `${line}\n${text}` : text;
+    }
+    if (!replaced || !settings?.includeAiPromptBlock || !settings.aiPromptText.trim()) return text;
     const block = promptBlock(settings.aiPromptText, language);
     return block ? `${block}\n\n${text}` : text;
   }
@@ -924,7 +982,7 @@ export function App({ storage }: { storage: StorageProvider }) {
       <div className="workspace" hidden={!workspaceVisible} inert={busy}><section className="project-heading"><div className="project-identity"><span className="eyebrow">{project ? 'LOKALT ARBETSUTKAST' : t.app.startNow}</span>
         {project ? <ProjectName key={session.key} name={session.name} change={name => controller.rename(name)} /> : <h1>Klistra in din kod</h1>}
         <div className="file-info"><label>{t.workspace.language} <select aria-label={t.workspace.language} value={language} onChange={e => { languageChosen.current.add(session.activeFileId); controller.changeLanguage(e.target.value as LanguageId); }}>{languages.map(l => <option key={l}>{l}</option>)}</select></label><span>{project ? t.workspace.files(session.files.length) : t.workspace.newProjectHint}{session.baseVersionId && t.workspace.basedOn(String(versions.find(v => v.id === session.baseVersionId)?.number ?? '?'))}</span></div>
-      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>{t.workspace.backToCurrent}</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}<button disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
+      </div><div className="heading-actions">{!project && currentId && <button onClick={() => void navigate(`#/project/${currentId}`)}>{t.workspace.backToCurrent}</button>}{project && <button className="text-button" disabled={busy} onClick={() => setDetails(true)}>Om projektet</button>}{project && <button className="text-button danger-text" disabled={busy} onClick={() => void removeProject(project.id, session.name)}>Radera projekt</button>}{project && root && <button className="text-button" disabled={busy} onClick={() => void copyNewItem()}>{t.paths.copyNewItem}</button>}<button disabled={busy || !template.trim()} onClick={() => setLabelling(true)}>Spara version</button></div></section>
         <div className="work-grid" onDragOver={e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDropping(true); } }}
           onDragLeave={e => { if (e.currentTarget === e.target) setDropping(false); }}
           onDrop={e => { e.preventDefault(); setDropping(false); void openFiles(e.dataTransfer.files); }}>
@@ -977,6 +1035,7 @@ export function App({ storage }: { storage: StorageProvider }) {
               onFocus={b => { setMode('template'); setFocusName(b.name); }}
               onEdit={b => setBindingDialog({ binding: b })}
               onDelete={b => void removeBinding(b)}
+              onRotated={b => void markRotated(b)}
               onCreate={() => void newBinding()} />
           </details>
           <FindingsPanel findings={findings} template={template} pasteRange={pasteRange}
@@ -1025,7 +1084,7 @@ export function App({ storage }: { storage: StorageProvider }) {
         controller.changeText(template.slice(0, s.start) + `{{${bindingDialog.reuse!}}}` + template.slice(s.end));
         changeMode('template'); setFocusName(bindingDialog.reuse!);
       } } : undefined}
-      save={storeBinding} close={() => setBindingDialog(null)} />}
+      root={root || undefined} save={storeBinding} close={() => setBindingDialog(null)} />}
     {copyMode && <CopyDialog mode={copyMode} coverage={cover} issues={ai.issues.length} replaced={ai.used.length}
       findings={copyFindings} seriousFindings={seriousFindings} reviewed={reviewed} onReviewed={setReviewed}
       profile={profiles.find(p => p.id === options.profileId)?.name}
@@ -1049,10 +1108,11 @@ export function App({ storage }: { storage: StorageProvider }) {
       <table className="shortcut-table"><tbody>{editorShortcuts.map(s => <tr key={s.label}><th scope="row">{s.label}</th><td>{s.keys.map(k => <kbd key={k}>{k}</kbd>)}{s.note && <small>{s.note}</small>}</td></tr>)}</tbody></table>
       <div className="dialog-actions"><button className="primary" onClick={() => setShowShortcuts(false)}>{t.dialog.close}</button></div>
     </Modal>}
-    {ingesting && <IngestDialog bindings={bindings} template={template} close={() => setIngesting(false)} apply={next => {
-      controller.changeText(next); setIngesting(false); changeMode('template');
-      setNotice(t.version.templateReplaced);
-    }} />}
+    {ingesting && <IngestDialog bindings={bindings} template={template} close={() => setIngesting(false)}
+      onExposed={names => void markExposed(names)} apply={next => {
+        controller.changeText(next); setIngesting(false); changeMode('template');
+        setNotice(t.version.templateReplaced);
+      }} />}
     {managingProfiles && <ProfileManager profiles={profiles} close={() => setManagingProfiles(false)}
       onCreate={async name => { const time = new Date().toISOString();
         await storage.saveProfile({ id: crypto.randomUUID(), name, description: '', createdAt: time, updatedAt: time });

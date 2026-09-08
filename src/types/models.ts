@@ -29,6 +29,17 @@ export interface Binding {
   id: string; name: string; category: Category; scope: 'global' | 'project' | 'version'; scopeRef: string | null;
   description: string; aiReplacement: string; values: Record<string, string>; escapeMode: 'auto' | 'raw';
   matchHints: { lastVariableNames: string[]; previousAiValues: string[]; aliases: string[] };
+  /** A path written against the shared root, e.g. `{{ROOT}}\\AdSync`. When set, and when the
+   * renderer knows the root, it decides the value: changing the root moves every path at once.
+   * The stored value is kept in step so a context without a root still resolves. */
+  pathTemplate?: string;
+  /** Values this binding used to have. A rotated password is still the password that was on the
+   * account last week, and code written then still carries it, so the leak check keeps watching
+   * them for good. Absent on records written before this existed. */
+  retired?: string[];
+  /** When a real value of this binding was last found in code coming back from an AI. A fact
+   * about what happened, not a judgement: the panel shows it until the value is rotated. */
+  exposedAt?: Iso;
   createdAt: Iso; updatedAt: Iso; deviceId: string;
 }
 export interface Profile { id: string; name: string; description: string; isActive?: boolean; createdAt: Iso; updatedAt: Iso }
@@ -60,6 +71,9 @@ export interface Settings {
   activeProfileId: string | null; roundTripMarkers: boolean; includeAiPromptBlock: boolean; aiPromptText: string;
   clipboardAutoClearSeconds: number; maskSecretsInUi: boolean; theme: 'system' | 'light' | 'dark';
   editorFontSize: number; editorWordWrap: boolean; introSeen: boolean;
+  /** Whether Copy Local starts with the line that says the text carries real values. On by
+   * default; absent means on, so a vault written before this existed gets it. */
+  localSentinel?: boolean;
   /** Minutes of inactivity before an encrypted vault locks itself; 0 or absent means never. Kept
    * in plaintext with the other lock-screen settings, since it has to be read to arm the timer. */
   autoLockMinutes?: number;

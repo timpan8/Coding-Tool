@@ -15,6 +15,7 @@ export function BindingPanel({
   onDelete,
   onCreate,
   canCreate,
+  onRotated,
 }: {
   rows: BindingRow[];
   onFocus: (binding: Binding) => void;
@@ -22,6 +23,9 @@ export function BindingPanel({
   onDelete: (binding: Binding) => void;
   onCreate: () => void;
   canCreate: boolean;
+  /** Clears the exposure flag. The user's claim that they have changed the value elsewhere; the
+   * app cannot check it and says so rather than implying otherwise. */
+  onRotated?: (binding: Binding) => void;
 }) {
   const orphans = rows.filter((r) => r.occurrences === 0).length;
   return (
@@ -61,6 +65,17 @@ export function BindingPanel({
             )}
           </div>
           <div className="binding-example">AI: {binding.aiReplacement}</div>
+          {binding.exposedAt && (
+            <div className="binding-exposed" role="status">
+              <strong>{t.exposure.flag(binding.exposedAt.slice(0, 10))}</strong>
+              <small>{t.exposure.explain}</small>
+              {onRotated && (
+                <button className="text-button" aria-label={`${t.exposure.rotate} ${binding.name}`} title={t.exposure.rotateHint} onClick={() => onRotated(binding)}>
+                  {t.exposure.rotate}
+                </button>
+              )}
+            </div>
+          )}
           <div className="binding-actions">
             <small className={occurrences === 0 ? 'danger-text' : ''}>
               {t.bindingPanel.occurrences(occurrences)}

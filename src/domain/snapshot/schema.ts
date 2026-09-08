@@ -72,6 +72,9 @@ export const bindingSchema = z.object({
     previousAiValues: z.array(z.string()),
     aliases: z.array(z.string()),
   }),
+  pathTemplate: z.string().optional(),
+  retired: z.array(z.string()).optional(),
+  exposedAt: iso.optional(),
   createdAt: iso,
   updatedAt: iso,
   deviceId: z.string(),
@@ -120,6 +123,7 @@ export const settingsSchema = z.object({
   editorWordWrap: z.boolean().default(true),
   introSeen: z.boolean().default(true),
   autoLockMinutes: z.number().int().nonnegative().optional(),
+  localSentinel: z.boolean().optional(),
   lastExportAt: iso.optional(),
 });
 
