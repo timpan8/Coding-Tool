@@ -49,3 +49,29 @@ jobs:
       - run: npm run check-deps
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+
+  # The site used to be published by a maintainer running scripts/publish-pages.mjs by hand. That
+  # is one forgotten step away from a stale site, and one deleted branch away from a 404 nobody is
+  # told about — which is exactly what happened. Publishing now follows a green verify of main.
+  #
+  # Only `verify` gates it: `codevault` builds a second app that is never part of what is served,
+  # so a failure there must not keep a working site from being updated.
+  publish:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Rebuilt rather than carried over as an artifact, so what is published is produced by the
+      # same command the audit runs against, from this commit and nothing else.
+      - run: pnpm build
+      # Pushes only dist/, as an orphan commit when gh-pages is missing (invariant 10).
+      - run: node scripts/publish-pages.mjs

@@ -16,7 +16,7 @@ Arton språk har var sitt escaping-regelverk. Kontexter som inte kan hanteras s�
 
 Valvet går att exportera i två former och återställa, appen begär beständig lagring så att webbläsaren inte vräker det, urklippet kan rensas automatiskt efter Copy Local, och kopieringsdialogen redovisar hur stor andel av kodens strängvärden som faktiskt är skyddade. Ljust och mörkt tema, introduktion vid första besöket, ångra-remsa efter radering och en textarea i stället för Monaco på smal skärm.
 
-**Inte levererat ännu:** datasets, sökvägsregler (`ProjectPathConfig` skrivs men läses aldrig) och diskintegration.
+**Inte levererat ännu:** datasets och diskintegration.
 
 ## Start
 
@@ -49,6 +49,8 @@ Endast byggda statiska appfiler publiceras. Inga serverfunktioner, CDN, externa 
 - `VITE_BASE` styr Vites basväg, standard `./`. Hash-routing fungerar under repo-sökvägen utan serveromskrivningar.
 - `pnpm build` skapar `dist/`, genererar en service worker med precache av app-shellet och kör nätverkskontrollen. En uppdatering aktiveras först via notisen i appen.
 - Byggd appversion/commit visas i sidfoten.
+- Publiceringen sker automatiskt: `publish`-jobbet i CI kör efter en grön `verify` på `main` och lägger `dist/` på `gh-pages`.
+  `node scripts/publish-pages.mjs` finns kvar för att publicera för hand, efter `pnpm build`.
 - Publicera bara `dist/` till `gh-pages`. Inkludera `.nojekyll`. Lägg aldrig backupfiler eller användardata i repot.
 
 ## Hotmodell och begränsningar
