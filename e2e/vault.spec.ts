@@ -1675,3 +1675,33 @@ test('writes a path against the root and binds only the folder', async ({ page }
   // injected badge, which sits between the value and the rest of the line on screen.
   await expect(async () => expect(await modelText(page)).toContain('D:\\Projekt\\AdSync\\run.log')).toPass({ timeout: 5000 });
 });
+
+// The offline shell used to answer Response.error() when an asset was missing from the cache, so
+// an eviction — which the browser does on its own under storage pressure — left the app dead in a
+// way no reload could fix: the worker kept answering, and only unregistering it by hand helped.
+test('still loads when the offline shell has fallen out of the cache', async ({ page }) => {
+  // The worker has to be in charge before emptying its cache means anything.
+  await page.waitForFunction(() => navigator.serviceWorker?.controller !== null, null, { timeout: 20_000 });
+
+  const emptied = await page.evaluate(async () => {
+    let removed = 0;
+    for (const key of await caches.keys()) {
+      const cache = await caches.open(key);
+      for (const request of await cache.keys()) if (await cache.delete(request)) removed++;
+    }
+    return removed;
+  });
+  expect(emptied).toBeGreaterThan(0);
+
+  await page.reload();
+  await expect(page.locator('.code-editor')).toBeVisible();
+  // And the shell is cached again, so the next load is offline-capable as before.
+  await expect(async () => {
+    const cached = await page.evaluate(async () => {
+      let n = 0;
+      for (const key of await caches.keys()) n += (await (await caches.open(key)).keys()).length;
+      return n;
+    });
+    expect(cached).toBeGreaterThan(0);
+  }).toPass({ timeout: 10_000 });
+});
