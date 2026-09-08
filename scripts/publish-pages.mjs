@@ -10,7 +10,10 @@ function run(command, args, options = {}) {
 }
 const root = resolve('.');
 const remote = run('git', ['remote', 'get-url', 'origin']);
-if (remote !== 'https://github.com/timpan8/Coding-Tool.git') throw new Error('Unexpected publication repository.');
+// Pinned to the one repository this may publish to. The `.git` suffix is optional because
+// `actions/checkout` and a hand-cloned working copy spell the same remote differently, and a
+// guard that refuses the right repository over a suffix just gets worked around.
+if (remote.replace(/\.git$/, '') !== 'https://github.com/timpan8/Coding-Tool') throw new Error('Unexpected publication repository.');
 if (!existsSync('dist/sw.js') || !readFileSync('dist/index.html', 'utf8').includes("connect-src 'none'")) throw new Error('Build the production app first.');
 run(process.execPath, ['scripts/check-network.mjs']);
 const sourceCommit = run('git', ['rev-parse', 'HEAD']);
