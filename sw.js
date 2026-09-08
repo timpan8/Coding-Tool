@@ -1,6 +1,6 @@
 const PREFIX = 'acv-shell:' + self.registration.scope + ':';
-const CACHE = PREFIX + '2038405362720e0d';
-const ASSETS = ["./assets/CodeEditor-C9THN3Ns.css","./assets/CodeEditor-ePYhRxpP.js","./assets/DiffEditor-ByncMy6t.js","./assets/codicon-Brq4_Ui5.ttf","./assets/editor-jjEx9u7D.css","./assets/editor.api-BIttNAso.js","./assets/editor.worker-DKXjC3Lf.js","./assets/index-BaNPicZY.js","./assets/index-Bx-MDGD1.css","./icon.svg","./index.html","./manifest.webmanifest"].map(p => new URL(p, self.registration.scope).href);
+const CACHE = PREFIX + '1381672f3d14cae5';
+const ASSETS = ["./assets/CodeEditor-BPZ7W_Hb.js","./assets/CodeEditor-C9THN3Ns.css","./assets/DiffEditor-D9k0Cwgh.js","./assets/codicon-Brq4_Ui5.ttf","./assets/editor-jjEx9u7D.css","./assets/editor.api-DnYL59Z3.js","./assets/editor.worker-DKXjC3Lf.js","./assets/index-Bx-MDGD1.css","./assets/index-gdwqBGLp.js","./icon.svg","./index.html","./manifest.webmanifest"].map(p => new URL(p, self.registration.scope).href);
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))); });
 self.addEventListener('activate', event => { event.waitUntil((async () => {
   for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== CACHE) await caches.delete(key);
